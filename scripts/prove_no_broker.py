@@ -1,124 +1,126 @@
 #!/usr/bin/env python3
-"""Executable negative-capability inventory for the frozen paper-trading candidate."""
+"""Fail-closed .NET negative-capability inventory for paper trading."""
 
 from __future__ import annotations
 
-import ast
 import json
 import pathlib
 import re
 import sys
+import xml.etree.ElementTree as ET
+from urllib.parse import urlparse
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "ai_stocks"
-FORBIDDEN_IMPORTS = {
-    "alpaca_trade_api",
-    "alpaca",
-    "ib_insync",
+SOURCE = ROOT / "src"
+
+FORBIDDEN_PACKAGES = {
+    "alpaca.markets",
+    "alpaca.markets.extensions",
     "ibapi",
-    "ccxt",
-    "robin_stocks",
-    "tinkoff",
+    "interactivebrokers.client",
+    "robinhood.net",
+    "tinkoff.investapi",
+    "ccxt.net",
 }
-FORBIDDEN_TERMS = re.compile(
-    r"(?:alpaca|interactive.?brokers|ibkr|nordnet|avanza|broker(?:age)?[_-]?(?:api|key|secret)|place.?order)",
+FORBIDDEN_HOSTS = {
+    "api.alpaca.markets",
+    "api.ibkr.com",
+    "api.nordnet.se",
+    "api.avanza.se",
+    "api.robinhood.com",
+}
+FORBIDDEN_CREDENTIAL = re.compile(
+    r"(?:broker|alpaca|ibkr|interactive_?brokers|nordnet|avanza).*(?:api_?key|secret|token|password)",
     re.IGNORECASE,
 )
-ALLOWED_SUBPROCESS_FILES = {"runner.py", "delivery.py"}
+URL = re.compile(r'https?://[^\s"\'<>]+', re.IGNORECASE)
+ENVIRONMENT = re.compile(
+    r'Environment\.GetEnvironmentVariable\(\s*"([A-Za-z0-9_]+)"',
+)
+ROUTE = re.compile(
+    r'\.Map(?P<method>Get|Post|Put|Patch|Delete)\s*\(\s*"(?P<path>/[^"?]*)"',
+)
+PROCESS = re.compile(r"\bProcessStartInfo\b|\bProcess\.Start\s*\(")
+ALLOWED_PROCESS_PROJECTS = {"AiStocks.Research", "AiStocks.Operations"}
+ALLOWED_MUTATIONS = {
+    "/owner/contest/start",
+    "/owner/contest/pause",
+    "/owner/contest/resume",
+    "/owner/contest/reset",
+}
 
 
-def dotted_name(node: ast.AST) -> str:
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        prefix = dotted_name(node.value)
-        return f"{prefix}.{node.attr}" if prefix else node.attr
-    return ""
+def relative(path: pathlib.Path) -> str:
+    return path.relative_to(ROOT).as_posix()
 
 
-def inventory() -> dict:
-    imports: set[str] = set()
-    urls: list[dict] = []
-    environment: list[dict] = []
-    subprocesses: list[dict] = []
-    routes: list[dict] = []
+def inventory() -> dict[str, object]:
     findings: list[str] = []
+    packages: list[dict[str, str]] = []
+    urls: list[dict[str, object]] = []
+    environment: list[dict[str, object]] = []
+    processes: list[dict[str, object]] = []
+    routes: list[dict[str, object]] = []
 
-    for path in sorted(SOURCE.glob("*.py")):
-        relative = str(path.relative_to(ROOT))
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                imports.update(alias.name for alias in node.names)
-            elif isinstance(node, ast.ImportFrom) and node.module:
-                imports.add(node.module)
-            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-                if re.search(r"https?://", node.value):
-                    urls.append({"file": relative, "line": node.lineno, "value": node.value[:500]})
-                if FORBIDDEN_TERMS.search(node.value):
-                    findings.append(f"forbidden executable string at {relative}:{node.lineno}")
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                for decorator in node.decorator_list:
-                    if (
-                        isinstance(decorator, ast.Call)
-                        and isinstance(decorator.func, ast.Attribute)
-                        and isinstance(decorator.func.value, ast.Name)
-                        and decorator.func.value.id == "app"
-                        and decorator.func.attr in {"get", "post", "put", "patch", "delete"}
-                        and decorator.args
-                        and isinstance(decorator.args[0], ast.Constant)
-                    ):
-                        routes.append(
-                            {
-                                "method": decorator.func.attr.upper(),
-                                "path": decorator.args[0].value,
-                            }
-                        )
-            elif isinstance(node, ast.Call):
-                name = dotted_name(node.func)
-                if name in {"os.getenv", "os.environ.get"} and node.args:
-                    value = node.args[0]
-                    if isinstance(value, ast.Constant) and isinstance(value.value, str):
-                        environment.append(
-                            {"file": relative, "line": node.lineno, "name": value.value}
-                        )
-                        if FORBIDDEN_TERMS.search(value.value):
-                            findings.append(
-                                f"forbidden environment read at {relative}:{node.lineno}"
-                            )
-                if name.startswith("subprocess.") or name == "os.system":
-                    subprocesses.append({"file": relative, "line": node.lineno, "call": name})
-                    if path.name not in ALLOWED_SUBPROCESS_FILES or name == "os.system":
-                        findings.append(
-                            f"unexpected process capability at {relative}:{node.lineno}"
-                        )
+    for project in sorted(SOURCE.glob("*/**/*.csproj")):
+        try:
+            root = ET.parse(project).getroot()
+        except ET.ParseError as error:
+            findings.append(f"invalid project XML: {relative(project)}: {error}")
+            continue
+        for package in root.findall(".//PackageReference"):
+            name = (package.get("Include") or package.get("Update") or "").strip()
+            if not name:
+                continue
+            entry = {"file": relative(project), "name": name}
+            packages.append(entry)
+            if name.casefold() in FORBIDDEN_PACKAGES:
+                findings.append(f"forbidden broker package: {name} in {relative(project)}")
 
-    forbidden_imports = sorted(
-        item for item in imports if item.split(".", 1)[0] in FORBIDDEN_IMPORTS
-    )
-    findings.extend(f"forbidden import: {item}" for item in forbidden_imports)
+    for path in sorted(SOURCE.glob("*/**/*.cs")):
+        if any(part in {"bin", "obj"} for part in path.parts):
+            continue
+        text = path.read_text(encoding="utf-8")
+        rel = relative(path)
+        project = path.relative_to(SOURCE).parts[0]
 
-    lock = (ROOT / "uv.lock").read_text(encoding="utf-8")
-    package_names = set(re.findall(r'^name = "([^"]+)"$', lock, flags=re.MULTILINE))
-    forbidden_packages = sorted(package_names & FORBIDDEN_IMPORTS)
-    findings.extend(f"forbidden locked package: {item}" for item in forbidden_packages)
+        for match in URL.finditer(text):
+            value = match.group(0).rstrip(".,);]")
+            host = (urlparse(value).hostname or "").casefold()
+            line = text.count("\n", 0, match.start()) + 1
+            urls.append({"file": rel, "line": line, "value": value})
+            if host in FORBIDDEN_HOSTS or any(host.endswith("." + item) for item in FORBIDDEN_HOSTS):
+                findings.append(f"forbidden broker host at {rel}:{line}: {host}")
 
-    mutation_routes = sorted(
-        route["path"]
-        for route in routes
-        if route["method"] != "GET" and not str(route["path"]).startswith("/admin/")
-    )
-    findings.extend(f"unapproved HTTP mutation route: {path}" for path in mutation_routes)
+        for match in ENVIRONMENT.finditer(text):
+            name = match.group(1)
+            line = text.count("\n", 0, match.start()) + 1
+            environment.append({"file": rel, "line": line, "name": name})
+            if FORBIDDEN_CREDENTIAL.search(name):
+                findings.append(f"forbidden broker credential read at {rel}:{line}: {name}")
+
+        for match in PROCESS.finditer(text):
+            line = text.count("\n", 0, match.start()) + 1
+            processes.append({"file": rel, "line": line})
+            if project not in ALLOWED_PROCESS_PROJECTS:
+                findings.append(f"unexpected process capability at {rel}:{line}")
+
+        for match in ROUTE.finditer(text):
+            method = match.group("method").upper()
+            route_path = match.group("path")
+            line = text.count("\n", 0, match.start()) + 1
+            routes.append({"file": rel, "line": line, "method": method, "path": route_path})
+            if method != "GET" and route_path not in ALLOWED_MUTATIONS:
+                findings.append(f"unapproved HTTP mutation route at {rel}:{line}: {method} {route_path}")
 
     return {
         "ok": not findings,
-        "findings": findings,
-        "imports": sorted(imports),
-        "locked_packages": sorted(package_names),
-        "url_constants": urls,
-        "environment_reads": environment,
-        "subprocess_calls": subprocesses,
-        "routes": sorted(routes, key=lambda route: (str(route["path"]), route["method"])),
+        "findings": sorted(findings),
+        "packages": sorted(packages, key=lambda item: (item["name"], item["file"])),
+        "url_constants": sorted(urls, key=lambda item: (str(item["file"]), str(item["line"]))),
+        "environment_reads": sorted(environment, key=lambda item: (str(item["file"]), str(item["line"]))),
+        "process_calls": sorted(processes, key=lambda item: (str(item["file"]), str(item["line"]))),
+        "routes": sorted(routes, key=lambda item: (str(item["path"]), str(item["method"]))),
     }
 
 
