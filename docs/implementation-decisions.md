@@ -16,10 +16,10 @@ This document resolves implementation details that they left open.
 
 ## Free authoritative source stack
 
-- Universe: ESMA FIRDS full and delta instrument-reference files. Include active XSTO equity instruments whose CFI identifies common shares; retain effective-dated versions and checksums.
-- Execution: Nasdaq Nordic MiFID II delayed post-trade reports already approved by the market-data contract.
+- Universe: [ESMA FIRDS full and delta instrument-reference files](https://registers.esma.europa.eu/publication/searchRegister?core=esma_registers_firds_files). Include active XSTO equity instruments whose CFI identifies common shares; retain effective-dated versions and checksums.
+- Execution: [Nasdaq Nordic MiFID II delayed post-trade reports](https://tradereports.nasdaq.com/shares/trade-reports/post-trade) already approved by the market-data contract.
 - Official closing price: the XSTO closing-auction price represented by authoritative `PATS` post-trade rows. If no unambiguous closing-auction price exists, finalization fails closed pending an audited correction; it never substitutes a website quote.
-- Warning, observation, suspension, and resumption events: Nasdaq Europe Main Markets Notices RSS. State is append-only and must be seeded by a reviewed signed snapshot before launch. Unknown state is ineligible.
+- Warning, observation, suspension, and resumption events: [Nasdaq Europe Main Markets Notices RSS](https://api.news.eu.nasdaq.com/news/rss/mainMarketNotices). State is append-only and must be seeded by a reviewed signed snapshot before launch. Unknown state is ineligible.
 - Corporate actions: Nasdaq official notices plus the already-required second source or audited owner normalization.
 
-Nasdaq's public website screener API is not a production dependency. Its legal terms prohibit automated or manual capture without prior written permission. The implementation may use only sources whose publication mechanism permits the intended automated use.
+Nasdaq's public website screener API is not a production dependency. [Nasdaq's legal terms](https://www.nasdaq.com/legal) prohibit automated or manual capture without prior written permission. The implementation may use only sources whose publication mechanism permits the intended automated use.
