@@ -12,10 +12,7 @@ x-runtime-security: &runtime-security
 services:
   app:
     <<: *runtime-security
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: app
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:app-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       APP_ENV: production
       DATABASE_URL: ${WEB_DATABASE_URL:?set the read-only web PostgreSQL URL}
@@ -40,10 +37,7 @@ services:
 
   collector:
     <<: *runtime-security
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: collector
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:collector-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       APP_ENV: production
       COLLECTOR_DATABASE_URL: ${COLLECTOR_DATABASE_URL:?set the least-privilege collector PostgreSQL URL}
@@ -70,10 +64,7 @@ services:
 
   worker:
     <<: *runtime-security
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: worker
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:worker-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       APP_ENV: production
       DATABASE_URL: ${WORKER_DATABASE_URL:?set the trading worker PostgreSQL URL}
@@ -99,10 +90,7 @@ services:
 
   reporter:
     <<: *runtime-security
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: reporter
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:reporter-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       APP_ENV: production
       DATABASE_URL: ${OPERATIONS_DATABASE_URL:?set the operations PostgreSQL URL}
@@ -120,10 +108,7 @@ services:
   migrate:
     <<: *runtime-security
     profiles: ["operations"]
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: operations
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:operations-${AISTOCKS_IMAGE_VERSION:-latest}
     command: ["migrate"]
     environment:
       APP_ENV: production
@@ -154,10 +139,7 @@ services:
     networks: [egress]
 
   backup-scheduler:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: backup-operations
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:backup-operations-${AISTOCKS_IMAGE_VERSION:-latest}
     profiles: ["operations"]
     environment:
       AISTOCKS_BACKUP_IN_CONTAINER: "1"

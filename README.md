@@ -23,6 +23,27 @@ Do not start the contest until every release gate in
 
 ## Dockge preparation
 
+Pushes to `main` publish six target-specific images to
+`ghcr.io/capttwigg-hermes/ai-stocks`. The Compose stack pulls
+`app-latest`, `collector-latest`, `worker-latest`, `reporter-latest`,
+`operations-latest`, and `backup-operations-latest`; Dockge no longer
+needs a local source checkout or Docker build context. Set
+`AISTOCKS_IMAGE_VERSION` to a full Git commit SHA instead of `latest`
+when an immutable rollback target is required.
+
+The repository and GHCR package are private. Before Dockge pulls the
+stack, authenticate the Docker client used by Dockge with a classic
+GitHub PAT carrying only `read:packages`:
+
+```bash
+printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u CaptTwiggHermes --password-stdin
+unset GHCR_TOKEN
+```
+
+Never place that token in Compose or `.env`. If Dockge itself runs in a
+container, its Docker credential directory—not merely an unrelated host
+shell—must contain the successful login.
+
 This stack requires Docker Compose, OpenSSL, and an existing
 PostgreSQL 18 instance with separate production and test
 roles/databases.

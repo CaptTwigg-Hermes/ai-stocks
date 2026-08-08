@@ -18,9 +18,19 @@ def test_dockge_compose_separates_and_hardens_services():
         assert "no-new-privileges:true" in service["security_opt"]
         assert service["init"] is True
     assert "HERMES_HOME" not in services["app"]["environment"]
-    assert services["app"]["build"]["target"] == "app"
-    assert services["collector"]["build"]["target"] == "collector"
-    assert services["worker"]["build"]["target"] == "worker"
+    repository = "${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}"
+    version = "${AISTOCKS_IMAGE_VERSION:-latest}"
+    targets = {
+        "app": "app",
+        "collector": "collector",
+        "worker": "worker",
+        "reporter": "reporter",
+        "migrate": "operations",
+        "backup-scheduler": "backup-operations",
+    }
+    for name, target in targets.items():
+        assert services[name]["image"] == f"{repository}:{target}-{version}"
+        assert "build" not in services[name]
     assert services["collector"]["volumes"] == [
         "${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq",
         "${MARKET_BOOTSTRAP_DIR:?set the reviewed FIRDS plan directory}:/run/market-bootstrap:ro",
@@ -77,6 +87,17 @@ def test_image_build_pins_hermes_source_and_frozen_lock():
     assert "uv sync --frozen --no-dev --extra cli --extra web" in dockerfile
     assert "COPY --from=hermes-builder" in dockerfile
     assert "/opt/hermes /opt/hermes" in dockerfile
+
+
+def test_github_publishes_every_dockge_image_target():
+    workflow = yaml.safe_load((ROOT / ".github/workflows/publish-images.yml").read_text())
+    assert workflow["permissions"] == {"contents": "read", "packages": "write"}
+    targets = workflow["jobs"]["publish"]["strategy"]["matrix"]["target"]
+    assert targets == ["app", "collector", "worker", "reporter", "operations", "backup-operations"]
+    build = workflow["jobs"]["publish"]["steps"][-1]
+    assert build["with"]["target"] == "${{ matrix.target }}"
+    assert build["with"]["push"] is True
+    assert "ghcr.io/capttwigg-hermes/ai-stocks:${{ matrix.target }}-latest" in build["with"]["tags"]
 
 
 def test_release_gate_and_restore_fail_closed_with_scheduled_backup():

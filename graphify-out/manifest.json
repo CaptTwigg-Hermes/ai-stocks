@@ -95,13 +95,13 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1786217789.1787531,
-    "ast_hash": "f44435ad9eec6cd8bb5b89464e8bafd3",
+    "mtime": 1786220851.810197,
+    "ast_hash": "1e02f5af68ee19a968f6f77dcf82f240",
     "semantic_hash": ""
   },
   "compose.yaml": {
-    "mtime": 1786217758.9221659,
-    "ast_hash": "2de5c63ad7ebf9760a968e9d894f7ed8",
+    "mtime": 1786220809.0613647,
+    "ast_hash": "c7b5470b618e696da30a6eec9d2fe5a7",
     "semantic_hash": ""
   },
   "docs/acceptance-contract.md": {
@@ -285,8 +285,8 @@
     "semantic_hash": ""
   },
   "tests/test_release_artifacts.py": {
-    "mtime": 1786217725.5495183,
-    "ast_hash": "cc5791e4e12f3920ea5d680bc2694520",
+    "mtime": 1786220795.9451091,
+    "ast_hash": "449e78eab9335a1abe1219070cb23ff0",
     "semantic_hash": ""
   },
   "tests/test_worker.py": {
@@ -907,6 +907,11 @@
   "src/AiStocks.Persistence/Migrations/008_trading_authority.sql": {
     "mtime": 1786208011.0780697,
     "ast_hash": "fa13ee789395e6c861e2d21fbfbbbf43",
+    "semantic_hash": ""
+  },
+  ".github/workflows/publish-images.yml": {
+    "mtime": 1786220822.577628,
+    "ast_hash": "555dd802f667d4367af5a60af434a076",
     "semantic_hash": ""
   }
 }
