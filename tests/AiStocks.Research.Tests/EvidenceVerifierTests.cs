@@ -1,0 +1,201 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using AiStocks.Research.Decisions;
+using AiStocks.Research.Evidence;
+
+namespace AiStocks.Research.Tests;
+
+public sealed class EvidenceVerifierTests
+{
+    [Fact]
+    public async Task VerifyAsync_IndependentlyFetchesVisibleClaimPublicationTimeAndHash()
+    {
+        const string html = "<html><head><meta property=\"article:published_time\" content=\"2026-08-08T09:00:00Z\"></head><body><script>Exact catalyst text</script><p>Exact <b>catalyst</b> text</p></body></html>";
+        var transport = new FakeTransport(Response(HttpStatusCode.OK, html));
+        var verifier = new EvidenceVerifier(new FakeDns(IPAddress.Parse("93.184.216.34")), transport, TestOptions());
+        var claim = new EvidenceClaim(new Uri("https://example.com/news"), DateTimeOffset.Parse("2026-08-08T09:00:00Z"), "Exact catalyst text");
+
+        var verified = await verifier.VerifyAsync(claim, CancellationToken.None);
+
+        Assert.Equal("https://example.com/news", verified.FinalUrl.AbsoluteUri);
+        Assert.Equal(claim.PublishedAt, verified.PublishedAt);
+        Assert.Equal(64, verified.ContentSha256.Length);
+        Assert.Equal(claim.ExactExcerpt, verified.ExactExcerpt);
+        Assert.Equal("example.com", transport.Requests.Single().Uri.Host);
+        Assert.Equal(IPAddress.Parse("93.184.216.34"), transport.Requests.Single().Addresses.Single());
+    }
+
+    [Fact]
+    public async Task VerifyAsync_RejectsClaimOnlyPresentInScriptOrMarkup()
+    {
+        const string html = "<html><head><meta property=\"article:published_time\" content=\"2026-08-08T09:00:00Z\"></head><body><script>hidden claim</script><p>Other text</p></body></html>";
+        var verifier = Verifier(Response(HttpStatusCode.OK, html));
+        var claim = Claim("https://example.com", "hidden claim");
+
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() => verifier.VerifyAsync(claim, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task VerifyAsync_RejectsExcerptSpanningSeparateVisibleBlocks()
+    {
+        var html = ValidHtml.Replace("Exact catalyst text", "<p>Exact catalyst</p><p>text</p>");
+        var verifier = Verifier(Response(HttpStatusCode.OK, html));
+
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() =>
+            verifier.VerifyAsync(Claim("https://example.com", "Exact catalyst text"), CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData("https://singlelabel/news")]
+    [InlineData("https://example.com:8443/news")]
+    [InlineData("https://example.com/news#fragment")]
+    public async Task VerifyAsync_RejectsNonPublicUrlForms(string url)
+    {
+        var transport = new FakeTransport(Response(HttpStatusCode.OK, ValidHtml));
+        var verifier = new EvidenceVerifier(new FakeDns(IPAddress.Parse("93.184.216.34")), transport, TestOptions());
+
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() =>
+            verifier.VerifyAsync(Claim(url, "Exact catalyst text"), CancellationToken.None));
+        Assert.Empty(transport.Requests);
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("10.0.0.1")]
+    [InlineData("169.254.169.254")]
+    [InlineData("224.0.0.1")]
+    [InlineData("::1")]
+    [InlineData("fc00::1")]
+    [InlineData("fe80::1")]
+    public async Task VerifyAsync_RejectsNonPublicDnsAnswers(string address)
+    {
+        var transport = new FakeTransport(Response(HttpStatusCode.OK, ValidHtml));
+        var verifier = new EvidenceVerifier(new FakeDns(IPAddress.Parse(address)), transport, TestOptions());
+
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() => verifier.VerifyAsync(Claim("https://research.example", "Exact catalyst text"), CancellationToken.None));
+        Assert.Empty(transport.Requests);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_RejectsIfAnyDnsAnswerIsPrivate()
+    {
+        var verifier = new EvidenceVerifier(
+            new FakeDns(IPAddress.Parse("93.184.216.34"), IPAddress.Loopback),
+            new FakeTransport(Response(HttpStatusCode.OK, ValidHtml)), TestOptions());
+
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() => verifier.VerifyAsync(Claim("https://example.com", "Exact catalyst text"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task VerifyAsync_ValidatesEveryRedirectAndPreservesOriginalTlsHostname()
+    {
+        var transport = new FakeTransport(
+            Response(HttpStatusCode.Redirect, "", new Dictionary<string, string> { ["Location"] = "https://cdn.example.org/item" }),
+            Response(HttpStatusCode.OK, ValidHtml));
+        var dns = new HostDns(new Dictionary<string, IPAddress>
+        {
+            ["example.com"] = IPAddress.Parse("93.184.216.34"),
+            ["cdn.example.org"] = IPAddress.Parse("1.1.1.1")
+        });
+        var verifier = new EvidenceVerifier(dns, transport, TestOptions());
+
+        var result = await verifier.VerifyAsync(Claim("https://example.com/start", "Exact catalyst text"), CancellationToken.None);
+
+        Assert.Equal("cdn.example.org", result.FinalUrl.Host);
+        Assert.Equal(new[] { "example.com", "cdn.example.org" }, transport.Requests.Select(x => x.Uri.Host));
+    }
+
+    [Fact]
+    public async Task VerifyAsync_RejectsHttpsDowngradeTooManyRedirectsAndOversizedBody()
+    {
+        var downgrade = Verifier(Response(HttpStatusCode.Redirect, "", new Dictionary<string, string> { ["Location"] = "http://example.com/item" }));
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() => downgrade.VerifyAsync(Claim("https://example.com", "x"), CancellationToken.None));
+
+        var redirects = new FakeTransport(
+            Response(HttpStatusCode.Redirect, "", new Dictionary<string, string> { ["Location"] = "/1" }),
+            Response(HttpStatusCode.Redirect, "", new Dictionary<string, string> { ["Location"] = "/2" }));
+        var lowRedirectVerifier = new EvidenceVerifier(new FakeDns(IPAddress.Parse("93.184.216.34")), redirects, TestOptions() with { MaximumRedirects = 1 });
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() => lowRedirectVerifier.VerifyAsync(Claim("https://example.com", "x"), CancellationToken.None));
+
+        var oversized = Verifier(Response(HttpStatusCode.OK, new string('x', 101)), TestOptions() with { MaximumResponseBytes = 100 });
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() => oversized.VerifyAsync(Claim("https://example.com", "x"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task VerifyAsync_RejectsMissingOrMismatchedIndependentlyParsedPublicationTime()
+    {
+        var missing = Verifier(Response(HttpStatusCode.OK, "<html><body>Exact catalyst text</body></html>"));
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() => missing.VerifyAsync(Claim("https://example.com", "Exact catalyst text"), CancellationToken.None));
+
+        var mismatchHtml = ValidHtml.Replace("2026-08-08T09:00:00Z", "2026-08-08T08:00:00Z");
+        var mismatch = Verifier(Response(HttpStatusCode.OK, mismatchHtml));
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() => mismatch.VerifyAsync(Claim("https://example.com", "Exact catalyst text"), CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData("image/png", null)]
+    [InlineData("text/html", "gzip")]
+    public async Task VerifyAsync_RejectsNonTextOrEncodedRepresentations(string contentType, string? contentEncoding)
+    {
+        var headers = new Dictionary<string, string> { ["Content-Type"] = contentType };
+        if (contentEncoding is not null) headers["Content-Encoding"] = contentEncoding;
+        var verifier = Verifier(Response(HttpStatusCode.OK, ValidHtml, headers));
+
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() =>
+            verifier.VerifyAsync(Claim("https://example.com", "Exact catalyst text"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task VerifyAsync_EnforcesOverallDeadline()
+    {
+        var transport = new DelayingTransport();
+        var verifier = new EvidenceVerifier(new FakeDns(IPAddress.Parse("93.184.216.34")), transport, TestOptions() with { Deadline = TimeSpan.FromMilliseconds(30) });
+
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() => verifier.VerifyAsync(Claim("https://example.com", "text"), CancellationToken.None));
+    }
+
+    private const string ValidHtml = "<html><head><meta name=\"datePublished\" content=\"2026-08-08T09:00:00Z\"></head><body>Exact catalyst text</body></html>";
+    private static EvidenceClaim Claim(string url, string excerpt) => new(new Uri(url), DateTimeOffset.Parse("2026-08-08T09:00:00Z"), excerpt);
+    private static EvidenceVerifier Verifier(EvidenceHttpResponse response, EvidenceVerificationOptions? options = null) =>
+        new(new FakeDns(IPAddress.Parse("93.184.216.34")), new FakeTransport(response), options ?? TestOptions());
+    private static EvidenceVerificationOptions TestOptions() => new() { Deadline = TimeSpan.FromSeconds(2), MaximumResponseBytes = 10_000, MaximumRedirects = 3 };
+    private static EvidenceHttpResponse Response(HttpStatusCode status, string content, IReadOnlyDictionary<string, string>? headers = null)
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = "text/html; charset=utf-8" };
+        if (headers is not null)
+            foreach (var pair in headers) values[pair.Key] = pair.Value;
+        return new EvidenceHttpResponse(status, values, new MemoryStream(Encoding.UTF8.GetBytes(content)));
+    }
+
+    private sealed class FakeDns(params IPAddress[] addresses) : IHostResolver
+    {
+        public Task<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<IPAddress>>(addresses);
+    }
+
+    private sealed class HostDns(IReadOnlyDictionary<string, IPAddress> addresses) : IHostResolver
+    {
+        public Task<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<IPAddress>>([addresses[host]]);
+    }
+
+    private sealed class FakeTransport(params EvidenceHttpResponse[] responses) : IEvidenceHttpTransport
+    {
+        private int _next;
+        public List<(Uri Uri, IReadOnlyList<IPAddress> Addresses)> Requests { get; } = [];
+        public Task<EvidenceHttpResponse> SendAsync(Uri uri, IReadOnlyList<IPAddress> approvedAddresses, CancellationToken cancellationToken)
+        {
+            Requests.Add((uri, approvedAddresses));
+            return Task.FromResult(responses[_next++]);
+        }
+    }
+
+    private sealed class DelayingTransport : IEvidenceHttpTransport
+    {
+        public async Task<EvidenceHttpResponse> SendAsync(Uri uri, IReadOnlyList<IPAddress> approvedAddresses, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException();
+        }
+    }
+}
