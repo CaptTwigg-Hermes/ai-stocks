@@ -359,6 +359,14 @@
         "resolved": "13.0.3",
         "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
       },
+      "Npgsql": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "xZAYhPOU2rUIFpV48xsqhCx9vXs6Y+0jX2LCoSEfDFYMw9jtAOUk3iQsCnDLrFIv9NT3JGMihn7nnuZsPKqJmA==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
+        }
+      },
       "System.Diagnostics.EventLog": {
         "type": "Transitive",
         "resolved": "10.0.0",
@@ -419,7 +427,8 @@
           "AiStocks.Core": "[1.0.0, )",
           "AiStocks.MarketData": "[1.0.0, )",
           "AiStocks.Research": "[1.0.0, )",
-          "AiStocks.Trading": "[1.0.0, )"
+          "AiStocks.Trading": "[1.0.0, )",
+          "Npgsql": "[10.0.0, )"
         }
       },
       "aistocks.research": {

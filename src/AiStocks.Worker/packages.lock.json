@@ -2,6 +2,11 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "Npgsql": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "xZAYhPOU2rUIFpV48xsqhCx9vXs6Y+0jX2LCoSEfDFYMw9jtAOUk3iQsCnDLrFIv9NT3JGMihn7nnuZsPKqJmA=="
+      },
       "aistocks.core": {
         "type": "Project"
       },
@@ -17,7 +22,8 @@
           "AiStocks.Core": "[1.0.0, )",
           "AiStocks.MarketData": "[1.0.0, )",
           "AiStocks.Research": "[1.0.0, )",
-          "AiStocks.Trading": "[1.0.0, )"
+          "AiStocks.Trading": "[1.0.0, )",
+          "Npgsql": "[10.0.0, )"
         }
       },
       "aistocks.research": {

@@ -120,7 +120,8 @@ public sealed class MarketDataTests
         Assert.Equal(report, archived.Report);
 
         using var replayHttp = new HttpClient(new StubHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-            { Content = new StringContent($"{{\"message\":null,\"reports\":[\"{report}\",\"{report}\"]}}") })) { BaseAddress = http.BaseAddress };
+        { Content = new StringContent($"{{\"message\":null,\"reports\":[\"{report}\",\"{report}\"]}}") }))
+        { BaseAddress = http.BaseAddress };
         await Assert.ThrowsAsync<MarketDataException>(() => new NasdaqPostTradeClient(replayHttp, new ImmutableArchive(temp.Path)).ListReportsAsync(CancellationToken.None));
     }
 
