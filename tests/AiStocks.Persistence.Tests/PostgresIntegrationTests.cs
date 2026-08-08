@@ -337,14 +337,11 @@ public sealed class PostgresIntegrationTests
 
     [Fact]
     public async Task RealPostgresCollectorPersistsStrictManifestBoundAuthorityAndFailsReadinessClosed()
-    public async Task RealPostgresRejectsSplitResearchAttestationReplayIdentity()
-
     {
         if (ConnectionString is not { } connectionString) return;
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ResetDatabase(dataSource);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
-<<<<<<< HEAD
         var root = Path.Combine(Path.GetTempPath(), $"aistocks-collector-pg-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         try
@@ -382,7 +379,15 @@ public sealed class PostgresIntegrationTests
             Assert.Contains(readiness.Failures, failure => failure.Contains("20 complete", StringComparison.Ordinal));
         }
         finally { Directory.Delete(root, true); }
-=======
+    }
+
+    [Fact]
+    public async Task RealPostgresRejectsSplitResearchAttestationReplayIdentity()
+    {
+        if (ConnectionString is not { } connectionString) return;
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ResetDatabase(dataSource);
+        await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
         var agent = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var scheduled = Guid.NewGuid(); var run = Guid.NewGuid(); var orderA = Guid.NewGuid();
@@ -427,7 +432,6 @@ public sealed class PostgresIntegrationTests
             SELECT persist_research_attestation(gen_random_uuid(),$1,$2,$3,'gpt-5.6-sol','copilot','gpt-5.6-sol','copilot',$4::jsonb,$5::sha256_hex,$6,$7::sha256_hex,$8::jsonb,$9::sha256_hex,'2026-08-08T09:01:00Z')
             """, run, orderB, agent, canonicalInvocation, invocationHash, report, reportHash, evidence, evidenceHash));
         Assert.Contains("split", split.MessageText, StringComparison.OrdinalIgnoreCase);
->>>>>>> 1791f12 (fix: harden research security boundaries)
     }
 
     private static async Task ResetDatabase(NpgsqlDataSource source)
