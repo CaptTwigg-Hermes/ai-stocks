@@ -95,7 +95,7 @@ public sealed class RuntimeIntegrationTests
         var decision = $$"""
             {"decisionId":"runtime-buy","agentId":"{{claimed.Run.AgentId:D}}","modelId":"{{claimed.Run.ModelId}}",
              "action":"buy","instrument":{"isin":"SE0000000001","orderBookId":"book-runtime","mic":"XSTO"},
-             "quantity":1,"decisionAt":"{{claimed.Run.ScheduledAt:O}}","observedPrice":100,"reason":"verified test decision",
+             "quantity":1,"decisionAt":"{{claimed.Run.ScheduledAt:O}}","observedPrice":100,"pendingOrderId":null,"reason":"verified test decision",
              "catalyst":"public catalyst","risks":["loss"],"confidence":0.5,
              "evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-09T10:00:00+00:00","exactExcerpt":"news"}],
              "canonicalRequestSha256":"{{new string('a', 64)}}"}
@@ -154,17 +154,68 @@ public sealed class RuntimeIntegrationTests
             session.OpenAt.AddHours(-1).AddMinutes(1), null, null, badEvidence), default));
         await worker.CompleteAsync(new RunCompletion(claimed.Run, claimed.ClaimToken, RunAttemptOutcome.Succeeded,
             session.OpenAt.AddHours(-1).AddMinutes(1), null, null, attestedResult), default);
+
+        Guid persistedOrder;
+        await using (var setup = await source.OpenConnectionAsync())
+        {
+            await using var order = new NpgsqlCommand("SELECT id FROM orders WHERE agent_id=$1 AND decision_id='runtime-buy'", setup);
+            order.Parameters.AddWithValue(claimed.Run.AgentId);
+            persistedOrder = (Guid)(await order.ExecuteScalarAsync() ?? throw new InvalidOperationException("Queued order missing."));
+            await using var skipRivals = new NpgsqlCommand("DELETE FROM scheduled_agent_runs WHERE status='PENDING' AND agent_id<>$1", setup);
+            skipRivals.Parameters.AddWithValue(claimed.Run.AgentId);
+            await skipRivals.ExecuteNonQueryAsync();
+        }
+        var cancelClaim = Assert.IsType<ClaimedRun>(await worker.ClaimNextAsync(session.CloseAt, default));
+        Assert.Equal(claimed.Run.AgentId, cancelClaim.Run.AgentId);
+        var cancelDecision = $$"""
+            {"decisionId":"runtime-cancel","agentId":"{{cancelClaim.Run.AgentId:D}}","modelId":"{{cancelClaim.Run.ModelId}}",
+             "action":"cancelPending","instrument":null,"quantity":0,"decisionAt":"{{cancelClaim.Run.ScheduledAt:O}}",
+             "observedPrice":null,"pendingOrderId":"{{persistedOrder:D}}","reason":"cancel stale queued order",
+             "catalyst":"risk changed","risks":["continued exposure"],"confidence":0.8,"evidence":[],
+             "canonicalRequestSha256":"{{new string('a', 64)}}"}
+            """;
+        var parsedCancel = new StrictDecisionJsonParser().Parse(cancelDecision, cancelClaim.Run.AgentId, cancelClaim.Run.ModelId);
+        var cancelOrderDecision = new OrderDecision(parsedCancel.DecisionId, parsedCancel.AgentId, parsedCancel.ModelId,
+            parsedCancel.Action, parsedCancel.Instrument, parsedCancel.Quantity, parsedCancel.DecisionAt,
+            parsedCancel.ObservedPrice, parsedCancel.Reason, parsedCancel.Catalyst, parsedCancel.Risks,
+            parsedCancel.Confidence, [], parsedCancel.CanonicalRequestSha256)
+        {
+            PendingOrderId = parsedCancel.PendingOrderId
+        };
+        var cancelReport = Encoding.UTF8.GetBytes($$"""
+            {"model":"{{cancelClaim.Run.ModelId}}","provider":"copilot","completed":true,"failed":false,"api_calls":1}
+            """);
+        var cancelProvenance = provenance with
+        {
+            AgentId = cancelClaim.Run.AgentId,
+            RequestedModelId = cancelClaim.Run.ModelId,
+            ModelId = cancelClaim.Run.ModelId,
+            RuntimeReport = cancelReport.ToImmutableArray(),
+            RuntimeReportSha256 = Convert.ToHexStringLower(SHA256.HashData(cancelReport)),
+            StartedAt = cancelClaim.Run.ScheduledAt.AddMinutes(-1),
+            CompletedAt = cancelClaim.Run.ScheduledAt,
+            StandardOutputSha256 = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(cancelDecision)))
+        };
+        var cancelResult = AgentRunResult.Success(cancelDecision,
+            new AttestedResearchDecision(cancelOrderDecision, cancelProvenance));
+        Assert.True(await worker.TryAcceptWhileRunningAsync(cancelClaim.Run, cancelResult, default));
+        await worker.CompleteAsync(new RunCompletion(cancelClaim.Run, cancelClaim.ClaimToken, RunAttemptOutcome.Succeeded,
+            cancelClaim.Run.ScheduledAt, null, null, cancelResult), default);
+
         var paused = await dashboard.ControlAsync(new(ContestControlAction.Pause, "owner@example.com", "pause-1"), default);
         Assert.True(paused.Paused);
 
         await using var connection = await source.OpenConnectionAsync();
-        await using var command = new NpgsqlCommand("SELECT (SELECT count(*) FROM scheduled_agent_runs WHERE status='SUCCEEDED'), (SELECT count(*) FROM agent_runs), (SELECT count(*) FROM delivery_audits WHERE status='SUCCEEDED'), (SELECT count(*) FROM orders)", connection);
+        await using var command = new NpgsqlCommand("SELECT (SELECT count(*) FROM scheduled_agent_runs WHERE status='SUCCEEDED'), (SELECT count(*) FROM agent_runs), (SELECT count(*) FROM delivery_audits WHERE status='SUCCEEDED'), (SELECT count(*) FROM orders), (SELECT count(*) FROM order_outcomes WHERE order_id=$1 AND status='CANCELLED'), (SELECT count(*) FROM fills WHERE order_id=$1)", connection);
+        command.Parameters.AddWithValue(persistedOrder);
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
-        Assert.Equal(1, reader.GetInt64(0));
-        Assert.Equal(1, reader.GetInt64(1));
+        Assert.Equal(2, reader.GetInt64(0));
+        Assert.Equal(2, reader.GetInt64(1));
         Assert.Equal(1, reader.GetInt64(2));
         Assert.Equal(1, reader.GetInt64(3));
+        Assert.Equal(1, reader.GetInt64(4));
+        Assert.Equal(0, reader.GetInt64(5));
     }
 
     [Fact]

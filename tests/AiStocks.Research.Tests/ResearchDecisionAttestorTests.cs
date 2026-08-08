@@ -71,7 +71,7 @@ public sealed class ResearchDecisionAttestorTests
     private static string Json(string hash) => $$"""
     {"decisionId":"decision-1","agentId":"{{AgentId}}","modelId":"gpt-5.6-sol","action":"buy",
     "instrument":{"isin":"SE0000000001","orderBookId":"123","mic":"XSTO"},"quantity":10,
-    "decisionAt":"2026-08-08T10:00:00Z","observedPrice":123.45,"reason":"Reason","catalyst":"Catalyst",
+    "decisionAt":"2026-08-08T10:00:00Z","observedPrice":123.45,"pendingOrderId":null,"reason":"Reason","catalyst":"Catalyst",
     "risks":["Risk"],"confidence":0.75,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-08T09:00:00Z","exactExcerpt":"Exact catalyst text"}],
     "canonicalRequestSha256":"{{hash}}"}
     """;

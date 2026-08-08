@@ -35,7 +35,10 @@ public sealed class ResearchDecisionAttestor(IEvidenceVerifier evidenceVerifier)
 
         var decision = new OrderDecision(draft.DecisionId, draft.AgentId, draft.ModelId, draft.Action, draft.Instrument,
             draft.Quantity, draft.DecisionAt, draft.ObservedPrice, draft.Reason, draft.Catalyst,
-            draft.Risks.ToArray(), draft.Confidence, evidence.AsReadOnly(), draft.CanonicalRequestSha256);
+            draft.Risks.ToArray(), draft.Confidence, evidence.AsReadOnly(), draft.CanonicalRequestSha256)
+        {
+            PendingOrderId = draft.PendingOrderId
+        };
         return new AttestedResearchDecision(decision, provenance);
     }
 

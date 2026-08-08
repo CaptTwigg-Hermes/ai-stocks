@@ -86,6 +86,24 @@ public sealed class DecisionJsonParserTests
     }
 
     [Fact]
+    public void Parse_CancelPendingRequiresExplicitOrderIdentity()
+    {
+        var pendingOrderId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var json = ValidJson()
+            .Replace("\"action\":\"buy\"", "\"action\":\"cancelPending\"")
+            .Replace("\"instrument\":{\"isin\":\"SE0000000001\",\"orderBookId\":\"123\",\"mic\":\"XSTO\"}", "\"instrument\":null")
+            .Replace("\"quantity\":10", "\"quantity\":0")
+            .Replace("\"observedPrice\":123.45", "\"observedPrice\":null")
+            .Replace("\"pendingOrderId\":null", "\"pendingOrderId\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\"")
+            .Replace("\"evidence\":[{\"url\":\"https://example.com/news\",\"publishedAt\":\"2026-08-08T09:00:00Z\",\"exactExcerpt\":\"Exact catalyst text\"}]", "\"evidence\":[]");
+
+        var decision = _parser.Parse(json, AgentId, "gpt-5.6-sol");
+
+        Assert.Equal(DecisionAction.CancelPending, decision.Action);
+        Assert.Equal(pendingOrderId, decision.PendingOrderId);
+    }
+
+    [Fact]
     public void Parse_AllowsHoldWithoutInstrumentEvidenceOrPositiveQuantity()
     {
         var json = ValidJson()
@@ -108,6 +126,7 @@ public sealed class DecisionJsonParserTests
       "quantity":10,
       "decisionAt":"2026-08-08T10:00:00Z",
       "observedPrice":123.45,
+      "pendingOrderId":null,
       "reason":"Strong verified setup",
       "catalyst":"Published contract win",
       "risks":["Currency risk"],

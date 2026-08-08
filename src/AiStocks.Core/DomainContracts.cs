@@ -131,7 +131,10 @@ public sealed record OrderDecision(
     IReadOnlyList<string> Risks,
     decimal Confidence,
     IReadOnlyList<VerifiedEvidence> Evidence,
-    string CanonicalRequestSha256);
+    string CanonicalRequestSha256)
+{
+    public Guid? PendingOrderId { get; init; }
+}
 
 public sealed record Position(InstrumentId Instrument, int Quantity, decimal AverageCost);
 public sealed record PortfolioSnapshot(

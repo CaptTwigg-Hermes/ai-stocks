@@ -113,28 +113,44 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
         Guid? orderId = null;
         if (completion.Outcome == RunAttemptOutcome.Succeeded && decision is not null && decision.Action != DecisionAction.Hold)
         {
-            if (decision.Action == DecisionAction.CancelPending)
-                throw new DecisionValidationException("cancelPending requires an explicit persisted order identity and is unavailable in this response contract.");
             await using (var state = new NpgsqlCommand("SELECT status::text FROM contest_state WHERE singleton", connection, transaction))
                 if (!StringComparer.Ordinal.Equals((string?)await state.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), "RUNNING"))
                     throw new DecisionValidationException("Contest paused before the decision transaction committed.");
-            await using var instrument = new NpgsqlCommand("SELECT id FROM instruments WHERE isin=$1 AND order_book_id=$2 AND mic='XSTO'", connection, transaction);
-            instrument.Parameters.AddWithValue(decision.Instrument!.Isin); instrument.Parameters.AddWithValue(decision.Instrument.OrderBookId);
-            var instrumentId = await instrument.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as Guid? ??
-                throw new DecisionValidationException("Decision instrument is not in the reviewed universe.");
             using var requestDocument = JsonDocument.Parse(completion.Result!.Decision!);
             var requestJson = CanonicalJson.Serialize(requestDocument.RootElement);
-            await using var submit = new NpgsqlCommand("SELECT submit_order($1,$2,$3,$4,$5::order_side,$6,$7,$8,$9::jsonb,canonical_jsonb_sha256($9::jsonb))", connection, transaction);
-            submit.Parameters.AddWithValue(Guid.NewGuid()); submit.Parameters.AddWithValue(completion.Run.AgentId);
-            submit.Parameters.AddWithValue(decision.DecisionId); submit.Parameters.AddWithValue($"run:{completion.Run.RunKey}:{decision.DecisionId}");
-            submit.Parameters.AddWithValue(decision.Action == DecisionAction.Buy ? "BUY" : "SELL"); submit.Parameters.AddWithValue(instrumentId);
-            submit.Parameters.AddWithValue(decision.Quantity); submit.Parameters.AddWithValue(decision.DecisionAt);
-            submit.Parameters.AddWithValue(requestJson);
-            orderId = (Guid)(await submit.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("Order was not persisted."));
+            var requestHash = CanonicalJson.Sha256(requestDocument.RootElement);
+            if (decision.Action == DecisionAction.CancelPending)
+            {
+                orderId = decision.PendingOrderId ?? throw new DecisionValidationException("cancelPending requires an explicit persisted order identity.");
+                await using var cancel = new NpgsqlCommand("""
+                    SELECT cancel_order($1,$2,$3,$4,$5::jsonb,$6::sha256_hex,$7)
+                    """, connection, transaction);
+                cancel.Parameters.AddWithValue(Guid.NewGuid()); cancel.Parameters.AddWithValue(orderId.Value);
+                cancel.Parameters.AddWithValue(completion.Run.AgentId);
+                cancel.Parameters.AddWithValue($"run:{completion.Run.RunKey}:{decision.DecisionId}:cancel");
+                cancel.Parameters.AddWithValue(requestJson); cancel.Parameters.AddWithValue(requestHash);
+                cancel.Parameters.AddWithValue(completion.CompletedAt);
+                await cancel.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await using var instrument = new NpgsqlCommand("SELECT id FROM instruments WHERE isin=$1 AND order_book_id=$2 AND mic='XSTO'", connection, transaction);
+                instrument.Parameters.AddWithValue(decision.Instrument!.Isin); instrument.Parameters.AddWithValue(decision.Instrument.OrderBookId);
+                var instrumentId = await instrument.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as Guid? ??
+                    throw new DecisionValidationException("Decision instrument is not in the reviewed universe.");
+                await using var submit = new NpgsqlCommand("SELECT submit_order($1,$2,$3,$4,$5::order_side,$6,$7,$8,$9::jsonb,$10::sha256_hex)", connection, transaction);
+                submit.Parameters.AddWithValue(Guid.NewGuid()); submit.Parameters.AddWithValue(completion.Run.AgentId);
+                submit.Parameters.AddWithValue(decision.DecisionId); submit.Parameters.AddWithValue($"run:{completion.Run.RunKey}:{decision.DecisionId}");
+                submit.Parameters.AddWithValue(decision.Action == DecisionAction.Buy ? "BUY" : "SELL"); submit.Parameters.AddWithValue(instrumentId);
+                submit.Parameters.AddWithValue(decision.Quantity); submit.Parameters.AddWithValue(decision.DecisionAt);
+                submit.Parameters.AddWithValue(requestJson); submit.Parameters.AddWithValue(requestHash);
+                orderId = (Guid)(await submit.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("Order was not persisted."));
+            }
         }
         if (attested is not null)
             await new ResearchAttestationStore().PersistAsync(connection, transaction,
-                CreatePersistableAttestation(attested, completion.Result!.Decision!, runId, orderId), cancellationToken).ConfigureAwait(false);
+                CreatePersistableAttestation(attested, completion.Result!.Decision!, runId,
+                    decision?.Action == DecisionAction.CancelPending ? null : orderId), cancellationToken).ConfigureAwait(false);
         await using (var finish = new NpgsqlCommand("SELECT complete_scheduled_run($1,$2,$3::run_status,$4,$5,$6)", connection, transaction))
         {
             finish.Parameters.AddWithValue(scheduledId); finish.Parameters.AddWithValue(token); finish.Parameters.AddWithValue(Status(completion.Outcome));
@@ -183,7 +199,20 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
             if (!StringComparer.Ordinal.Equals((string?)await state.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), "RUNNING")) return false;
         if (decision.Action == DecisionAction.Hold) return true;
         if (decision.Action == DecisionAction.CancelPending)
-            throw new DecisionValidationException("cancelPending requires an explicit persisted order identity and is unavailable in this response contract.");
+        {
+            if (decision.PendingOrderId is not { } pendingOrderId)
+                throw new DecisionValidationException("cancelPending requires an explicit persisted order identity.");
+            await using var pending = new NpgsqlCommand("""
+                SELECT EXISTS(SELECT FROM orders o
+                  WHERE o.id=$1 AND o.agent_id=$2
+                    AND NOT EXISTS (SELECT FROM order_outcomes outcome WHERE outcome.order_id=o.id))
+                """, connection);
+            pending.Parameters.AddWithValue(pendingOrderId);
+            pending.Parameters.AddWithValue(run.AgentId);
+            if (await pending.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not true)
+                throw new DecisionValidationException("cancelPending may target only the agent's own non-terminal queued order.");
+            return true;
+        }
         await using var instrument = new NpgsqlCommand("SELECT id FROM instruments WHERE isin=$1 AND order_book_id=$2 AND mic='XSTO'", connection);
         instrument.Parameters.AddWithValue(decision.Instrument!.Isin); instrument.Parameters.AddWithValue(decision.Instrument.OrderBookId);
         _ = await instrument.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as Guid? ??

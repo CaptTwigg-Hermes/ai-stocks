@@ -30,6 +30,95 @@ public sealed class ProductionCompositionIntegrationTests
     }
 
     [Fact]
+    public async Task ModelCancellationIsWorkerOnlyOwnedIdempotentAndTerminal()
+    {
+        var configured = Environment.GetEnvironmentVariable("AISTOCKS_TEST_DATABASE_URL");
+        if (string.IsNullOrWhiteSpace(configured)) return;
+        await using var database = await DisposableDatabase.CreateAsync(configured);
+        await using var source = NpgsqlDataSource.Create(database.ConnectionString);
+        await new PostgresMigrationRunner(source).ApplyAsync();
+        var instrument = Guid.NewGuid();
+        var ownOrder = Guid.NewGuid();
+        var otherOrder = Guid.NewGuid();
+        var ownAgent = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var otherAgent = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+        await using var connection = await source.OpenConnectionAsync();
+        await ExecuteAsync(connection, "UPDATE contest_state SET status='RUNNING',started_at='2026-06-01T08:00:00Z' WHERE singleton");
+        await ExecuteAsync(connection, """
+            INSERT INTO instruments(id,isin,issuer_id,order_book_id,mic,symbol,cfi,active_from,source_json,source_hash)
+            VALUES($1,'SE0000000088','CCCCCCCCCCCCCCCCCCCC','book-cancel','XSTO','CANCEL','ESVUFR','2026-01-01',
+              '{"source":"cancellation"}',canonical_jsonb_sha256('{"source":"cancellation"}'))
+            """, instrument);
+        await ExecuteAsync(connection, """
+            INSERT INTO trading_sessions(session_id,session_day,opens_at,closes_at)
+            VALUES('cancel-session','2026-06-01','2026-06-01T08:00:00Z','2026-06-01T16:00:00Z')
+            """);
+        await ExecuteAsync(connection, """
+            INSERT INTO raw_market_reports VALUES(gen_random_uuid(),'cancel-report','https://example.test/cancel','2026-06-01T09:55:00Z',
+              'x',encode(digest('x','sha256'),'hex'),'{"fixture":true}',canonical_jsonb_sha256('{"fixture":true}'))
+            """);
+        await ExecuteAsync(connection, """
+            INSERT INTO market_observations(id,instrument_id,raw_market_report_id,traded_at,retrieved_at,price,quantity,
+              average_daily_value_20,complete_history_sessions,session_id,is_official_pats,warning,suspended,verified,source_json,source_hash)
+            SELECT gen_random_uuid(),$1,id,observation.traded_at,observation.retrieved_at,100,10,1000000,20,
+              'cancel-session',false,false,false,true,jsonb_build_object('at',observation.traded_at),
+              canonical_jsonb_sha256(jsonb_build_object('at',observation.traded_at))
+            FROM raw_market_reports CROSS JOIN (VALUES
+              ('2026-06-01T09:00:00Z'::timestamptz,'2026-06-01T09:15:00Z'::timestamptz),
+              ('2026-06-01T09:40:00Z'::timestamptz,'2026-06-01T09:55:00Z'::timestamptz)
+            ) observation(traded_at,retrieved_at)
+            WHERE report_name='cancel-report'
+            """, instrument);
+        await ExecuteAsync(connection, """
+            SELECT submit_order($1,$2,'own-decision','own-order','BUY',$3,1,'2026-06-01T09:30:00Z',
+              '{"reason":"own"}',canonical_jsonb_sha256('{"reason":"own"}'))
+            """, ownOrder, ownAgent, instrument);
+        await ExecuteAsync(connection, """
+            SELECT submit_order($1,$2,'other-decision','other-order','BUY',$3,1,'2026-06-01T09:30:00Z',
+              '{"reason":"other"}',canonical_jsonb_sha256('{"reason":"other"}'))
+            """, otherOrder, otherAgent, instrument);
+
+        Assert.True(await ScalarBoolAsync(connection,
+            "SELECT has_function_privilege('ai_stocks_worker_runtime','cancel_order(uuid,uuid,uuid,text,jsonb,sha256_hex,timestamptz)','EXECUTE')"));
+        Assert.False(await ScalarBoolAsync(connection,
+            "SELECT has_function_privilege('ai_stocks_runtime','cancel_order(uuid,uuid,uuid,text,jsonb,sha256_hex,timestamptz)','EXECUTE')"));
+        Assert.False(await ScalarBoolAsync(connection,
+            "SELECT has_function_privilege('ai_stocks_operations_runtime','cancel_order(uuid,uuid,uuid,text,jsonb,sha256_hex,timestamptz)','EXECUTE')"));
+        Assert.False(await ScalarBoolAsync(connection,
+            "SELECT has_function_privilege('ai_stocks_web_runtime','cancel_order(uuid,uuid,uuid,text,jsonb,sha256_hex,timestamptz)','EXECUTE')"));
+
+        await ExecuteAsync(connection, "SET ROLE ai_stocks_worker_runtime");
+        var foreign = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(connection, """
+            SELECT cancel_order(gen_random_uuid(),$1,$2,'cancel:foreign','{"reason":"forbidden"}',
+              'db09347e7a86964a792c586ea2c20ff42ae265a7053c4b3f8ea50fcb66dc78fd','2026-06-01T09:31:00Z')
+            """, otherOrder, ownAgent));
+        Assert.Contains("ownership mismatch", foreign.MessageText, StringComparison.Ordinal);
+
+        var outcome = Guid.NewGuid();
+        await ExecuteAsync(connection, """
+            SELECT cancel_order($1,$2,$3,'cancel:own','{"reason":"model cancellation"}',
+              'c7a05a30b988513168c5f21740620f586c372839452dc4b8a7d463cf02335684','2026-06-01T09:31:00Z')
+            """, outcome, ownOrder, ownAgent);
+        var replay = await ScalarStringAsync(connection, """
+            SELECT cancel_order(gen_random_uuid(),$1,$2,'cancel:own','{"reason":"model cancellation"}',
+              'c7a05a30b988513168c5f21740620f586c372839452dc4b8a7d463cf02335684','2026-06-01T09:31:00Z')::text
+            """, ownOrder, ownAgent);
+        Assert.Equal(outcome.ToString(), replay);
+        var terminal = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(connection, """
+            SELECT cancel_order(gen_random_uuid(),$1,$2,'cancel:different','{"reason":"different"}',
+              'f1d71130c2e74c5b820202982aa4b665af3f38e4368b40f76205ea7a0bc7988b','2026-06-01T09:32:00Z')
+            """, ownOrder, ownAgent));
+        Assert.Contains("terminal outcome", terminal.MessageText, StringComparison.Ordinal);
+        await ExecuteAsync(connection, "SELECT execute_queued_order($1,'2026-06-01T10:00:00Z')", ownOrder);
+        await ExecuteAsync(connection, "RESET ROLE");
+
+        Assert.Equal(0L, await ScalarLongAsync(connection, "SELECT count(*) FROM fills WHERE order_id=$1", ownOrder));
+        Assert.Equal("CANCELLED", await ScalarStringAsync(connection,
+            "SELECT status::text FROM order_outcomes WHERE order_id=$1", ownOrder));
+    }
+
+    [Fact]
     public async Task AcceptedQueueFlowsThroughFillActionsFinalizationReportAndLeasedDelivery()
     {
         var configured = Environment.GetEnvironmentVariable("AISTOCKS_TEST_DATABASE_URL");

@@ -96,6 +96,64 @@ public sealed class PostgresIntegrationTests
     }
 
     [Fact]
+    public async Task SubmitOrderObservedPriceExcludesImmutablePausedIntervals()
+    {
+        if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ResetDatabase(dataSource);
+        await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
+        await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
+        var instrument = Guid.NewGuid();
+
+        await Execute(connection, "UPDATE contest_state SET status='RUNNING',started_at='2026-06-01T08:00:00Z' WHERE singleton");
+        await Execute(connection, """
+            INSERT INTO contest_state_events(id,idempotency_key,request_json,request_hash,from_status,to_status,reason,actor,occurred_at)
+            SELECT gen_random_uuid(),transition.key,transition.body::jsonb,canonical_jsonb_sha256(transition.body::jsonb),
+                   transition.from_state::contest_status,transition.to_state::contest_status,'test transition','test',transition.at
+            FROM (VALUES
+              ('start','{"transition":"start"}','DRAFT','RUNNING','2026-06-01T08:00:00Z'::timestamptz),
+              ('pause','{"transition":"pause"}','RUNNING','PAUSED','2026-06-01T09:00:00Z'::timestamptz),
+              ('resume','{"transition":"resume"}','PAUSED','RUNNING','2026-06-01T09:10:00Z'::timestamptz)
+            ) transition(key,body,from_state,to_state,at)
+            """);
+        await Execute(connection, """
+            INSERT INTO instruments(id,isin,issuer_id,order_book_id,mic,symbol,cfi,active_from,source_json,source_hash)
+            VALUES($1,'SE0000000077','PAUSEISSUER000000001','pause-book','XSTO','PAUSE','ESVUFR','2026-01-01',
+                   '{"source":"pause-test"}',canonical_jsonb_sha256('{"source":"pause-test"}'))
+            """, instrument);
+        await Execute(connection, """
+            INSERT INTO trading_sessions(session_id,session_day,opens_at,closes_at)
+            VALUES('pause-session','2026-06-01','2026-06-01T08:00:00Z','2026-06-01T16:00:00Z')
+            """);
+        await Execute(connection, """
+            INSERT INTO raw_market_reports VALUES(gen_random_uuid(),'pause-report','https://example.test/pause',
+              '2026-06-01T09:20:00Z','x',encode(digest('x','sha256'),'hex'),'{"fixture":true}',
+              canonical_jsonb_sha256('{"fixture":true}'))
+            """);
+        await Execute(connection, """
+            INSERT INTO market_observations(id,instrument_id,raw_market_report_id,traded_at,retrieved_at,price,quantity,
+              average_daily_value_20,complete_history_sessions,session_id,is_official_pats,warning,suspended,verified,source_json,source_hash)
+            SELECT gen_random_uuid(),$1,id,observation.traded_at,observation.retrieved_at,observation.price,10,
+              1000000,20,'pause-session',false,false,false,true,jsonb_build_object('price',observation.price),
+              canonical_jsonb_sha256(jsonb_build_object('price',observation.price))
+            FROM raw_market_reports CROSS JOIN (VALUES
+              ('2026-06-01T08:55:00Z'::timestamptz,'2026-06-01T09:10:00Z'::timestamptz,90::numeric),
+              ('2026-06-01T09:05:00Z'::timestamptz,'2026-06-01T09:20:00Z'::timestamptz,100::numeric)
+            ) observation(traded_at,retrieved_at,price)
+            WHERE report_name='pause-report'
+            """, instrument);
+
+        using var request = JsonDocument.Parse("{\"reason\":\"pause exclusion\"}");
+        var order = await ScalarGuid(connection, """
+            SELECT submit_order(gen_random_uuid(),'11111111-1111-1111-1111-111111111111','pause-decision','pause-key',
+              'BUY',$1,1,'2026-06-01T09:30:00Z',$2::jsonb,$3::sha256_hex)
+            """, instrument, CanonicalJson.Serialize(request.RootElement), CanonicalJson.Sha256(request.RootElement));
+
+        Assert.Equal(90m, await ScalarDecimal(connection, "SELECT observed_price FROM orders WHERE id=$1", order));
+    }
+
+    [Fact]
     public async Task RealPostgresSerializesConcurrentOverspendAndOversell()
     {
         if (ConnectionString is not { } connectionString) return;

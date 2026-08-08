@@ -38,7 +38,10 @@ public sealed record ResearchDecisionDraft(
     IReadOnlyList<string> Risks,
     decimal Confidence,
     IReadOnlyList<EvidenceClaim> Evidence,
-    string CanonicalRequestSha256);
+    string CanonicalRequestSha256)
+{
+    public Guid? PendingOrderId { get; init; }
+}
 
 public sealed class DecisionValidationException : Exception
 {
@@ -50,7 +53,7 @@ public sealed partial class StrictDecisionJsonParser
     private static readonly HashSet<string> RootProperties =
     [
         "decisionId", "agentId", "modelId", "action", "instrument", "quantity", "decisionAt",
-        "observedPrice", "reason", "catalyst", "risks", "confidence", "evidence", "canonicalRequestSha256"
+        "observedPrice", "pendingOrderId", "reason", "catalyst", "risks", "confidence", "evidence", "canonicalRequestSha256"
     ];
     private static readonly HashSet<string> InstrumentProperties = ["isin", "orderBookId", "mic"];
     private static readonly HashSet<string> EvidenceProperties = ["url", "publishedAt", "exactExcerpt"];
@@ -94,6 +97,7 @@ public sealed partial class StrictDecisionJsonParser
             var quantity = RequiredInt32(root, "quantity");
             var decisionAt = ParseTimestamp(RequiredString(root, "decisionAt"), "decisionAt");
             var observedPrice = OptionalDecimal(root.GetProperty("observedPrice"), "observedPrice");
+            var pendingOrderId = OptionalGuid(root.GetProperty("pendingOrderId"), "pendingOrderId");
             var reason = RequiredBoundedString(root, "reason", 1, _limits.MaximumReasonCharacters);
             var catalyst = RequiredBoundedString(root, "catalyst", 1, _limits.MaximumCatalystCharacters);
             var risks = ParseRisks(root.GetProperty("risks"));
@@ -103,9 +107,12 @@ public sealed partial class StrictDecisionJsonParser
             var requestHash = RequiredString(root, "canonicalRequestSha256");
             if (!Sha256Regex().IsMatch(requestHash)) throw new DecisionValidationException("canonicalRequestSha256 must be 64 lowercase hexadecimal characters.");
 
-            ValidateActionFields(action, instrument, quantity, observedPrice, risks, evidence);
+            ValidateActionFields(action, instrument, quantity, observedPrice, pendingOrderId, risks, evidence);
             return new ResearchDecisionDraft(decisionId, agentId, modelId, action, instrument, quantity,
-                decisionAt, observedPrice, reason, catalyst, risks.AsReadOnly(), confidence, evidence.AsReadOnly(), requestHash);
+                decisionAt, observedPrice, reason, catalyst, risks.AsReadOnly(), confidence, evidence.AsReadOnly(), requestHash)
+            {
+                PendingOrderId = pendingOrderId
+            };
         }
         catch (DecisionValidationException) { throw; }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException or OverflowException)
@@ -190,13 +197,21 @@ public sealed partial class StrictDecisionJsonParser
     }
 
     private static void ValidateActionFields(DecisionAction action, InstrumentId? instrument, int quantity,
-        decimal? observedPrice, IReadOnlyCollection<string> risks, IReadOnlyCollection<EvidenceClaim> evidence)
+        decimal? observedPrice, Guid? pendingOrderId, IReadOnlyCollection<string> risks, IReadOnlyCollection<EvidenceClaim> evidence)
     {
         var trade = action is DecisionAction.Buy or DecisionAction.Sell;
-        if (trade && (instrument is null || quantity <= 0 || observedPrice is null or <= 0 || risks.Count == 0 || evidence.Count == 0))
+        if (trade && (instrument is null || quantity <= 0 || observedPrice is null or <= 0 || pendingOrderId is not null || risks.Count == 0 || evidence.Count == 0))
             throw new DecisionValidationException("Buy/sell decisions require instrument, positive quantity/price, risks, and evidence.");
-        if (!trade && (quantity != 0 || observedPrice is not null))
-            throw new DecisionValidationException("Non-trade decisions require zero quantity and null observedPrice.");
+        if (action == DecisionAction.Hold && (instrument is not null || quantity != 0 || observedPrice is not null || pendingOrderId is not null))
+            throw new DecisionValidationException("Hold decisions require null order identities and zero quantity.");
+        if (action == DecisionAction.CancelPending && (instrument is not null || quantity != 0 || observedPrice is not null || pendingOrderId is null))
+            throw new DecisionValidationException("cancelPending requires only an explicit pendingOrderId.");
+    }
+
+    private static Guid? OptionalGuid(JsonElement element, string name)
+    {
+        if (element.ValueKind == JsonValueKind.Null) return null;
+        return ParseGuid(BoundedString(element, name, 36, 36), name);
     }
 
     private static DecisionAction ParseAction(string value) => value switch
