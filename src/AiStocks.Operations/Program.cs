@@ -15,12 +15,13 @@ try
             ? configuredPoll : 30;
         await using var runtimeSource = NpgsqlDataSource.Create(runtimeConnection);
         var clock = new SystemOperationsClock(TimeProvider.System);
-        var publisher = new PostgresDailyReportPublisher(runtimeSource, new DailyReportService(),
-            new AuditedDiscordDelivery(new PostgresDeliveryAuditPort(runtimeSource),
-                new HermesDiscordPort(executable, target), clock));
+        var delivery = new AuditedDiscordDelivery(new PostgresDeliveryAuditPort(runtimeSource),
+            new HermesDiscordPort(executable, target), clock);
+        var publisher = new PostgresDailyReportPublisher(runtimeSource, new DailyReportService(), delivery);
+        var alerts = new PostgresImmediateAlertPublisher(runtimeSource, delivery);
         using var shutdown = new CancellationTokenSource();
         Console.CancelKeyPress += (_, eventArgs) => { eventArgs.Cancel = true; shutdown.Cancel(); };
-        await new OperationsRuntimeService(new PostgresContestOperations(runtimeSource), publisher,
+        await new OperationsRuntimeService(new PostgresContestOperations(runtimeSource), publisher, alerts,
             TimeProvider.System, TimeSpan.FromSeconds(pollSeconds)).RunAsync(shutdown.Token);
         return;
     }

@@ -1,3 +1,5 @@
+using System.Text;
+using AiStocks.Collector;
 using AiStocks.Operations;
 using AiStocks.Persistence;
 using AiStocks.Worker;
@@ -8,13 +10,23 @@ namespace AiStocks.Persistence.Tests;
 public sealed class ProductionCompositionIntegrationTests
 {
     [Fact]
-    public void HermesDiscordReceiptRequiresCliSuccessAndExternalMessageIdentity()
+    public void HermesDiscordReceiptRequiresExactDiscordSuccessAndNumericSnowflake()
     {
-        Assert.Equal("discord-message-123", HermesDiscordPort.ParseReceipt(
-            "{\"success\":true,\"platform\":\"discord\",\"message_id\":\"discord-message-123\"}"));
-        Assert.Throws<OperationsException>(() => HermesDiscordPort.ParseReceipt("{\"ok\":true}"));
-        Assert.Throws<OperationsException>(() => HermesDiscordPort.ParseReceipt("{\"success\":true}"));
-        Assert.Throws<OperationsException>(() => HermesDiscordPort.ParseReceipt("{\"success\":false,\"message_id\":\"unexpected\"}"));
+        Assert.Equal("1534975156781322311", HermesDiscordPort.ParseReceipt(
+            "{\"success\":true,\"platform\":\"discord\",\"message_id\":\"1534975156781322311\"}"));
+    }
+
+    [Theory]
+    [InlineData("{\"ok\":true,\"platform\":\"discord\",\"message_id\":\"1534975156781322311\"}")]
+    [InlineData("{\"success\":false,\"platform\":\"discord\",\"message_id\":\"1534975156781322311\"}")]
+    [InlineData("{\"success\":true,\"platform\":\"slack\",\"message_id\":\"1534975156781322311\"}")]
+    [InlineData("{\"success\":true,\"platform\":\"discord\",\"message_id\":\"discord-message-123\"}")]
+    [InlineData("{\"success\":true,\"success\":false,\"platform\":\"discord\",\"message_id\":\"1534975156781322311\"}")]
+    [InlineData("{\"success\":true,\"platform\":\"discord\",\"platform\":\"slack\",\"message_id\":\"1534975156781322311\"}")]
+    [InlineData("{\"success\":true,\"platform\":\"discord\",\"message_id\":\"1534975156781322311\",\"message_id\":\"1534975156781322312\"}")]
+    public void HermesDiscordReceiptRejectsFakeNonDiscordAndDuplicateProperties(string receipt)
+    {
+        Assert.Throws<OperationsException>(() => HermesDiscordPort.ParseReceipt(receipt));
     }
 
     [Fact]
@@ -88,13 +100,37 @@ public sealed class ProductionCompositionIntegrationTests
             Assert.Equal("2026-06-21 10:00:00", await ScalarStringAsync(connection,
                 "SELECT (observation.traded_at AT TIME ZONE 'UTC')::text FROM fills fill JOIN market_observations observation ON observation.id=fill.market_observation_id WHERE fill.order_id=$1", order));
             Assert.Equal(1L, await ScalarLongAsync(connection, "SELECT quantity FROM positions WHERE agent_id='11111111-1111-1111-1111-111111111111' AND instrument_id=$1", instrument));
-            await ExecuteAsync(connection, """
-                INSERT INTO corporate_actions VALUES($1,'compose-split',$2,'SPLIT','2026-06-22T08:00:00Z',
-                  '{"numerator":2,"denominator":1}',canonical_jsonb_sha256('{"numerator":2,"denominator":1}'),
-                  '{"authority":"nasdaq"}',canonical_jsonb_sha256('{"authority":"nasdaq"}'),
-                  '{"authority":"issuer"}',canonical_jsonb_sha256('{"authority":"issuer"}'),'owner:test','2026-06-21T12:00:00Z')
-                """, action, instrument);
         }
+        await new PostgresCorporateActionIngestion(database.ConnectionString).IngestAsync(Encoding.UTF8.GetBytes($$"""
+            {
+              "schemaVersion": 1,
+              "id": "{{action:D}}",
+              "externalReference": "compose-split",
+              "isin": "SE0000000099",
+              "orderBookId": "book-compose",
+              "actionType": "SPLIT",
+              "effectiveAt": "2026-06-22T08:00:00Z",
+              "normalized": {"numerator": 2, "denominator": 1},
+              "primaryEvidence": {
+                "authority": "nasdaq-main-market-notices",
+                "sourceUrl": "https://api.news.eu.nasdaq.com/news/rss/mainMarketNotices",
+                "publishedAt": "2026-06-21T10:00:00Z",
+                "retrievedAt": "2026-06-21T10:15:00Z",
+                "payloadSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              },
+              "secondaryEvidence": {
+                "authority": "issuer-ir",
+                "sourceUrl": "https://issuer.example/actions/compose-split",
+                "publishedAt": "2026-06-21T10:01:00Z",
+                "retrievedAt": "2026-06-21T10:16:00Z",
+                "payloadSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "approval": {
+                "approvedBy": "owner:test",
+                "approvedAt": "2026-06-21T12:00:00Z"
+              }
+            }
+            """), default);
 
         var operations = new PostgresContestOperations(source);
         await operations.ApplyDueCorporateActionsAsync(new DateTimeOffset(2026, 6, 22, 8, 0, 0, TimeSpan.Zero), default);
@@ -142,12 +178,27 @@ public sealed class ProductionCompositionIntegrationTests
         Assert.Equal(2, discord.Messages.Count);
         Assert.DoesNotContain("daily 0.40%; total 0.40%", discord.Messages[1], StringComparison.Ordinal);
 
+        var alertStore = new PostgresImmediateAlertStore(source);
+        foreach (var kind in Enum.GetValues<ImmediateAlertKind>())
+        {
+            var alert = ImmediateAlert.Create(kind, $"production {kind}", $"test:{kind}");
+            await alertStore.EnqueueAsync(alert, default);
+            await alertStore.EnqueueAsync(alert, default);
+        }
+        var alertPublisher = new PostgresImmediateAlertPublisher(source,
+            new AuditedDiscordDelivery(new PostgresDeliveryAuditPort(source), discord,
+                new FixedClock(new DateTimeOffset(2026, 12, 30, 17, 31, 0, TimeSpan.Zero))));
+        Assert.Equal(5, await alertPublisher.PublishPendingAsync(default));
+        Assert.Equal(0, await alertPublisher.PublishPendingAsync(default));
+        Assert.Equal(7, discord.Messages.Count);
+
         await using var verify = await source.OpenConnectionAsync();
         Assert.Equal("FINISHED", await ScalarStringAsync(verify, "SELECT status::text FROM contest_state WHERE singleton"));
         Assert.Equal(4L, await ScalarLongAsync(verify, "SELECT count(*) FROM final_rankings"));
         Assert.Equal(2L, await ScalarLongAsync(verify, "SELECT count(*) FROM daily_reports"));
         Assert.Equal(8L, await ScalarLongAsync(verify, "SELECT count(*) FROM daily_report_values"));
-        Assert.Equal(2L, await ScalarLongAsync(verify, "SELECT count(*) FROM delivery_audits WHERE status='SUCCEEDED'"));
+        Assert.Equal(7L, await ScalarLongAsync(verify, "SELECT count(*) FROM delivery_audits WHERE status='SUCCEEDED'"));
+        Assert.Equal(5L, await ScalarLongAsync(verify, "SELECT count(*) FROM immediate_alerts"));
         Assert.True(await ScalarBoolAsync(verify, "SELECT has_function_privilege('ai_stocks_worker_runtime','execute_queued_order(uuid,timestamptz)','EXECUTE')"));
         Assert.False(await ScalarBoolAsync(verify, "SELECT has_function_privilege('ai_stocks_worker_runtime','finalize_contest(text,uuid,text,jsonb,sha256_hex,timestamptz)','EXECUTE')"));
         Assert.False(await ScalarBoolAsync(verify, "SELECT has_function_privilege('ai_stocks_worker_runtime','apply_corporate_action(uuid,uuid,uuid,uuid,timestamptz)','EXECUTE')"));

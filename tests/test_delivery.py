@@ -15,7 +15,13 @@ def test_uses_exact_hermes_send_argv_without_shell_or_secret(monkeypatch):
             (),
             {
                 "returncode": 0,
-                "stdout": json.dumps({"ok": True, "platform": "discord"}),
+                "stdout": json.dumps(
+                    {
+                        "success": True,
+                        "platform": "discord",
+                        "message_id": "1534975156781322311",
+                    }
+                ),
                 "stderr": "",
             },
         )()
@@ -44,7 +50,15 @@ def test_serious_alerts_are_allowlisted_and_prefixed(monkeypatch):
 
     def executor(_argv, **kwargs):
         messages.append(kwargs["input"])
-        return type("Result", (), {"returncode": 0, "stdout": '{"ok":true}', "stderr": ""})()
+        return type(
+            "Result",
+            (),
+            {
+                "returncode": 0,
+                "stdout": '{"success":true,"platform":"discord","message_id":"1534975156781322311"}',
+                "stderr": "",
+            },
+        )()
 
     monkeypatch.setenv("DISCORD_REPORT_TARGET", "discord:1534963881317896212")
     sink = HermesDiscordDelivery(executor=executor)
@@ -70,3 +84,24 @@ def test_fails_closed_on_bad_target_delivery_error_and_oversized_text(monkeypatc
 
     with pytest.raises(DeliveryError, match="length"):
         sink.send_report("x" * 6001)
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        '{"ok":true,"platform":"discord","message_id":"1534975156781322311"}',
+        '{"success":false,"platform":"discord","message_id":"1534975156781322311"}',
+        '{"success":true,"platform":"slack","message_id":"1534975156781322311"}',
+        '{"success":true,"platform":"discord","message_id":"discord-message-123"}',
+        '{"success":true,"success":false,"platform":"discord","message_id":"1534975156781322311"}',
+        '{"success":true,"platform":"discord","message_id":"1534975156781322311","message_id":"1534975156781322312"}',
+    ],
+)
+def test_receipt_rejects_fake_non_discord_and_duplicate_properties(monkeypatch, receipt):
+    monkeypatch.setenv("DISCORD_REPORT_TARGET", "discord:1534963881317896212")
+
+    def executor(_argv, **_kwargs):
+        return type("Result", (), {"returncode": 0, "stdout": receipt, "stderr": ""})()
+
+    with pytest.raises(DeliveryError, match="receipt|success"):
+        HermesDiscordDelivery(executor=executor).send_report("report")

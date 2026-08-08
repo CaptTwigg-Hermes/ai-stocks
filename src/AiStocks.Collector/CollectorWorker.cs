@@ -6,6 +6,7 @@ public sealed class CollectorWorker(
     MarketReferenceAcquirer referenceAcquirer,
     NasdaqCollector collector,
     PostgresCollectorPersistence persistence,
+    PostgresCorporateActionIngestion corporateActions,
     CollectorHealth health,
     IConfiguration configuration,
     TimeProvider timeProvider,
@@ -23,6 +24,9 @@ public sealed class CollectorWorker(
             {
                 await persistence.PollStartedAsync(now, stoppingToken).ConfigureAwait(false);
                 await referenceAcquirer.AcquireAsync(now, stoppingToken).ConfigureAwait(false);
+                var corporateActionInput = configuration["CORPORATE_ACTION_INPUT_PATH"]
+                    ?? throw new InvalidOperationException("CORPORATE_ACTION_INPUT_PATH is required");
+                await corporateActions.IngestDirectoryAsync(corporateActionInput, stoppingToken).ConfigureAwait(false);
                 var result = await collector.CollectOnceAsync(now, stoppingToken).ConfigureAwait(false);
                 if (result.Missing.Count > 0) throw new MarketDataException($"Session incomplete: {result.Missing.Count} reports missing");
                 await persistence.PersistAsync(result, now, stoppingToken).ConfigureAwait(false);

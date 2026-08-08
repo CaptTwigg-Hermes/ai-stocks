@@ -15,6 +15,7 @@ from typing import Any
 
 _HERMES = "/opt/hermes/bin/hermes"
 _TARGET_RE = re.compile(r"discord:\d+(?::\d+)?\Z")
+_SNOWFLAKE_RE = re.compile(r"[0-9]{17,20}\Z")
 _MAX_MESSAGE = 6000
 
 
@@ -53,6 +54,15 @@ class HermesDiscordDelivery:
         if not isinstance(message, str) or not message.strip() or len(message) > _MAX_MESSAGE:
             raise DeliveryError("Discord message length is outside the allowed range")
 
+    @staticmethod
+    def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON property")
+            result[key] = value
+        return result
+
     def send_report(self, message: str) -> DeliveryReceipt:
         self._validate_message(message)
         argv = [
@@ -81,12 +91,18 @@ class HermesDiscordDelivery:
         if len(result.stdout) > 64_000:
             raise DeliveryError("Discord delivery returned an oversized receipt")
         try:
-            payload = json.loads(result.stdout)
+            payload = json.loads(result.stdout, object_pairs_hook=self._unique_object)
         except (TypeError, ValueError) as exc:
             raise DeliveryError("Discord delivery returned an invalid receipt") from exc
-        if not isinstance(payload, dict) or payload.get("ok") is not True:
+        if (
+            not isinstance(payload, dict)
+            or payload.get("success") is not True
+            or payload.get("platform") != "discord"
+            or not isinstance(payload.get("message_id"), str)
+            or not _SNOWFLAKE_RE.fullmatch(payload["message_id"])
+        ):
             raise DeliveryError("Discord delivery did not confirm success")
-        return DeliveryReceipt(platform=str(payload.get("platform", "discord")), response=payload)
+        return DeliveryReceipt(platform="discord", response=payload)
 
     def send_alert(self, kind: SeriousAlertKind, detail: str) -> DeliveryReceipt:
         if not isinstance(kind, SeriousAlertKind):

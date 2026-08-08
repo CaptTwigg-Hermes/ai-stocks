@@ -46,6 +46,7 @@ builder.Services.AddSingleton(serviceProvider => new PostgresCollectorPersistenc
     serviceProvider.GetRequiredService<ImmutableArchive>(), serviceProvider.GetRequiredService<SessionManifestStore>(),
     serviceProvider.GetRequiredService<DurableFirdsStore>(), serviceProvider.GetRequiredService<NasdaqStatusMachine>(),
     seedPayloadPath, seedSignaturePath));
+builder.Services.AddSingleton(new PostgresCorporateActionIngestion(databaseUrl));
 builder.Services.AddSingleton(new PostgresCollectorReadiness(databaseUrl));
 builder.Services.AddHostedService<CollectorWorker>();
 

@@ -19,8 +19,18 @@ public sealed class PostgresCollectorPersistence(
     public async Task PollStartedAsync(DateTimeOffset at, CancellationToken cancellationToken) =>
         await UpdateStateAsync("last_poll_started_at=$1,last_error=NULL", at, null, cancellationToken).ConfigureAwait(false);
 
-    public async Task PollFailedAsync(DateTimeOffset at, Exception error, CancellationToken cancellationToken) =>
+    public async Task PollFailedAsync(DateTimeOffset at, Exception error, CancellationToken cancellationToken)
+    {
         await UpdateStateAsync("last_poll_started_at=$1,last_error=$2", at, error.Message, cancellationToken).ConfigureAwait(false);
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var alert = new NpgsqlCommand(
+            "SELECT enqueue_immediate_alert('RunWideInvalidMarketData',$1,$2,$3)", connection);
+        alert.Parameters.AddWithValue($"collector poll failed closed ({error.GetType().Name})");
+        alert.Parameters.AddWithValue($"market-data:{at.ToUnixTimeSeconds()}");
+        alert.Parameters.AddWithValue(at.ToUniversalTime());
+        await alert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
 
     public async Task PersistAsync(CollectionResult result, DateTimeOffset at, CancellationToken cancellationToken)
     {

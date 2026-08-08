@@ -36,6 +36,23 @@ public sealed class PostgresQueuedExecutionPort(NpgsqlDataSource dataSource, Tim
         await using var command = new NpgsqlCommand("SELECT execute_queued_order($1,$2)", connection);
         command.Parameters.AddWithValue(orderId);
         command.Parameters.AddWithValue(timeProvider.GetUtcNow());
-        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (PostgresException exception) when (
+            exception.MessageText.Contains("account", StringComparison.OrdinalIgnoreCase) ||
+            exception.MessageText.Contains("negative", StringComparison.OrdinalIgnoreCase) ||
+            exception.MessageText.Contains("projection", StringComparison.OrdinalIgnoreCase))
+        {
+            await using var alertConnection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var alert = new NpgsqlCommand(
+                "SELECT enqueue_immediate_alert('AccountingInvariantViolation',$1,$2,$3)", alertConnection);
+            alert.Parameters.AddWithValue("queued execution blocked by an accounting invariant");
+            alert.Parameters.AddWithValue($"accounting:{orderId:D}");
+            alert.Parameters.AddWithValue(timeProvider.GetUtcNow());
+            await alert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
     }
 }

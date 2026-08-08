@@ -53,6 +53,7 @@ services:
       STATUS_SEED_SIGNATURE_PATH: /run/market-bootstrap/status-seed.sig
       STATUS_PINNED_PUBLIC_KEY_PATH: /run/market-bootstrap/status-seed-public.der
       STATUS_PINNED_KEY_ID: ${STATUS_PINNED_KEY_ID:?set the reviewed status seed signer key ID}
+      CORPORATE_ACTION_INPUT_PATH: /run/corporate-actions
       COLLECTOR_POLL_SECONDS: ${COLLECTOR_POLL_SECONDS:-15}
       COLLECTOR_MAX_DOWNLOADS_PER_POLL: ${COLLECTOR_MAX_DOWNLOADS_PER_POLL:-32}
       COLLECTOR_CONFLICT_REFETCH_MINUTES: ${COLLECTOR_CONFLICT_REFETCH_MINUTES:-360}
@@ -60,6 +61,7 @@ services:
     volumes:
       - ${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq
       - ${MARKET_BOOTSTRAP_DIR:?set the reviewed signed seed and FIRDS plan directory}:/run/market-bootstrap:ro
+      - ${CORPORATE_ACTION_INPUT_DIR:?set the reviewed corporate-action input directory}:/run/corporate-actions:ro
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
     healthcheck:
@@ -165,7 +167,6 @@ services:
       AISTOCKS_BACKUP_IN_CONTAINER: "1"
       BACKUP_DATABASE_URL: ${BACKUP_DATABASE_URL:?set the restricted backup PostgreSQL URL}
       RESTORE_DATABASE_URL: ${RESTORE_DATABASE_URL:?set the disposable ai_stocks_test restore URL}
-      BACKUP_ALERT_WEBHOOK_URL: ${BACKUP_ALERT_WEBHOOK_URL:?set a private Discord failure webhook}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
       BACKUP_DIR: /backups
       BACKUP_PASSPHRASE_FILE: /run/secrets/backup-passphrase

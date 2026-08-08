@@ -160,6 +160,47 @@ public sealed class PostgresDailyReportPublisher(
     }
 }
 
+public sealed class PostgresImmediateAlertStore(NpgsqlDataSource dataSource, TimeProvider? timeProvider = null)
+{
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
+
+    public async Task EnqueueAsync(ImmediateAlert alert, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(alert);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand(
+            "SELECT enqueue_immediate_alert($1,$2,$3,$4)", connection);
+        command.Parameters.AddWithValue(alert.Kind.ToString());
+        command.Parameters.AddWithValue(alert.Detail);
+        command.Parameters.AddWithValue(alert.IdempotencyKey);
+        command.Parameters.AddWithValue(clock.GetUtcNow());
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+}
+
+public sealed class PostgresImmediateAlertPublisher(NpgsqlDataSource dataSource, AuditedDiscordDelivery delivery)
+{
+    public async Task<int> PublishPendingAsync(CancellationToken cancellationToken)
+    {
+        var pending = new List<(string Key, string Hash, string Message)>();
+        await using (var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        await using (var command = new NpgsqlCommand("""
+            SELECT 'alert:'||alert.alert_key,alert.content_hash::text,alert.message
+            FROM immediate_alerts alert
+            WHERE NOT EXISTS (SELECT FROM delivery_reservations delivery
+                              WHERE delivery.delivery_key='alert:'||alert.alert_key AND delivery.status='SUCCEEDED')
+            ORDER BY alert.occurred_at,alert.alert_key
+            """, connection))
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                pending.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+
+        foreach (var alert in pending)
+            await delivery.DeliverAsync(alert.Key, alert.Hash, alert.Message, cancellationToken).ConfigureAwait(false);
+        return pending.Count;
+    }
+}
+
 public sealed partial class HermesDiscordPort : IDiscordPort
 {
     private const int MaximumMessageLength = 6000;
@@ -207,15 +248,27 @@ public sealed partial class HermesDiscordPort : IDiscordPort
         try
         {
             using var document = JsonDocument.Parse(output);
-            if (document.RootElement.ValueKind != JsonValueKind.Object ||
-                !document.RootElement.TryGetProperty("success", out var success) || success.ValueKind != JsonValueKind.True ||
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                throw new OperationsException("Hermes delivery did not return a durable external receipt.");
+
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var property in document.RootElement.EnumerateObject())
+                if (!names.Add(property.Name))
+                    throw new OperationsException("Hermes delivery receipt contains duplicate properties.");
+
+            if (!document.RootElement.TryGetProperty("success", out var success) || success.ValueKind != JsonValueKind.True ||
+                !document.RootElement.TryGetProperty("platform", out var platform) || platform.ValueKind != JsonValueKind.String ||
+                !StringComparer.Ordinal.Equals(platform.GetString(), "discord") ||
                 !document.RootElement.TryGetProperty("message_id", out var messageId) || messageId.ValueKind != JsonValueKind.String ||
-                string.IsNullOrWhiteSpace(messageId.GetString()))
+                !DiscordSnowflakePattern().IsMatch(messageId.GetString()!))
                 throw new OperationsException("Hermes delivery did not return a durable external receipt.");
             return messageId.GetString()!;
         }
         catch (JsonException exception) { throw new OperationsException("Hermes delivery receipt is invalid.", exception); }
     }
+
+    [GeneratedRegex("^[0-9]{17,20}$", RegexOptions.CultureInvariant)]
+    private static partial Regex DiscordSnowflakePattern();
 
     [GeneratedRegex("^discord:[0-9]+(?::[0-9]+)?$", RegexOptions.CultureInvariant)]
     private static partial Regex TargetPattern();
@@ -224,6 +277,7 @@ public sealed partial class HermesDiscordPort : IDiscordPort
 public sealed class OperationsRuntimeService(
     PostgresContestOperations contest,
     PostgresDailyReportPublisher reports,
+    PostgresImmediateAlertPublisher alerts,
     TimeProvider timeProvider,
     TimeSpan pollInterval)
 {
@@ -234,6 +288,7 @@ public sealed class OperationsRuntimeService(
         while (!cancellationToken.IsCancellationRequested)
         {
             var now = timeProvider.GetUtcNow();
+            await alerts.PublishPendingAsync(cancellationToken).ConfigureAwait(false);
             await contest.ApplyDueCorporateActionsAsync(now, cancellationToken).ConfigureAwait(false);
             await contest.FinalizeIfDueAsync(now, cancellationToken).ConfigureAwait(false);
             await reports.PublishIfDueAsync(now, cancellationToken).ConfigureAwait(false);

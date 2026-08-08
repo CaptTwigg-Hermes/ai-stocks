@@ -43,6 +43,7 @@ env \
   NASDAQ_ARCHIVE_DIR=/tmp/archive \
   NASDAQ_STATUS_DIR=/tmp/status \
   MARKET_BOOTSTRAP_DIR=/tmp/market-bootstrap \
+  CORPORATE_ACTION_INPUT_DIR=/tmp/corporate-actions \
   STATUS_PINNED_KEY_ID=test-status-key \
   ACCESS_TEAM_DOMAIN=https://example.cloudflareaccess.com \
   ACCESS_AUD=test-aud \
@@ -51,7 +52,6 @@ env \
   ACCESS_VIEWER_EMAILS=viewer@example.com \
   TRUSTED_PROXY_IPS=127.0.0.1 \
   DISCORD_REPORT_TARGET='discord:1534963881317896212' \
-  BACKUP_ALERT_WEBHOOK_URL='https://discord.com/api/webhooks/test/test' \
   "$COMPOSE" config -q
 
 git diff --check

@@ -5,7 +5,7 @@ broker integration and cannot place real orders.
 
 ## Production topology
 
-- Dockge runs `app`, `worker`, and `collector`.
+- Dockge runs `app`, `worker`, `collector`, and `reporter`.
 - PostgreSQL is external. There is no database service in this
   Compose stack.
 - The app binds by default to `192.168.50.2:3232` for the existing
@@ -43,15 +43,31 @@ Create the host datasets from `.env` before opening the stack
 in Dockge:
 
 ```bash
-mkdir -p "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR" "$MARKET_BOOTSTRAP_DIR"
-chown -R 10001:10001 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR"
-chmod 700 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR"
+mkdir -p "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR" "$MARKET_BOOTSTRAP_DIR" "$CORPORATE_ACTION_INPUT_DIR"
+chown -R 10001:10001 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR" "$CORPORATE_ACTION_INPUT_DIR"
+chmod 700 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR" "$CORPORATE_ACTION_INPUT_DIR"
 ```
 
 `HERMES_AUTH_DIR` must contain only the credentials/configuration
 needed by the isolated Hermes runner. Archive and status datasets
 must be writable by UID/GID 10001. The app and worker mount market
 data read-only.
+
+The reporter requires `OPERATIONS_DATABASE_URL`, `HERMES_AUTH_DIR`,
+`DISCORD_REPORT_TARGET` (a numeric `discord:<channel>` target), and optionally
+`OPERATIONS_POLL_SECONDS` (default 30). It is the only Discord sender: daily
+reports and the five approved immediate-alert kinds use the same PostgreSQL
+lease, immutable audit, receipt, and idempotency path. Backup failures enqueue
+through `BACKUP_DATABASE_URL`; no unaudited Discord webhook is used.
+
+`CORPORATE_ACTION_INPUT_DIR` is a read-only owner-reviewed drop directory for
+schema-version-1 JSON normalizations. Each input identifies the XSTO
+ISIN/order-book, one of `DIVIDEND`, `SPLIT`, `CASH_MERGER`, `STOCK_MERGER`,
+`DELISTING`, or `CORRECTION`, exact normalized values, Nasdaq Main Markets
+evidence, an independent HTTPS evidence source, both payload SHA-256 values,
+and an `owner:*` approval/time. The collector is the sole production ingester;
+PostgreSQL rejects missing/mismatched evidence, conflicting replay, or direct
+runtime writes and retains the exact immutable input bytes and hash.
 
 `MARKET_BOOTSTRAP_DIR` is read-only configuration, not a preseeded data volume.
 It must contain the reviewed `status-seed.json`, detached `status-seed.sig`,
@@ -90,17 +106,17 @@ Equivalent CLI verification:
 
 ```bash
 docker compose config --quiet
-docker compose build --pull app worker collector backup-scheduler
+docker compose build --pull app worker collector reporter backup-scheduler
 docker compose --profile operations run --rm migrate
 docker compose --profile operations run --rm migrate bootstrap
 docker compose up -d collector
 # The collector acquires FIRDS/RSS/post-trade bytes and projects verified observations.
 # Wait until it has accumulated 20 complete verified sessions and /readyz passes.
 docker compose --profile operations run --rm migrate preflight
-docker compose up -d app worker
+docker compose up -d app worker reporter
 docker compose --profile operations up -d backup-scheduler
 docker compose ps
-docker compose logs --tail=100 app worker collector
+docker compose logs --tail=100 app worker collector reporter
 ```
 
 The migration runner applies checksum-locked SQL migrations. Those
@@ -114,7 +130,7 @@ PostgreSQL observation projection. `/readyz` remains closed until the required
 
 Verify separately:
 
-1. all three runtime services are healthy;
+1. all four runtime services are running and the three HTTP runtime services are healthy;
 2. unauthenticated direct-origin requests fail closed;
 3. an authorized Access session reaches the dashboard;
 4. only identities in `ACCESS_OWNER_EMAILS` can use contest controls;
@@ -165,7 +181,7 @@ have both succeeded in the Docker-capable deployment environment.
 ## Stop and incident handling
 
 ```bash
-docker compose stop app worker collector
+docker compose stop app worker collector reporter
 ```
 
 Do not use `docker compose down --volumes` as an operational habit.
