@@ -16,10 +16,47 @@ public static class ContestContract
         new(Guid.Parse("33333333-3333-3333-3333-333333333333"), "claude-sonnet-5"),
         new(Guid.Parse("44444444-4444-4444-4444-444444444444"), "gemini-3.1-pro-preview")
     ];
+
+    public static bool IsExactAgent(Guid agentId, string modelId) =>
+        Agents.Any(agent => agent.Id == agentId &&
+            string.Equals(agent.ModelId, modelId, StringComparison.Ordinal));
+}
+
+public static class Money
+{
+    public static decimal Round(decimal value) =>
+        decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+}
+
+public static class DecimalMath
+{
+    public static decimal Sqrt(decimal value)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
+        if (value == 0m)
+        {
+            return 0m;
+        }
+
+        var estimate = value >= 1m ? value : 1m;
+        while (true)
+        {
+            var next = (estimate + (value / estimate)) / 2m;
+            if (next == estimate)
+            {
+                return next;
+            }
+
+            estimate = next;
+        }
+    }
 }
 
 public sealed record AgentDefinition(Guid Id, string ModelId);
-public sealed record InstrumentId(string Isin, string OrderBookId, string Mic);
+public sealed record InstrumentId(string Isin, string OrderBookId, string Mic, string? IssuerId = null)
+{
+    public string IssuerKey => IssuerId ?? Isin;
+}
 
 public enum ContestStatus { Draft, Running, Paused, Finished }
 public enum OrderSide { Buy, Sell }
