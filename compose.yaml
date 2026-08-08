@@ -9,6 +9,11 @@ x-runtime-security: &runtime-security
   restart: unless-stopped
   stop_grace_period: 30s
 
+x-app-environment: &app-environment
+  APP_ENV: production
+  DATABASE_URL: ${DATABASE_URL:?set the restricted runtime PostgreSQL URL}
+  TZ: Europe/Stockholm
+
 services:
   app:
     <<: *runtime-security
@@ -17,21 +22,18 @@ services:
       dockerfile: Dockerfile
       target: app
     environment:
-      APP_ENV: production
-      DATABASE_URL: ${DATABASE_URL:?set the external ai_stocks PostgreSQL URL in .env}
-      ACCESS_TEAM_DOMAIN: ${ACCESS_TEAM_DOMAIN:?set the exact Cloudflare Access team domain in .env}
-      ACCESS_AUD: ${ACCESS_AUD:?set this Access application exact AUD in .env}
-      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set the exact public HTTPS origin in .env}
-      ACCESS_OWNER_EMAILS: ${ACCESS_OWNER_EMAILS:?set the owner email allowlist in .env}
-      ACCESS_ALLOW_ANY_AUTHENTICATED_VIEWER: ${ACCESS_ALLOW_ANY_AUTHENTICATED_VIEWER:-false}
-      ACCESS_VIEWER_EMAILS: ${ACCESS_VIEWER_EMAILS:-}
-      TZ: Europe/Stockholm
+      <<: *app-environment
+      ACCESS_TEAM_DOMAIN: ${ACCESS_TEAM_DOMAIN:?set the exact Cloudflare Access team domain}
+      ACCESS_AUD: ${ACCESS_AUD:?set the exact Access application AUD}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set the exact public HTTPS origin}
+      ACCESS_OWNER_EMAILS: ${ACCESS_OWNER_EMAILS:?set the owner email allowlist}
+      ACCESS_VIEWER_EMAILS: ${ACCESS_VIEWER_EMAILS:?set the viewer email allowlist}
     ports:
-      - "${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8000"
+      - "${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8080"
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).read()"]
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/healthz"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -43,9 +45,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: app
-    command: ["python", "-m", "ai_stocks.collector"]
+      target: collector
     environment:
+      APP_ENV: production
       ARCHIVE_PATH: /data/nasdaq
       COLLECTOR_POLL_SECONDS: ${COLLECTOR_POLL_SECONDS:-15}
       TZ: Europe/Stockholm
@@ -53,13 +55,13 @@ services:
       - ${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
-    networks: [egress]
     healthcheck:
-      test: ["CMD", "python", "-m", "ai_stocks.health", "collector"]
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 4
       start_period: 30s
+    networks: [egress]
 
   worker:
     <<: *runtime-security
@@ -67,29 +69,27 @@ services:
       context: .
       dockerfile: Dockerfile
       target: worker
-    command: ["python", "-m", "ai_stocks.worker_cli"]
     environment:
-      APP_ENV: production
-      DATABASE_URL: ${DATABASE_URL:?set the external ai_stocks PostgreSQL URL in .env}
+      <<: *app-environment
       HERMES_HOME: /run/hermes-auth
-      NASDAQ_UNIVERSE_PATH: /app/config/nasdaq-stockholm-main-market-universe.json
-      NASDAQ_STATUS_PATH: /data/status/status.json
+      HERMES_EXECUTABLE: /opt/hermes/bin/hermes
       NASDAQ_ARCHIVE_PATH: /data/nasdaq
+      NASDAQ_STATUS_PATH: /data/status
       WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-5}
-      TZ: Europe/Stockholm
+      DISCORD_TARGET: ${DISCORD_TARGET:?set the Hermes Discord target for #ai-stocks}
     volumes:
-      - ${HERMES_AUTH_DIR:?set a UID-10001 private Hermes auth directory}:/run/hermes-auth
+      - ${HERMES_AUTH_DIR:?set a UID-10001 private Hermes auth directory}:/run/hermes-auth:ro
       - ${NASDAQ_ARCHIVE_DIR:?set the Nasdaq archive dataset}:/data/nasdaq:ro
       - ${NASDAQ_STATUS_DIR:?set the verified Nasdaq status dataset}:/data/status:ro
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
-    networks: [egress]
     healthcheck:
-      test: ["CMD", "python", "-m", "ai_stocks.health", "worker"]
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 4
       start_period: 30s
+    networks: [egress]
 
   migrate:
     <<: *runtime-security
@@ -97,17 +97,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: app
-    command: ["/app/migrate.sh"]
+      target: operations
+    command: ["migrate"]
     environment:
       APP_ENV: production
-      DATABASE_URL: ${DATABASE_URL:?set the external ai_stocks PostgreSQL URL in .env}
-      ACCESS_TEAM_DOMAIN: ${ACCESS_TEAM_DOMAIN:?set the exact Cloudflare Access team domain in .env}
-      ACCESS_AUD: ${ACCESS_AUD:?set this Access application exact AUD in .env}
-      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set the exact public HTTPS origin in .env}
-      ACCESS_OWNER_EMAILS: ${ACCESS_OWNER_EMAILS:?set the owner email allowlist in .env}
-      ACCESS_ALLOW_ANY_AUTHENTICATED_VIEWER: ${ACCESS_ALLOW_ANY_AUTHENTICATED_VIEWER:-false}
-      ACCESS_VIEWER_EMAILS: ${ACCESS_VIEWER_EMAILS:-}
+      MIGRATOR_DATABASE_URL: ${MIGRATOR_DATABASE_URL:?set the privileged migrator PostgreSQL URL}
+      RUNTIME_DATABASE_URL: ${DATABASE_URL:?set the restricted runtime PostgreSQL URL}
+      ACCESS_TEAM_DOMAIN: ${ACCESS_TEAM_DOMAIN:?set the exact Cloudflare Access team domain}
+      ACCESS_AUD: ${ACCESS_AUD:?set the exact Access application AUD}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set the exact public HTTPS origin}
+      ACCESS_OWNER_EMAILS: ${ACCESS_OWNER_EMAILS:?set the owner email allowlist}
+      ACCESS_VIEWER_EMAILS: ${ACCESS_VIEWER_EMAILS:?set the viewer email allowlist}
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
     restart: "no"
@@ -117,7 +117,7 @@ services:
     image: postgres:18.4-bookworm@sha256:882236b897e39051d2368c5ccc6cda944904723506b2dfc97f2a8f5bc9afa382
     profiles: ["operations"]
     environment:
-      BACKUP_DATABASE_URL: ${BACKUP_DATABASE_URL:?set the libpq ai_stocks PostgreSQL URL in .env}
+      BACKUP_DATABASE_URL: ${BACKUP_DATABASE_URL:?set the libpq backup PostgreSQL URL}
       RESTORE_DATABASE_URL: ${RESTORE_DATABASE_URL:-}
     read_only: true
     cap_drop: ["ALL"]
