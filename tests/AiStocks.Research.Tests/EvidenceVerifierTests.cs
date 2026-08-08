@@ -54,6 +54,50 @@ public sealed class EvidenceVerifierTests
     }
 
     [Theory]
+    [InlineData("<dialog>Exact catalyst text</dialog>")]
+    [InlineData("<details><summary>Other text</summary><p>Exact catalyst text</p></details>")]
+    [InlineData("<details open><summary>Outer</summary><details><summary>Inner</summary><p>Exact catalyst text</p></details></details>")]
+    public async Task VerifyAsync_RejectsClaimsHiddenByClosedNativeDisclosureState(string body)
+    {
+        var html = ValidHtml.Replace("Exact catalyst text", body);
+
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() =>
+            Verifier(Response(HttpStatusCode.OK, html)).VerifyAsync(
+                Claim("https://example.com", "Exact catalyst text"), CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData("<dialog open>Exact catalyst text</dialog>")]
+    [InlineData("<dialog open=\"false\">Exact catalyst text</dialog>")]
+    [InlineData("<details open><summary>Other text</summary><p>Exact catalyst text</p></details>")]
+    [InlineData("<details open=\"false\"><summary>Other text</summary><p>Exact catalyst text</p></details>")]
+    [InlineData("<details><summary>Exact catalyst text</summary><p>Other text</p></details>")]
+    public async Task VerifyAsync_AcceptsClaimsVisibleUnderNativeOpenAttributeSemantics(string body)
+    {
+        var html = ValidHtml.Replace("Exact catalyst text", body);
+
+        var verified = await Verifier(Response(HttpStatusCode.OK, html)).VerifyAsync(
+            Claim("https://example.com", "Exact catalyst text"), CancellationToken.None);
+
+        Assert.Equal("Exact catalyst text", verified.ExactExcerpt);
+    }
+
+    [Theory]
+    [InlineData("<div popover>Exact catalyst text</div>")]
+    [InlineData("<select><option>Other text</option><option>Exact catalyst text</option></select>")]
+    [InlineData("<datalist><option>Exact catalyst text</option></datalist>")]
+    public async Task VerifyAsync_FailsClosedForUnsupportedNativeVisibilityElements(string body)
+    {
+        var html = ValidHtml.Replace("Exact catalyst text", body);
+
+        var exception = await Assert.ThrowsAsync<EvidenceVerificationException>(() =>
+            Verifier(Response(HttpStatusCode.OK, html)).VerifyAsync(
+                Claim("https://example.com", "Exact catalyst text"), CancellationToken.None));
+
+        Assert.Contains("native visibility", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
     [InlineData("<p style=\"font-size:0\">Exact catalyst text</p>")]
     [InlineData("<p style=\"color:transparent\">Exact catalyst text</p>")]
     [InlineData("<div style=\"color:transparent\"><p style=\"color:currentColor;opacity:.01\">Exact catalyst text</p></div>")]

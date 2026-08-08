@@ -491,6 +491,53 @@ public sealed class PostgresIntegrationTests
     }
 
     [Fact]
+    public async Task RealPostgresRestrictsResearchAttestationPersistenceToWorkerAuthority()
+    {
+        if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ResetDatabase(dataSource);
+        await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
+        await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
+        await Execute(connection, "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_stocks_public_attestation_test') THEN CREATE ROLE ai_stocks_public_attestation_test NOLOGIN NOINHERIT; END IF; END $$; GRANT USAGE ON SCHEMA public TO ai_stocks_public_attestation_test");
+
+        const string signature = "public.persist_research_attestation(uuid,uuid,uuid,uuid,text,text,text,text,jsonb,public.sha256_hex,bytea,public.sha256_hex,jsonb,public.sha256_hex,timestamptz)";
+        const string probe = """
+            SELECT public.persist_research_attestation(
+              '00000000-0000-0000-0000-000000000001'::uuid,NULL::uuid,NULL::uuid,
+              '11111111-1111-1111-1111-111111111111'::uuid,
+              'gpt-5.6-sol'::text,'copilot'::text,'gpt-5.6-sol'::text,'copilot'::text,
+              '{}'::jsonb,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'::public.sha256_hex,
+              '\x00'::bytea,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'::public.sha256_hex,
+              '[]'::jsonb,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'::public.sha256_hex,
+              '2026-08-08T09:01:00Z'::timestamptz)
+            """;
+
+        foreach (var role in new[]
+                 {
+                     "ai_stocks_collector", "ai_stocks_web_runtime", "ai_stocks_operations_runtime",
+                     "ai_stocks_public_attestation_test"
+                 })
+        {
+            Assert.Equal(false, await Scalar(connection, "SELECT has_function_privilege($1,$2,'EXECUTE')", role, signature));
+            await Execute(connection, $"SET ROLE {role}");
+            try { await AssertInsufficientPrivilege(connection, probe); }
+            finally { await Execute(connection, "RESET ROLE"); }
+        }
+
+        Assert.Equal(true, await Scalar(connection,
+            "SELECT has_function_privilege('ai_stocks_worker_runtime',$1,'EXECUTE')", signature));
+        await Execute(connection, "SET ROLE ai_stocks_worker_runtime");
+        try
+        {
+            var reachedBody = await Assert.ThrowsAsync<PostgresException>(() => Execute(connection, probe));
+            Assert.Equal(PostgresErrorCodes.RaiseException, reachedBody.SqlState);
+            Assert.Contains("bind a run or order", reachedBody.MessageText, StringComparison.OrdinalIgnoreCase);
+        }
+        finally { await Execute(connection, "RESET ROLE"); }
+    }
+
+    [Fact]
     public async Task RealPostgresDeniesCollectorAndWebRunAccountingResetAndFinalizationAuthority()
     {
         if (ConnectionString is not { } connectionString) return;

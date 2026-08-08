@@ -126,6 +126,7 @@ BEGIN
     RETURN p_id;
 END $$;
 
+REVOKE EXECUTE ON FUNCTION persist_research_attestation(uuid,uuid,uuid,uuid,text,text,text,text,jsonb,sha256_hex,bytea,sha256_hex,jsonb,sha256_hex,timestamptz) FROM PUBLIC;
 GRANT SELECT ON research_attestations TO ai_stocks_runtime;
 GRANT EXECUTE ON FUNCTION persist_research_attestation(uuid,uuid,uuid,uuid,text,text,text,text,jsonb,sha256_hex,bytea,sha256_hex,jsonb,sha256_hex,timestamptz) TO ai_stocks_runtime;
 RESET ROLE;

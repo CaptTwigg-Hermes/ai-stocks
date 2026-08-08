@@ -366,6 +366,8 @@ public sealed partial class EvidenceVerifier : IEvidenceVerifier
                 throw new EvidenceVerificationException("Evidence HTML depends on an external stylesheet, so visible text cannot be proven from the retained representation.");
             if (document.QuerySelector("style, [style]") is not null)
                 throw new EvidenceVerificationException("Evidence HTML contains CSS whose browser visibility cannot be proven from the retained representation.");
+            if (document.QuerySelector("[popover], select, datalist, object, iframe, canvas, audio, video, picture") is not null)
+                throw new EvidenceVerificationException("Evidence HTML contains unsupported native visibility semantics.");
             var roots = new List<IElement>();
             if (document.Body is not null) roots.Add(document.Body);
             roots.AddRange(document.QuerySelectorAll(string.Join(',', BlockElements)));
@@ -417,8 +419,16 @@ public sealed partial class EvidenceVerifier : IEvidenceVerifier
 
     private static bool IsHidden(IElement element)
     {
-        for (var current = element; current is not null; current = current.ParentElement)
+        IElement? descendant = null;
+        for (var current = element; current is not null; descendant = current, current = current.ParentElement)
         {
+            if (current.LocalName == "dialog" && !current.HasAttribute("open"))
+                return true;
+            if (current.LocalName == "details" && !current.HasAttribute("open") && descendant is not null)
+            {
+                var summary = current.Children.FirstOrDefault(child => child.LocalName == "summary");
+                if (!ReferenceEquals(descendant, summary)) return true;
+            }
             if (current.HasAttribute("hidden") ||
                 current.GetAttribute("aria-hidden")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true ||
                 current.LocalName is "script" or "style" or "noscript" or "template" or "svg" or "head")
