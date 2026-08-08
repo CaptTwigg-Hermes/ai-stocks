@@ -55,6 +55,16 @@ FROM runtime AS operations
 COPY --from=build --chown=app:app /out/operations ./
 ENTRYPOINT ["dotnet", "AiStocks.Operations.dll"]
 
+FROM postgres:18.4-bookworm@sha256:882236b897e39051d2368c5ccc6cda944904723506b2dfc97f2a8f5bc9afa382 AS backup-operations
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl openssl \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /ops
+COPY scripts/backup.sh scripts/restore-test.sh scripts/backup-cycle.sh ./scripts/
+COPY src/AiStocks.Persistence/Migrations ./src/AiStocks.Persistence/Migrations
+RUN chmod 0555 scripts/*.sh
+ENTRYPOINT ["/ops/scripts/backup-cycle.sh"]
+
 FROM python:3.13.5-slim-bookworm@sha256:4c2cf9917bd1cbacc5e9b07320025bdb7cdf2df7b0ceaccb55e9dd7e30987419 AS worker
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl \

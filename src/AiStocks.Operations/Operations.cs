@@ -104,19 +104,22 @@ public sealed record DeliveryAudit(
     string? Error,
     DateTimeOffset AttemptedAt);
 
-public enum ReservationState { Acquired, AlreadyCompleted, Conflict }
+public enum ReservationState { Acquired, AlreadyCompleted, Busy, Uncertain, Conflict }
 
-public sealed record DeliveryReservation(ReservationState State, DeliveryAudit? Existing)
+public sealed record DeliveryReservation(ReservationState State, DeliveryAudit? Existing, string? LeaseToken)
 {
-    public static DeliveryReservation Acquired() => new(ReservationState.Acquired, null);
-    public static DeliveryReservation AlreadyCompleted(DeliveryAudit audit) => new(ReservationState.AlreadyCompleted, audit);
-    public static DeliveryReservation Conflict() => new(ReservationState.Conflict, null);
+    public static DeliveryReservation Acquired(string leaseToken) => new(ReservationState.Acquired, null, leaseToken);
+    public static DeliveryReservation AlreadyCompleted(DeliveryAudit audit) => new(ReservationState.AlreadyCompleted, audit, null);
+    public static DeliveryReservation Busy() => new(ReservationState.Busy, null, null);
+    public static DeliveryReservation Uncertain() => new(ReservationState.Uncertain, null, null);
+    public static DeliveryReservation Conflict() => new(ReservationState.Conflict, null, null);
 }
 
 public interface IDeliveryAuditPort
 {
     Task<DeliveryReservation> ReserveAsync(string key, string contentHash, CancellationToken cancellationToken);
-    Task RecordAsync(DeliveryAudit audit, CancellationToken cancellationToken);
+    Task BeginSendAsync(string key, string contentHash, string leaseToken, CancellationToken cancellationToken);
+    Task RecordAsync(DeliveryAudit audit, string leaseToken, CancellationToken cancellationToken);
 }
 
 public interface IDiscordPort
@@ -136,24 +139,25 @@ public sealed class AuditedDiscordDelivery(IDeliveryAuditPort auditPort, IDiscor
             throw new OperationsException("Delivery key, content hash, and message are required.");
 
         var reservation = await auditPort.ReserveAsync(key, contentHash, cancellationToken).ConfigureAwait(false);
-        if (reservation.State == ReservationState.Conflict)
-            throw new OperationsException("Delivery idempotency conflict.");
+        if (reservation.State is ReservationState.Conflict or ReservationState.Busy or ReservationState.Uncertain)
+            throw new OperationsException($"Delivery cannot proceed safely: {reservation.State}.");
         if (reservation.State == ReservationState.AlreadyCompleted)
             return reservation.Existing!;
 
         var attemptedAt = clock.UtcNow;
+        await auditPort.BeginSendAsync(key, contentHash, reservation.LeaseToken!, cancellationToken).ConfigureAwait(false);
         try
         {
             var receipt = await discordPort.SendAsync(message, cancellationToken).ConfigureAwait(false);
             var success = new DeliveryAudit(key, contentHash, DeliveryStatus.Succeeded, receipt, null, attemptedAt);
-            await auditPort.RecordAsync(success, cancellationToken).ConfigureAwait(false);
+            await auditPort.RecordAsync(success, reservation.LeaseToken!, cancellationToken).ConfigureAwait(false);
             return success;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             var failure = new DeliveryAudit(key, contentHash, DeliveryStatus.Failed, null,
                 $"{exception.GetType().Name}: {exception.Message}", attemptedAt);
-            await auditPort.RecordAsync(failure, cancellationToken).ConfigureAwait(false);
+            await auditPort.RecordAsync(failure, reservation.LeaseToken!, cancellationToken).ConfigureAwait(false);
             throw new OperationsException("Discord delivery failed.", exception);
         }
     }

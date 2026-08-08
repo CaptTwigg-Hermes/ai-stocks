@@ -32,23 +32,19 @@ def test_dockge_compose_separates_and_hardens_services():
     assert "DATABASE_URL" not in backup
     assert backup["BACKUP_DATABASE_URL"].startswith("${BACKUP_DATABASE_URL:")
     expected_health = [
-        "CMD",
-        "curl",
-        "--fail",
-        "--silent",
-        "--max-time",
-        "2",
+        "CMD", "curl", "--fail", "--silent", "--max-time", "2",
         "http://127.0.0.1:8080/healthz",
     ]
     assert services["app"]["healthcheck"]["test"] == expected_health
     assert services["worker"]["healthcheck"]["test"] == expected_health
+    expected_health[-1] = "http://127.0.0.1:8080/readyz"
     assert services["collector"]["healthcheck"]["test"] == expected_health
 
 
 def test_backup_and_restore_handoff_exports_libpq_urls():
     example = (ROOT / ".env.example").read_text()
     readme = (ROOT / "README.md").read_text()
-    backup = (ROOT / "scripts/backup.sh").read_text()
+    backup = (ROOT / "scripts" / "backup.sh").read_text()
     assert "BACKUP_DATABASE_URL=postgresql://" in example
     assert 'export BACKUP_DATABASE_URL="$(grep' in readme
     assert 'export RESTORE_DATABASE_URL="$(grep' in readme
@@ -63,3 +59,15 @@ def test_image_build_pins_hermes_source_and_frozen_lock():
     assert "uv sync --frozen --no-dev --extra cli --extra web" in dockerfile
     assert "COPY --from=hermes-builder" in dockerfile
     assert "/opt/hermes /opt/hermes" in dockerfile
+
+
+def test_release_gate_and_restore_fail_closed_with_scheduled_backup():
+    verify = (ROOT / "scripts" / "verify-release.sh").read_text()
+    restore = (ROOT / "scripts" / "restore-test.sh").read_text()
+    cycle = (ROOT / "scripts" / "backup-cycle.sh").read_text()
+    compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
+    assert "AISTOCKS_TEST_DATABASE_URL is required" in verify
+    assert "restored migration checksums or contest invariants failed verification" in restore
+    assert "120000" in restore
+    assert "backup-cycle failed" in cycle
+    assert "backup-scheduler" in compose["services"]

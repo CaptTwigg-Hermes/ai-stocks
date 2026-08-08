@@ -146,6 +146,14 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
         return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true;
     }
 
+    public async Task<DateTimeOffset?> ContestStartedAtAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand("SELECT started_at FROM contest_state WHERE singleton AND status IN ('RUNNING','PAUSED')", connection);
+        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        return value is DateTimeOffset startedAt ? startedAt : null;
+    }
+
     public async Task<AgentContext> LoadIsolatedAsync(Guid agentId, CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -311,14 +319,28 @@ public sealed class WorkerRuntimeService(
             try
             {
                 var now = timeProvider.GetUtcNow();
-                var localDay = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, StockholmCalendar.Zone).DateTime);
-                if (StockholmCalendar.GetSession(localDay) is { } marketSession)
-                    await state.EnsureAtomicallyAsync(RunSchedule.Create(new Orchestration.TradingSession(marketSession.Day, marketSession.Open, marketSession.Close)), stoppingToken).ConfigureAwait(false);
+                if (await state.ContestStartedAtAsync(stoppingToken).ConfigureAwait(false) is { } startedAt)
+                    await state.EnsureAtomicallyAsync(WorkerScheduleRecovery.Create(startedAt, now), stoppingToken).ConfigureAwait(false);
                 while (await orchestrator.TickAsync(stoppingToken).ConfigureAwait(false)) { }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception exception) { logger.LogError(exception, "Worker iteration failed closed"); }
             await Task.Delay(poll, timeProvider, stoppingToken).ConfigureAwait(false);
         }
+    }
+}
+
+public static class WorkerScheduleRecovery
+{
+    public static IReadOnlyList<RunWindow> Create(DateTimeOffset contestStartedAt, DateTimeOffset now)
+    {
+        var first = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(contestStartedAt, StockholmCalendar.Zone).DateTime);
+        var last = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, StockholmCalendar.Zone).DateTime);
+        if (last < first) throw new ArgumentException("Recovery time cannot precede contest start.", nameof(now));
+        var windows = new List<RunWindow>();
+        for (var day = first; day <= last; day = day.AddDays(1))
+            if (StockholmCalendar.GetSession(day) is { } session)
+                windows.AddRange(RunSchedule.Create(new Orchestration.TradingSession(day, session.Open, session.Close)));
+        return windows;
     }
 }

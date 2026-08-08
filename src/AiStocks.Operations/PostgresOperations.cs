@@ -117,11 +117,17 @@ public sealed class PostgresDeliveryAuditPort(NpgsqlDataSource dataSource) : IDe
         try
         {
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-            await using var command = new NpgsqlCommand("SELECT reserve_delivery($1,$2::sha256_hex,clock_timestamp())::text", connection);
+            await using var command = new NpgsqlCommand("SELECT outcome,lease_token FROM reserve_delivery($1,$2::sha256_hex,clock_timestamp(),interval '5 minutes')", connection);
             command.Parameters.AddWithValue(key);
             command.Parameters.AddWithValue(contentHash);
-            var status = (string?)await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-            if (StringComparer.Ordinal.Equals(status, "RESERVED")) return DeliveryReservation.Acquired();
+            await using var result = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            if (!await result.ReadAsync(cancellationToken).ConfigureAwait(false)) return DeliveryReservation.Conflict();
+            var status = result.GetString(0);
+            var leaseToken = result.IsDBNull(1) ? null : result.GetGuid(1).ToString("D");
+            await result.DisposeAsync().ConfigureAwait(false);
+            if (StringComparer.Ordinal.Equals(status, "ACQUIRED")) return DeliveryReservation.Acquired(leaseToken!);
+            if (StringComparer.Ordinal.Equals(status, "BUSY")) return DeliveryReservation.Busy();
+            if (StringComparer.Ordinal.Equals(status, "UNCERTAIN")) return DeliveryReservation.Uncertain();
             if (!StringComparer.Ordinal.Equals(status, "SUCCEEDED")) return DeliveryReservation.Conflict();
             await using var existing = new NpgsqlCommand("SELECT receipt,updated_at FROM delivery_reservations WHERE delivery_key=$1", connection);
             existing.Parameters.AddWithValue(key);
@@ -136,11 +142,24 @@ public sealed class PostgresDeliveryAuditPort(NpgsqlDataSource dataSource) : IDe
         }
     }
 
-    public async Task RecordAsync(DeliveryAudit audit, CancellationToken cancellationToken)
+    public async Task BeginSendAsync(string key, string contentHash, string leaseToken, CancellationToken cancellationToken)
+    {
+        Validate(key, contentHash);
+        if (!Guid.TryParse(leaseToken, out var token)) throw new OperationsException("Delivery lease is invalid.");
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand("SELECT begin_delivery_send($1,$2::sha256_hex,$3,clock_timestamp())", connection);
+        command.Parameters.AddWithValue(key);
+        command.Parameters.AddWithValue(contentHash);
+        command.Parameters.AddWithValue(token);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task RecordAsync(DeliveryAudit audit, string leaseToken, CancellationToken cancellationToken)
     {
         Validate(audit.Key, audit.ContentHash);
+        if (!Guid.TryParse(leaseToken, out var token)) throw new OperationsException("Delivery lease is invalid.");
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new NpgsqlCommand("SELECT record_delivery($1,$2,$3::sha256_hex,$4::delivery_status,$5,$6,$7)", connection);
+        await using var command = new NpgsqlCommand("SELECT record_delivery($1,$2,$3::sha256_hex,$4::delivery_status,$5,$6,$7,$8)", connection);
         command.Parameters.AddWithValue(Guid.NewGuid());
         command.Parameters.AddWithValue(audit.Key);
         command.Parameters.AddWithValue(audit.ContentHash);
@@ -148,6 +167,7 @@ public sealed class PostgresDeliveryAuditPort(NpgsqlDataSource dataSource) : IDe
         AddNullable(command, audit.Receipt, NpgsqlDbType.Text);
         AddNullable(command, audit.Error, NpgsqlDbType.Text);
         command.Parameters.AddWithValue(audit.AttemptedAt);
+        command.Parameters.AddWithValue(token);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 

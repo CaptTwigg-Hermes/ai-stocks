@@ -58,9 +58,11 @@ public sealed class RuntimeIntegrationTests
         var claimed = Assert.IsType<ClaimedRun>(await worker.ClaimNextAsync(session.OpenAt.AddHours(-1), default));
 
         var delivery = new PostgresDeliveryAuditPort(source);
-        Assert.Equal(ReservationState.Acquired, (await delivery.ReserveAsync("daily:2026-08-10", new string('a', 64), default)).State);
+        var reservation = await delivery.ReserveAsync("daily:2026-08-10", new string('a', 64), default);
+        Assert.Equal(ReservationState.Acquired, reservation.State);
+        await delivery.BeginSendAsync("daily:2026-08-10", new string('a', 64), reservation.LeaseToken!, default);
         await delivery.RecordAsync(new DeliveryAudit("daily:2026-08-10", new string('a', 64), DeliveryStatus.Succeeded,
-            "receipt", null, DateTimeOffset.UtcNow), default);
+            "receipt", null, DateTimeOffset.UtcNow), reservation.LeaseToken!, default);
         Assert.Equal(ReservationState.AlreadyCompleted, (await delivery.ReserveAsync("daily:2026-08-10", new string('a', 64), default)).State);
 
         var dashboard = new PostgresDashboardFacade(source, TimeProvider.System);
@@ -149,6 +151,27 @@ public sealed class RuntimeIntegrationTests
         Assert.Equal(1, reader.GetInt64(1));
         Assert.Equal(1, reader.GetInt64(2));
         Assert.Equal(1, reader.GetInt64(3));
+    }
+
+    [Fact]
+    public async Task DisposablePostgresSerializesDeliveryLeaseAndFailsClosedAfterSendBegins()
+    {
+        var configured = Environment.GetEnvironmentVariable("AISTOCKS_TEST_DATABASE_URL");
+        if (string.IsNullOrWhiteSpace(configured)) return;
+        await using var database = await DisposableDatabase.CreateAsync(configured);
+        await using var source = NpgsqlDataSource.Create(database.ConnectionString);
+        await new PostgresMigrationRunner(source).ApplyAsync();
+        var port = new PostgresDeliveryAuditPort(source);
+        var hash = new string('b', 64);
+
+        var attempts = await Task.WhenAll(Enumerable.Range(0, 8)
+            .Select(_ => port.ReserveAsync("daily:lease-race", hash, default)));
+        var acquired = Assert.Single(attempts, x => x.State == ReservationState.Acquired);
+        Assert.All(attempts.Where(x => x != acquired), x => Assert.Equal(ReservationState.Busy, x.State));
+
+        await port.BeginSendAsync("daily:lease-race", hash, acquired.LeaseToken!, default);
+        Assert.Equal(ReservationState.Uncertain,
+            (await port.ReserveAsync("daily:lease-race", hash, default)).State);
     }
 
     private sealed class RecordingOperationsPorts : IOperationsPorts

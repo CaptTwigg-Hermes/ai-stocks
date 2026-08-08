@@ -68,11 +68,15 @@ Equivalent CLI verification:
 
 ```bash
 docker compose config --quiet
-docker compose build --pull app
+docker compose build --pull app worker collector backup-scheduler
 docker compose --profile operations run --rm migrate
 docker compose --profile operations run --rm migrate bootstrap
+docker compose up -d collector
+# Wait for /readyz, then run the separately deployed archive-to-PostgreSQL importer.
+# Do not continue until every eligible instrument has 20 complete verified sessions.
 docker compose --profile operations run --rm migrate preflight
-docker compose up -d app worker collector
+docker compose up -d app worker
+docker compose --profile operations up -d backup-scheduler
 docker compose ps
 docker compose logs --tail=100 app worker collector
 ```
@@ -80,7 +84,11 @@ docker compose logs --tail=100 app worker collector
 The migration runner applies checksum-locked SQL migrations. Those
 migrations idempotently create the fixed four agents and SEK 30,000
 ledgers. The explicit bootstrap command verifies that exact state;
-the final preflight command must pass before runtime services start.
+the final preflight command must pass before app/worker start. The collector
+must start first so `/readyz` can prove the filesystem feed is complete;
+preflight comes only after the separate PostgreSQL importer has loaded the
+required history. This repository does not yet compose that importer, so a
+clean deployment must stop here rather than claim launch readiness.
 
 Verify separately:
 
@@ -107,6 +115,12 @@ scripts/backup.sh
 Keep an off-host encrypted copy and a separately protected copy of
 the passphrase. Monitor every backup job; a created file alone is
 not proof of recoverability.
+
+For Dockge, start `backup-scheduler` in the `operations` profile. It runs an
+encrypted backup and disposable restore rehearsal every
+`BACKUP_INTERVAL_SECONDS`, validates migration checksums and contest/accounting
+invariants, clears `ai_stocks_test`, and posts failures to the private Discord
+webhook in `BACKUP_ALERT_WEBHOOK_URL`. No Cloudflare sidecar is required.
 
 ## Destructive restore rehearsal
 

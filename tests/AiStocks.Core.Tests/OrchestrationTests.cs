@@ -1,5 +1,6 @@
 using AiStocks.Core;
 using AiStocks.Operations;
+using AiStocks.Worker;
 using AiStocks.Worker.Orchestration;
 
 namespace AiStocks.Core.Tests;
@@ -42,6 +43,19 @@ public sealed class OrchestrationTests
         var batch = Assert.Single(port.Batches);
         Assert.Equal(24, batch.Count);
         Assert.Equal(24, batch.Select(x => x.RunKey).Distinct().Count());
+    }
+
+    [Fact]
+    public void RecoveryCreatesEveryTradingSessionFromContestStartThroughToday()
+    {
+        var started = AiStocks.MarketData.StockholmCalendar.Local(new DateOnly(2026, 8, 6), 10, 0);
+        var now = AiStocks.MarketData.StockholmCalendar.Local(new DateOnly(2026, 8, 10), 12, 0);
+
+        var windows = WorkerScheduleRecovery.Create(started, now);
+
+        Assert.Equal(72, windows.Count); // Thursday, Friday, and Monday; weekend is excluded.
+        Assert.Equal(new[] { new DateOnly(2026, 8, 6), new DateOnly(2026, 8, 7), new DateOnly(2026, 8, 10) },
+            windows.Select(x => DateOnly.ParseExact(x.RunKey[..10], "yyyy-MM-dd")).Distinct());
     }
 
     [Fact]
@@ -304,9 +318,10 @@ public sealed class OrchestrationTests
         {
             if (completed.TryGetValue(key, out var audit))
                 return Task.FromResult(audit.ContentHash == contentHash ? DeliveryReservation.AlreadyCompleted(audit) : DeliveryReservation.Conflict());
-            return Task.FromResult(DeliveryReservation.Acquired());
+            return Task.FromResult(DeliveryReservation.Acquired("lease-1"));
         }
-        public Task RecordAsync(DeliveryAudit audit, CancellationToken cancellationToken) { Audits.Add(audit); if (audit.Status == DeliveryStatus.Succeeded) completed[audit.Key] = audit; return Task.CompletedTask; }
+        public Task BeginSendAsync(string key, string contentHash, string leaseToken, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task RecordAsync(DeliveryAudit audit, string leaseToken, CancellationToken cancellationToken) { Audits.Add(audit); if (audit.Status == DeliveryStatus.Succeeded) completed[audit.Key] = audit; return Task.CompletedTask; }
     }
 
     private sealed class FakeDiscord : IDiscordPort

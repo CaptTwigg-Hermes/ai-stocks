@@ -27,9 +27,11 @@ fail() {
 case "$BACKUP_RETENTION_DAYS" in
   ''|*[!0-9]*) fail 'BACKUP_RETENTION_DAYS must be a non-negative integer' ;;
 esac
-command -v docker >/dev/null 2>&1 || fail 'docker is required'
 command -v openssl >/dev/null 2>&1 || fail 'openssl is required'
-if docker compose version >/dev/null 2>&1; then
+if [[ ${AISTOCKS_BACKUP_IN_CONTAINER:-0} == 1 ]]; then
+  command -v pg_dump >/dev/null 2>&1 || fail 'pg_dump is required'
+  COMPOSE=()
+elif docker compose version >/dev/null 2>&1; then
   COMPOSE=(docker compose)
 elif command -v docker-compose >/dev/null 2>&1; then
   COMPOSE=(docker-compose)
@@ -47,9 +49,12 @@ mkdir -- "$LOCK_DIR" 2>/dev/null || fail "another backup is running (lock: $LOCK
 [[ ! -e "$FINAL_PATH" ]] || fail "daily backup already exists: $FINAL_PATH"
 
 printf 'Creating encrypted PostgreSQL backup for %s...\n' "$TODAY"
-"${COMPOSE[@]}" --profile operations run --rm -T --no-deps \
-  -e BACKUP_DATABASE_URL backup-tools sh -ceu \
-  'exec pg_dump --format=custom --compress=9 --no-owner --no-privileges --dbname="$BACKUP_DATABASE_URL"' \
+if [[ ${AISTOCKS_BACKUP_IN_CONTAINER:-0} == 1 ]]; then
+  DUMP=(pg_dump --format=custom --compress=9 --no-owner --no-privileges --dbname="$BACKUP_DATABASE_URL")
+else
+  DUMP=("${COMPOSE[@]}" --profile operations run --rm -T --no-deps -e BACKUP_DATABASE_URL backup-tools sh -ceu 'exec pg_dump --format=custom --compress=9 --no-owner --no-privileges --dbname="$BACKUP_DATABASE_URL"')
+fi
+"${DUMP[@]}" \
   | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -md sha256 \
       -pass "file:$BACKUP_PASSPHRASE_FILE" -out "$TEMP_PATH"
 

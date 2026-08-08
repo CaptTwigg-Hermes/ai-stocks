@@ -15,9 +15,12 @@ fail() {
   exit 1
 }
 
-command -v docker >/dev/null 2>&1 || fail 'docker is required'
 command -v openssl >/dev/null 2>&1 || fail 'openssl is required'
-if docker compose version >/dev/null 2>&1; then
+if [[ ${AISTOCKS_BACKUP_IN_CONTAINER:-0} == 1 ]]; then
+  command -v psql >/dev/null 2>&1 || fail 'psql is required'
+  command -v pg_restore >/dev/null 2>&1 || fail 'pg_restore is required'
+  COMPOSE=()
+elif docker compose version >/dev/null 2>&1; then
   COMPOSE=(docker compose)
 elif command -v docker-compose >/dev/null 2>&1; then
   COMPOSE=(docker-compose)
@@ -28,6 +31,10 @@ fi
 [[ -n "${RESTORE_DATABASE_URL:-}" ]] || fail 'RESTORE_DATABASE_URL is required and must target ai_stocks_test'
 
 pg_tool() {
+  if [[ ${AISTOCKS_BACKUP_IN_CONTAINER:-0} == 1 ]]; then
+    "$@"
+    return
+  fi
   "${COMPOSE[@]}" --profile operations run --rm -T --no-deps \
     -e RESTORE_DATABASE_URL backup-tools "$@"
 }
@@ -48,11 +55,16 @@ clear_test_database() {
 }
 
 cleanup() {
+  local status=$?
+  trap - EXIT INT TERM
   if (( RESTORE_TOUCHED )); then
-    clear_test_database >/dev/null 2>&1 || printf \
-      'restore-test: WARNING: cleanup failed for ai_stocks_test\n' >&2
+    if ! clear_test_database >/dev/null 2>&1; then
+      printf 'restore-test: cleanup failed for ai_stocks_test\n' >&2
+      status=1
+    fi
   fi
   rmdir -- "$LOCK_DIR" 2>/dev/null || true
+  exit "$status"
 }
 trap cleanup EXIT INT TERM
 
@@ -88,8 +100,26 @@ openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 \
   | pg_tool pg_restore --exit-on-error --no-owner --no-privileges \
       --dbname="$RESTORE_DATABASE_URL"
 
+MIGRATION_VALUES=''
+for migration in src/AiStocks.Persistence/Migrations/*.sql; do
+  id=$(basename "$migration" .sql)
+  hash=$(sha256sum "$migration" | cut -d' ' -f1)
+  MIGRATION_VALUES+="('${id}','${hash}'),"
+done
+MIGRATION_VALUES=${MIGRATION_VALUES%,}
+VERIFY_SQL="WITH expected(id,sha256) AS (VALUES ${MIGRATION_VALUES})
+SELECT (SELECT count(*) FROM expected)=(SELECT count(*) FROM schema_migrations)
+ AND NOT EXISTS (SELECT FROM expected e LEFT JOIN schema_migrations m USING(id) WHERE m.sha256<>e.sha256 OR m.id IS NULL)
+ AND (SELECT count(*)=4 AND count(DISTINCT model_id)=4 AND bool_and(initial_cash=30000) FROM agents)
+ AND (SELECT count(*)=4 AND sum(cash)=120000 AND bool_and(cash>=0) FROM account_balances)
+ AND NOT EXISTS (SELECT FROM positions WHERE quantity<0 OR average_cost<0)
+ AND NOT EXISTS (SELECT FROM ledger_events GROUP BY agent_id HAVING sum(cash_delta)<0);"
+VERIFIED=$(pg_tool psql --no-psqlrc --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+  --dbname="$RESTORE_DATABASE_URL" --command="$VERIFY_SQL")
+[[ "$VERIFIED" == "t" ]] || fail 'restored migration checksums or contest invariants failed verification'
+
 TABLE_COUNT=$(pg_tool psql --no-psqlrc --tuples-only --no-align \
   --set=ON_ERROR_STOP=1 --dbname="$RESTORE_DATABASE_URL" \
   --command="SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND table_type = 'BASE TABLE'")
 (( TABLE_COUNT > 0 )) || fail 'restored database contains no user tables'
-printf 'Restore test passed: %s user tables restored; ai_stocks_test will be cleared.\n' "$TABLE_COUNT"
+printf 'Restore test passed: checksums, four agents/funding, invariants, and %s user tables verified; ai_stocks_test will be cleared.\n' "$TABLE_COUNT"
