@@ -45,8 +45,34 @@ public sealed record CollectionResult(IReadOnlyList<string> Downloaded, IReadOnl
     public string? FinalizedManifest => FinalizedManifests.LastOrDefault();
 }
 
-public sealed class NasdaqCollector(NasdaqPostTradeClient client, ImmutableArchive archive, SessionManifestStore manifests)
+public sealed record CollectorDownloadPolicy(int MaximumDownloadsPerPoll, TimeSpan ConflictRefetchInterval)
 {
+    public static CollectorDownloadPolicy Default { get; } = new(32, TimeSpan.FromHours(6));
+    public CollectorDownloadPolicy() : this(32, TimeSpan.FromHours(6)) { }
+}
+
+public sealed class NasdaqCollector
+{
+    private readonly NasdaqPostTradeClient client;
+    private readonly ImmutableArchive archive;
+    private readonly SessionManifestStore manifests;
+    private readonly CollectorDownloadPolicy policy;
+    private readonly Dictionary<string, DateTimeOffset> lastConflictChecks = new(StringComparer.Ordinal);
+
+    public NasdaqCollector(NasdaqPostTradeClient client, ImmutableArchive archive, SessionManifestStore manifests)
+        : this(client, archive, manifests, CollectorDownloadPolicy.Default) { }
+
+    public NasdaqCollector(NasdaqPostTradeClient client, ImmutableArchive archive, SessionManifestStore manifests,
+        CollectorDownloadPolicy policy)
+    {
+        if (policy.MaximumDownloadsPerPoll is < 1 or > 128 || policy.ConflictRefetchInterval < TimeSpan.FromMinutes(15))
+            throw new ArgumentOutOfRangeException(nameof(policy));
+        this.client = client;
+        this.archive = archive;
+        this.manifests = manifests;
+        this.policy = policy;
+    }
+
     public async Task<CollectionResult> CollectOnceAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
         var listing = await client.ListReportsAsync(cancellationToken).ConfigureAwait(false);
@@ -54,6 +80,7 @@ public sealed class NasdaqCollector(NasdaqPostTradeClient client, ImmutableArchi
         var downloaded = new List<string>();
         var missing = new List<string>();
         var finalized = new List<string>();
+        var downloadBudget = policy.MaximumDownloadsPerPoll;
         var days = listing.Select(NasdaqReportName.ParseTimestamp).Select(x => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(x, StockholmCalendar.Zone).DateTime))
             .Append(DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, StockholmCalendar.Zone).DateTime)).Distinct().Order().ToArray();
         foreach (var day in days)
@@ -68,19 +95,30 @@ public sealed class NasdaqCollector(NasdaqPostTradeClient client, ImmutableArchi
                 }
                 continue;
             }
-            foreach (var report in listing.Where(x =>
+            var due = listing.Where(x =>
             {
                 var timestamp = NasdaqReportName.ParseTimestamp(x);
                 return timestamp >= session.Open.AddMinutes(15) && timestamp <= session.Close.AddMinutes(15) && timestamp <= now;
-            }))
+            }).Select(report => (Report: report, Existing: archive.TryVerify(report)))
+              .OrderBy(item => item.Existing is null ? 0 : 1)
+              .ThenBy(item => NasdaqReportName.ParseTimestamp(item.Report));
+            foreach (var item in due)
             {
+                var report = item.Report;
+                var existing = item.Existing;
+                var lastChecked = lastConflictChecks.GetValueOrDefault(report, existing?.FetchedAt ?? DateTimeOffset.MinValue);
+                if (existing is not null && now - lastChecked < policy.ConflictRefetchInterval) continue;
+                if (downloadBudget == 0) break;
                 await client.DownloadAsync(report, now, cancellationToken).ConfigureAwait(false);
+                lastConflictChecks[report] = now;
                 downloaded.Add(report);
+                downloadBudget--;
             }
             if (now < session.Close.AddMinutes(15)) continue;
             var expected = SessionManifest.ExpectedReports(session);
             var absent = expected.Where(x => !listed.Contains(x)).ToArray();
             if (absent.Length > 0) { missing.AddRange(absent); continue; }
+            if (expected.Any(x => archive.TryVerify(x) is null)) continue;
             var archived = expected.Select(archive.Verify).ToArray();
             finalized.Add(manifests.Save(session, archived, now));
         }

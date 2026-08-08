@@ -13,7 +13,7 @@ CREATE TABLE market_firds_artifacts (
     cursor bigint PRIMARY KEY CHECK (cursor > 0),
     version text NOT NULL UNIQUE,
     is_full boolean NOT NULL,
-    source_url text NOT NULL CHECK (source_url ~ '^https://registers\.esma\.europa\.eu/'),
+    source_url text NOT NULL CHECK (source_url ~ '^https://firds\.esma\.europa\.eu/firds/[^/]+\.zip$'),
     payload bytea NOT NULL CHECK (octet_length(payload) > 0),
     payload_hash sha256_hex NOT NULL CHECK (payload_hash = encode(digest(payload, 'sha256'), 'hex')::sha256_hex),
     applied_at timestamptz NOT NULL,
@@ -49,8 +49,19 @@ CREATE TABLE market_status_events (
     isin char(12) NOT NULL,
     state text NOT NULL CHECK (state IN ('Clear','Warning','Observation','Suspended')),
     published_at timestamptz NOT NULL,
-    source_url text NOT NULL CHECK (source_url ~ '^https://api\.news\.eu\.nasdaq\.com/'),
-    raw_hash sha256_hex NOT NULL
+    source_url text NOT NULL CHECK (source_url ~ '^https://(api|view)\.news\.eu\.nasdaq\.com/'),
+    raw_hash sha256_hex NOT NULL,
+    rss_payload_hash sha256_hex NOT NULL,
+    rss_retrieved_at timestamptz NOT NULL
+);
+
+CREATE TABLE market_status_rss_artifacts (
+    payload_hash sha256_hex NOT NULL,
+    source_url text NOT NULL CHECK (source_url = 'https://api.news.eu.nasdaq.com/news/rss/mainMarketNotices'),
+    retrieved_at timestamptz NOT NULL,
+    payload bytea NOT NULL CHECK (octet_length(payload) > 0),
+    CHECK (payload_hash = encode(digest(payload, 'sha256'), 'hex')::sha256_hex),
+    PRIMARY KEY (payload_hash, retrieved_at)
 );
 
 CREATE TABLE market_status_current (
@@ -58,8 +69,12 @@ CREATE TABLE market_status_current (
     isin char(12) NOT NULL,
     state text NOT NULL CHECK (state IN ('Clear','Warning','Observation','Suspended')),
     effective_at timestamptz NOT NULL,
-    PRIMARY KEY (seed_as_of, isin)
+    PRIMARY KEY (seed_as_of, isin, effective_at)
 );
+
+ALTER TABLE market_status_events ADD CONSTRAINT market_status_event_rss_provenance
+    FOREIGN KEY (rss_payload_hash,rss_retrieved_at)
+    REFERENCES market_status_rss_artifacts(payload_hash,retrieved_at) ON DELETE RESTRICT;
 
 CREATE TABLE market_session_manifests (
     session_id text PRIMARY KEY REFERENCES trading_sessions(session_id) ON DELETE RESTRICT,
@@ -110,16 +125,17 @@ CREATE TRIGGER market_firds_artifacts_immutable BEFORE UPDATE OR DELETE ON marke
 CREATE TRIGGER market_instrument_versions_immutable BEFORE UPDATE OR DELETE ON market_instrument_versions FOR EACH ROW EXECUTE FUNCTION reject_audit_mutation();
 CREATE TRIGGER market_status_snapshots_immutable BEFORE UPDATE OR DELETE ON market_status_snapshots FOR EACH ROW EXECUTE FUNCTION reject_audit_mutation();
 CREATE TRIGGER market_status_events_immutable BEFORE UPDATE OR DELETE ON market_status_events FOR EACH ROW EXECUTE FUNCTION reject_audit_mutation();
+CREATE TRIGGER market_status_rss_artifacts_immutable BEFORE UPDATE OR DELETE ON market_status_rss_artifacts FOR EACH ROW EXECUTE FUNCTION reject_audit_mutation();
 CREATE TRIGGER market_status_current_immutable BEFORE UPDATE OR DELETE ON market_status_current FOR EACH ROW EXECUTE FUNCTION reject_audit_mutation();
 CREATE TRIGGER market_session_manifests_immutable BEFORE UPDATE OR DELETE ON market_session_manifests FOR EACH ROW EXECUTE FUNCTION reject_audit_mutation();
 CREATE TRIGGER market_manifest_reports_immutable BEFORE UPDATE OR DELETE ON market_manifest_reports FOR EACH ROW EXECUTE FUNCTION reject_audit_mutation();
 CREATE TRIGGER market_strict_trade_rows_immutable BEFORE UPDATE OR DELETE ON market_strict_trade_rows FOR EACH ROW EXECUTE FUNCTION reject_audit_mutation();
 
 REVOKE INSERT ON instruments,trading_sessions,instrument_session_stats,raw_market_reports,market_observations FROM ai_stocks_runtime;
-REVOKE ALL ON market_firds_artifacts,market_instrument_versions,market_status_snapshots,market_status_events,market_status_current,market_session_manifests,market_manifest_reports,market_strict_trade_rows,collector_runtime_state FROM PUBLIC,ai_stocks_runtime,ai_stocks_collector;
+REVOKE ALL ON market_firds_artifacts,market_instrument_versions,market_status_snapshots,market_status_events,market_status_rss_artifacts,market_status_current,market_session_manifests,market_manifest_reports,market_strict_trade_rows,collector_runtime_state FROM PUBLIC,ai_stocks_runtime,ai_stocks_collector;
 GRANT USAGE ON SCHEMA public TO ai_stocks_collector;
-GRANT SELECT ON market_firds_artifacts,market_instrument_versions,market_status_snapshots,market_status_events,market_status_current,market_session_manifests,market_manifest_reports,market_strict_trade_rows,collector_runtime_state TO ai_stocks_runtime,ai_stocks_collector;
-GRANT SELECT,INSERT ON instruments,trading_sessions,instrument_session_stats,raw_market_reports,market_observations,market_firds_artifacts,market_instrument_versions,market_status_snapshots,market_status_events,market_status_current,market_session_manifests,market_manifest_reports,market_strict_trade_rows TO ai_stocks_collector;
+GRANT SELECT ON market_firds_artifacts,market_instrument_versions,market_status_snapshots,market_status_events,market_status_rss_artifacts,market_status_current,market_session_manifests,market_manifest_reports,market_strict_trade_rows,collector_runtime_state TO ai_stocks_runtime,ai_stocks_collector;
+GRANT SELECT,INSERT ON instruments,trading_sessions,instrument_session_stats,raw_market_reports,market_observations,market_firds_artifacts,market_instrument_versions,market_status_snapshots,market_status_events,market_status_rss_artifacts,market_status_current,market_session_manifests,market_manifest_reports,market_strict_trade_rows TO ai_stocks_collector;
 GRANT UPDATE (last_poll_started_at,last_poll_succeeded_at,last_error,last_finalized_session_id) ON collector_runtime_state TO ai_stocks_collector;
 ALTER DEFAULT PRIVILEGES FOR ROLE ai_stocks_migrator IN SCHEMA public REVOKE ALL ON TABLES FROM ai_stocks_collector;
 RESET ROLE;

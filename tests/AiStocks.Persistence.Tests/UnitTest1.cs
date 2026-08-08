@@ -104,6 +104,7 @@ public sealed class PersistenceContractTests
         Assert.Contains("market_manifest_reports", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("market_instrument_versions", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("market_status_events", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("market_status_rss_artifacts", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("collector_runtime_state", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("REVOKE INSERT ON instruments,trading_sessions,instrument_session_stats,raw_market_reports,market_observations FROM ai_stocks_runtime", sql, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("GRANT UPDATE ON market_session_manifests", sql, StringComparison.OrdinalIgnoreCase);

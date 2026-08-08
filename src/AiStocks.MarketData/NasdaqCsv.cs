@@ -129,3 +129,16 @@ public static class NasdaqTradeSelection
         return prices.Length == 1 ? prices[0] : throw new MarketDataException("Closing auction PATS price is missing or ambiguous");
     }
 }
+
+public static class TradeInstrumentMapper
+{
+    public static FirdsInstrument Resolve(NasdaqTrade trade, IEnumerable<FirdsInstrument> instruments)
+    {
+        var matches = instruments.Where(x => x.Isin == trade.Isin && x.Venue == trade.Venue).ToArray();
+        return matches.Length == 1
+            ? matches[0]
+            : throw new MarketDataException(matches.Length == 0
+                ? "Trade ISIN has no authoritative FIRDS order-book mapping"
+                : "Trade source lacks order-book identity and FIRDS mapping is ambiguous");
+    }
+}

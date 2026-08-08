@@ -48,11 +48,18 @@ services:
       APP_ENV: production
       COLLECTOR_DATABASE_URL: ${COLLECTOR_DATABASE_URL:?set the least-privilege collector PostgreSQL URL}
       ARCHIVE_PATH: /data/nasdaq
+      FIRDS_ACQUISITION_PLAN_PATH: /run/market-bootstrap/firds-plan.json
+      STATUS_SEED_PAYLOAD_PATH: /run/market-bootstrap/status-seed.json
+      STATUS_SEED_SIGNATURE_PATH: /run/market-bootstrap/status-seed.sig
+      STATUS_PINNED_PUBLIC_KEY_PATH: /run/market-bootstrap/status-seed-public.der
       STATUS_PINNED_KEY_ID: ${STATUS_PINNED_KEY_ID:?set the reviewed status seed signer key ID}
       COLLECTOR_POLL_SECONDS: ${COLLECTOR_POLL_SECONDS:-15}
+      COLLECTOR_MAX_DOWNLOADS_PER_POLL: ${COLLECTOR_MAX_DOWNLOADS_PER_POLL:-32}
+      COLLECTOR_CONFLICT_REFETCH_MINUTES: ${COLLECTOR_CONFLICT_REFETCH_MINUTES:-360}
       TZ: Europe/Stockholm
     volumes:
       - ${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq
+      - ${MARKET_BOOTSTRAP_DIR:?set the reviewed signed seed and FIRDS plan directory}:/run/market-bootstrap:ro
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
     healthcheck:

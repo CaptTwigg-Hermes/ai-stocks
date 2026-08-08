@@ -22,8 +22,14 @@ def test_dockge_compose_separates_and_hardens_services():
     assert services["collector"]["build"]["target"] == "collector"
     assert services["worker"]["build"]["target"] == "worker"
     assert services["collector"]["volumes"] == [
-        "${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq"
+        "${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq",
+        "${MARKET_BOOTSTRAP_DIR:?set the reviewed signed seed and FIRDS plan directory}:/run/market-bootstrap:ro",
     ]
+    collector_environment = services["collector"]["environment"]
+    assert collector_environment["FIRDS_ACQUISITION_PLAN_PATH"] == "/run/market-bootstrap/firds-plan.json"
+    assert collector_environment["STATUS_SEED_PAYLOAD_PATH"] == "/run/market-bootstrap/status-seed.json"
+    assert collector_environment["STATUS_SEED_SIGNATURE_PATH"] == "/run/market-bootstrap/status-seed.sig"
+    assert collector_environment["STATUS_PINNED_PUBLIC_KEY_PATH"] == "/run/market-bootstrap/status-seed-public.der"
     assert (
         "${NASDAQ_ARCHIVE_DIR:?set the Nasdaq archive dataset}:/data/nasdaq:ro"
         in services["worker"]["volumes"]
@@ -81,3 +87,14 @@ def test_release_gate_and_restore_fail_closed_with_scheduled_backup():
     assert "120000" in restore
     assert "backup or restore verification failed" in cycle
     assert "backup-scheduler" in compose["services"]
+
+
+def test_clean_start_documents_composed_reference_acquisition_not_preseed_importer_magic():
+    readme = (ROOT / "README.md").read_text()
+    program = (ROOT / "src" / "AiStocks.Collector" / "Program.cs").read_text()
+    worker = (ROOT / "src" / "AiStocks.Collector" / "CollectorWorker.cs").read_text()
+    assert "firds-plan.json" in readme
+    assert "full" in readme and "delta" in readme
+    assert "MarketReferenceAcquirer" in program
+    assert "AcquireAsync" in worker
+    assert "separately deployed archive-to-PostgreSQL importer" not in readme

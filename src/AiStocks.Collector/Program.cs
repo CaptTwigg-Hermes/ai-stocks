@@ -7,6 +7,8 @@ var artifactRoot = builder.Configuration["ARTIFACT_ROOT"] ?? AppContext.BaseDire
 var databaseUrl = builder.Configuration["COLLECTOR_DATABASE_URL"]
     ?? throw new InvalidOperationException("COLLECTOR_DATABASE_URL is required");
 var firdsPath = builder.Configuration["FIRDS_STATE_PATH"] ?? Path.Combine(archivePath, "firds-state.json");
+var firdsPlanPath = builder.Configuration["FIRDS_ACQUISITION_PLAN_PATH"]
+    ?? throw new InvalidOperationException("FIRDS_ACQUISITION_PLAN_PATH is required");
 var seedPayloadPath = builder.Configuration["STATUS_SEED_PAYLOAD_PATH"] ?? Path.Combine(archivePath, "status-seed.json");
 var seedSignaturePath = builder.Configuration["STATUS_SEED_SIGNATURE_PATH"] ?? Path.Combine(archivePath, "status-seed.sig");
 var pinnedPublicKeyPath = builder.Configuration["STATUS_PINNED_PUBLIC_KEY_PATH"] ?? Path.Combine(archivePath, "status-seed-public.der");
@@ -26,7 +28,20 @@ builder.Services.AddHttpClient<NasdaqPostTradeClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("ai-stocks-collector/1.0 official-delayed-feed");
 });
-builder.Services.AddSingleton<NasdaqCollector>();
+builder.Services.AddHttpClient("market-reference", client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("ai-stocks-collector/1.0 authoritative-reference-acquisition");
+});
+builder.Services.AddSingleton(serviceProvider => new MarketReferenceAcquirer(
+    serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("market-reference"),
+    serviceProvider.GetRequiredService<DurableFirdsStore>(), serviceProvider.GetRequiredService<NasdaqStatusMachine>(),
+    firdsPlanPath, Path.Combine(archivePath, "status-rss")));
+builder.Services.AddSingleton(serviceProvider => new NasdaqCollector(
+    serviceProvider.GetRequiredService<NasdaqPostTradeClient>(), serviceProvider.GetRequiredService<ImmutableArchive>(),
+    serviceProvider.GetRequiredService<SessionManifestStore>(), new CollectorDownloadPolicy(
+        builder.Configuration.GetValue("COLLECTOR_MAX_DOWNLOADS_PER_POLL", 32),
+        TimeSpan.FromMinutes(builder.Configuration.GetValue("COLLECTOR_CONFLICT_REFETCH_MINUTES", 360)))));
 builder.Services.AddSingleton(serviceProvider => new PostgresCollectorPersistence(databaseUrl,
     serviceProvider.GetRequiredService<ImmutableArchive>(), serviceProvider.GetRequiredService<SessionManifestStore>(),
     serviceProvider.GetRequiredService<DurableFirdsStore>(), serviceProvider.GetRequiredService<NasdaqStatusMachine>(),

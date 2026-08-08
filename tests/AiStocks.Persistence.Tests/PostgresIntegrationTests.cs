@@ -352,7 +352,7 @@ public sealed class PostgresIntegrationTests
             var firdsPath = Path.Combine(root, "firds.json");
             var firds = new DurableFirdsStore(firdsPath);
             var full = await File.ReadAllBytesAsync(Path.Combine(fixtures, "firds-full.xml"));
-            firds.ApplyFull(new MemoryStream(full), new DateOnly(2026, 8, 6), new Uri("https://registers.esma.europa.eu/firds/full.xml"),
+            firds.ApplyFull(new MemoryStream(full), new DateOnly(2026, 8, 6), new Uri("https://firds.esma.europa.eu/firds/FULINS_E_20260806_01of01.zip"),
                 Convert.ToHexStringLower(SHA256.HashData(full)), "full-20260806", 1);
             using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
             var payload = "{\"asOf\":\"2026-08-06T07:00:00Z\",\"states\":{\"SE0000108656\":\"Clear\"}}";
@@ -361,6 +361,12 @@ public sealed class PostgresIntegrationTests
             await File.WriteAllBytesAsync(signaturePath, key.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256));
             var statuses = new PinnedStatusSeedVerifier("test-key", key.ExportSubjectPublicKeyInfo())
                 .Load(payload, await File.ReadAllBytesAsync(signaturePath), Path.Combine(root, "status.json"));
+            var rss = await File.ReadAllBytesAsync(Path.Combine(fixtures, "nasdaq-status-rss.xml"));
+            var rssHash = Convert.ToHexStringLower(SHA256.HashData(rss));
+            var rssPath = Path.Combine(root, rssHash + ".xml");
+            await File.WriteAllBytesAsync(rssPath, rss);
+            statuses.ApplyRssSnapshot(new MemoryStream(rss), new Uri("https://api.news.eu.nasdaq.com/news/rss/mainMarketNotices"),
+                DateTimeOffset.Parse("2026-08-06T09:00:00Z"), rssHash, rssPath);
             var session = StockholmCalendar.GetSession(new DateOnly(2026, 8, 6))!;
             var csv = await File.ReadAllBytesAsync(Path.Combine(fixtures, "nasdaq-posttrade.csv"));
             var reports = SessionManifest.ExpectedReports(session).Select(name => archive.Archive(name, csv,
@@ -372,8 +378,25 @@ public sealed class PostgresIntegrationTests
             await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
             Assert.Equal(511L, await ScalarLong(connection, "SELECT count(*) FROM raw_market_reports"));
             Assert.Equal(1L, await ScalarLong(connection, "SELECT count(*) FROM market_session_manifests"));
+            Assert.Equal(1L, await ScalarLong(connection, "SELECT count(*) FROM market_status_rss_artifacts"));
+            Assert.Equal(0L, await ScalarLong(connection, """
+                SELECT count(*) FROM market_status_events e LEFT JOIN market_status_rss_artifacts a
+                  ON (a.payload_hash,a.retrieved_at)=(e.rss_payload_hash,e.rss_retrieved_at)
+                WHERE a.payload_hash IS NULL
+                """));
             Assert.True(await ScalarLong(connection, "SELECT count(*) FROM market_strict_trade_rows") > 0);
+            Assert.Equal(await ScalarLong(connection, "SELECT count(*) FROM market_strict_trade_rows"),
+                await ScalarLong(connection, "SELECT count(*) FROM market_observations"));
+            Assert.Equal(0L, await ScalarLong(connection, """
+                SELECT count(*) FROM market_observations o
+                LEFT JOIN market_strict_trade_rows t ON t.id=(o.source_json->>'strictTradeRowId')::uuid
+                WHERE t.id IS NULL OR t.instrument_id<>o.instrument_id OR t.raw_market_report_id<>o.raw_market_report_id
+                   OR t.traded_at<>o.traded_at OR t.price<>o.price OR t.quantity<>o.quantity
+                """));
             Assert.Equal(1L, await ScalarLong(connection, "SELECT count(*) FROM instrument_session_stats WHERE complete"));
+            await persistence.PersistAsync(new CollectionResult([], [manifestPath], []), session.Close.AddHours(1), CancellationToken.None);
+            Assert.Equal(await ScalarLong(connection, "SELECT count(*) FROM market_strict_trade_rows"),
+                await ScalarLong(connection, "SELECT count(*) FROM market_observations"));
             var readiness = await new PostgresCollectorReadiness(connectionString).EvaluateAsync(session.Close.AddHours(1), CancellationToken.None);
             Assert.False(readiness.Ready);
             Assert.Contains(readiness.Failures, failure => failure.Contains("20 complete", StringComparison.Ordinal));

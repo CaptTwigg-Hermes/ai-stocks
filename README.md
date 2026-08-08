@@ -39,11 +39,11 @@ Replace every placeholder in `.env`. Never commit `.env`,
 `secrets/`, backups, database credentials, the Cloudflare Access
 AUD, or Hermes credentials.
 
-Create the three host datasets from `.env` before opening the stack
+Create the host datasets from `.env` before opening the stack
 in Dockge:
 
 ```bash
-mkdir -p "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR"
+mkdir -p "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR" "$MARKET_BOOTSTRAP_DIR"
 chown -R 10001:10001 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR"
 chmod 700 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR"
 ```
@@ -52,6 +52,28 @@ chmod 700 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR"
 needed by the isolated Hermes runner. Archive and status datasets
 must be writable by UID/GID 10001. The app and worker mount market
 data read-only.
+
+`MARKET_BOOTSTRAP_DIR` is read-only configuration, not a preseeded data volume.
+It must contain the reviewed `status-seed.json`, detached `status-seed.sig`,
+pinned `status-seed-public.der`, and `firds-plan.json`. The plan is an ordered,
+checksummed acquisition manifest; the collector downloads every unapplied ESMA
+artifact itself and applies the initial `full` followed by contiguous `delta`
+entries. Example:
+
+```json
+{"artifacts":[
+  {"kind":"full","sourceUrl":"https://firds.esma.europa.eu/firds/FULINS_E_20260806_01of02.zip","sha256":"<64 lowercase hex>","version":"full-2026-08-06-1","cursor":1,"effectiveAt":"2026-08-06"},
+  {"kind":"full-part","sourceUrl":"https://firds.esma.europa.eu/firds/FULINS_E_20260806_02of02.zip","sha256":"<64 lowercase hex>","version":"full-2026-08-06-2","cursor":2,"effectiveAt":"2026-08-06"},
+  {"kind":"delta","sourceUrl":"https://firds.esma.europa.eu/firds/DLTINS_E_20260807_01of01.zip","sha256":"<64 lowercase hex>","version":"delta-2026-08-07","cursor":3,"effectiveAt":"2026-08-07"}
+]}
+```
+
+The collector also fetches Nasdaq Main Markets RSS on every poll, archives the
+immutable raw XML by SHA-256, applies new notices to signed durable status, and
+persists FIRDS/RSS provenance transactionally with trade authority. Add reviewed
+delta entries to the mounted plan before their effective session. A clean
+`NASDAQ_ARCHIVE_DIR` is supported; missing/invalid plan, seed, signature, key,
+checksum, cursor, or upstream bytes keeps `/readyz` closed.
 
 Before deployment, verify that the Dockge host owns
 `192.168.50.2`, that port `3232` is free, and that the existing
@@ -72,8 +94,8 @@ docker compose build --pull app worker collector backup-scheduler
 docker compose --profile operations run --rm migrate
 docker compose --profile operations run --rm migrate bootstrap
 docker compose up -d collector
-# Wait for /readyz, then run the separately deployed archive-to-PostgreSQL importer.
-# Do not continue until every eligible instrument has 20 complete verified sessions.
+# The collector acquires FIRDS/RSS/post-trade bytes and projects verified observations.
+# Wait until it has accumulated 20 complete verified sessions and /readyz passes.
 docker compose --profile operations run --rm migrate preflight
 docker compose up -d app worker
 docker compose --profile operations up -d backup-scheduler
@@ -85,10 +107,10 @@ The migration runner applies checksum-locked SQL migrations. Those
 migrations idempotently create the fixed four agents and SEK 30,000
 ledgers. The explicit bootstrap command verifies that exact state;
 the final preflight command must pass before app/worker start. The collector
-must start first so `/readyz` can prove the filesystem feed is complete;
-preflight comes only after the separate PostgreSQL importer has loaded the
-required history. This repository does not yet compose that importer, so a
-clean deployment must stop here rather than claim launch readiness.
+must start first: it performs clean-start reference acquisition, bounded
+post-trade catch-up, immutable archival, and the transactionally bound
+PostgreSQL observation projection. `/readyz` remains closed until the required
+20 consecutive complete sessions have actually accumulated.
 
 Verify separately:
 

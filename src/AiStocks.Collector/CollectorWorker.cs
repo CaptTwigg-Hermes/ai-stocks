@@ -3,6 +3,7 @@ using AiStocks.MarketData;
 namespace AiStocks.Collector;
 
 public sealed class CollectorWorker(
+    MarketReferenceAcquirer referenceAcquirer,
     NasdaqCollector collector,
     PostgresCollectorPersistence persistence,
     CollectorHealth health,
@@ -21,6 +22,7 @@ public sealed class CollectorWorker(
             try
             {
                 await persistence.PollStartedAsync(now, stoppingToken).ConfigureAwait(false);
+                await referenceAcquirer.AcquireAsync(now, stoppingToken).ConfigureAwait(false);
                 var result = await collector.CollectOnceAsync(now, stoppingToken).ConfigureAwait(false);
                 if (result.Missing.Count > 0) throw new MarketDataException($"Session incomplete: {result.Missing.Count} reports missing");
                 await persistence.PersistAsync(result, now, stoppingToken).ConfigureAwait(false);

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.IO.Compression;
 using System.Text.Json;
 using System.Xml;
 using System.Xml.Linq;
@@ -79,11 +80,12 @@ public sealed class DurableFirdsStore
     private readonly FirdsUniverseParser _parser = new();
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     public DurableFirdsStore(string path) => _path = Path.GetFullPath(path);
+    public bool Exists => File.Exists(_path);
 
     public void ApplyFull(Stream xml, DateOnly effectiveAt, Uri sourceUrl, string sha256, string version, long cursor)
     {
         var bytes = ReadAndVerify(xml, sourceUrl, sha256, version, cursor);
-        var instruments = _parser.ParseFull(new MemoryStream(bytes), effectiveAt);
+        var instruments = _parser.ParseFull(OpenXmlPayload(bytes), effectiveAt);
         var current = File.Exists(_path) ? LoadVerified() : null;
         if (current is not null && (cursor <= current.Cursor || current.Versions.Any(x => x.Version == version)))
             throw new MarketDataException("FIRDS full cursor/version is not monotonic");
@@ -96,8 +98,21 @@ public sealed class DurableFirdsStore
         var current = LoadVerified();
         if (cursor != current.Cursor + 1 || current.Versions.Any(x => x.Version == version)) throw new MarketDataException("FIRDS delta cursor/version replay or gap");
         var bytes = ReadAndVerify(xml, sourceUrl, sha256, version, cursor);
-        var instruments = _parser.ApplyDelta(current.Instruments, new MemoryStream(bytes), effectiveAt);
+        var instruments = _parser.ApplyDelta(current.Instruments, OpenXmlPayload(bytes), effectiveAt);
         Persist(new(cursor, instruments, current.Versions.Append(new(version, cursor, sourceUrl, sha256, DateTimeOffset.UtcNow, false, ArchiveRaw(bytes, sha256))).ToArray()));
+    }
+
+    public void ApplyFullPart(Stream xml, DateOnly effectiveAt, Uri sourceUrl, string sha256, string version, long cursor)
+    {
+        var current = LoadVerified();
+        if (cursor != current.Cursor + 1 || current.Versions.Any(x => x.Version == version))
+            throw new MarketDataException("FIRDS full-part cursor/version replay or gap");
+        var bytes = ReadAndVerify(xml, sourceUrl, sha256, version, cursor);
+        var instruments = current.Instruments.Concat(_parser.ParseFull(OpenXmlPayload(bytes), effectiveAt))
+            .GroupBy(x => (x.Isin, x.OrderBookId)).Select(group => group.Last())
+            .OrderBy(x => x.Isin, StringComparer.Ordinal).ThenBy(x => x.OrderBookId, StringComparer.Ordinal).ToArray();
+        Persist(new(cursor, instruments, current.Versions.Append(new(version, cursor, sourceUrl, sha256,
+            DateTimeOffset.UtcNow, true, ArchiveRaw(bytes, sha256))).ToArray()));
     }
 
     public FirdsSnapshot LoadVerified()
@@ -121,12 +136,33 @@ public sealed class DurableFirdsStore
 
     private static byte[] ReadAndVerify(Stream stream, Uri sourceUrl, string sha256, string version, long cursor)
     {
-        if (sourceUrl.Scheme != Uri.UriSchemeHttps || sourceUrl.Host != "registers.esma.europa.eu" || string.IsNullOrWhiteSpace(version) || cursor <= 0 ||
+        if (!IsOfficialSource(sourceUrl) || string.IsNullOrWhiteSpace(version) || cursor <= 0 ||
             sha256.Length != 64 || !sha256.All(Uri.IsHexDigit)) throw new MarketDataException("FIRDS source provenance is invalid");
         using var memory = new MemoryStream(); stream.CopyTo(memory); var bytes = memory.ToArray();
         var actual = Convert.ToHexStringLower(SHA256.HashData(bytes));
         if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(actual), Convert.FromHexString(sha256))) throw new MarketDataException("FIRDS source checksum mismatch");
         return bytes;
+    }
+
+    public static bool IsOfficialSource(Uri sourceUrl) =>
+        sourceUrl.Scheme == Uri.UriSchemeHttps && sourceUrl.IsDefaultPort && string.IsNullOrEmpty(sourceUrl.UserInfo) &&
+        string.IsNullOrEmpty(sourceUrl.Query) && string.IsNullOrEmpty(sourceUrl.Fragment) &&
+        sourceUrl.Host == "firds.esma.europa.eu" && sourceUrl.AbsolutePath.StartsWith("/firds/", StringComparison.Ordinal) &&
+        sourceUrl.AbsolutePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+
+    private static Stream OpenXmlPayload(byte[] bytes)
+    {
+        if (bytes.Length < 4 || bytes[0] != (byte)'P' || bytes[1] != (byte)'K') return new MemoryStream(bytes, writable: false);
+        using var archive = new ZipArchive(new MemoryStream(bytes, writable: false), ZipArchiveMode.Read);
+        var entries = archive.Entries.Where(entry => entry.Name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (entries.Length != 1 || entries[0].Length <= 0 || entries[0].Length > 1_000_000_000)
+            throw new MarketDataException("FIRDS ZIP must contain exactly one bounded XML payload");
+        using var input = entries[0].Open();
+        var output = new MemoryStream(checked((int)Math.Min(entries[0].Length, int.MaxValue)));
+        input.CopyTo(output);
+        if (output.Length != entries[0].Length) throw new MarketDataException("FIRDS ZIP payload length is invalid");
+        output.Position = 0;
+        return output;
     }
 
     private void Persist(FirdsSnapshot state)

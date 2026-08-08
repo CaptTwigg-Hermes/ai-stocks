@@ -42,6 +42,7 @@ env \
   HERMES_AUTH_DIR=/tmp/hermes \
   NASDAQ_ARCHIVE_DIR=/tmp/archive \
   NASDAQ_STATUS_DIR=/tmp/status \
+  MARKET_BOOTSTRAP_DIR=/tmp/market-bootstrap \
   STATUS_PINNED_KEY_ID=test-status-key \
   ACCESS_TEAM_DOMAIN=https://example.cloudflareaccess.com \
   ACCESS_AUD=test-aud \
