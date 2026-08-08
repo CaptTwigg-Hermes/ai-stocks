@@ -11,6 +11,8 @@ public sealed class PostgresMigrationRunner(NpgsqlDataSource dataSource)
         await using (var migrationLock = new NpgsqlCommand("SELECT pg_advisory_xact_lock(741025001)", connection, transaction))
             await migrationLock.ExecuteNonQueryAsync(cancellationToken);
 
+        await RefuseUnmanagedApplicationSchemaAsync(connection, transaction, cancellationToken);
+
         await using (var bootstrap = new NpgsqlCommand(
             "CREATE TABLE IF NOT EXISTS schema_migrations (id text PRIMARY KEY, sha256 char(64) NOT NULL, applied_at timestamptz NOT NULL DEFAULT clock_timestamp())",
             connection, transaction))
@@ -36,5 +38,29 @@ public sealed class PostgresMigrationRunner(NpgsqlDataSource dataSource)
             await record.ExecuteNonQueryAsync(cancellationToken);
         }
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static async Task RefuseUnmanagedApplicationSchemaAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("""
+            SELECT to_regclass('public.schema_migrations') IS NULL
+               AND EXISTS (
+                   SELECT 1
+                   FROM pg_catalog.pg_class c
+                   JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                   WHERE n.nspname = 'public'
+                     AND c.relkind IN ('r','p')
+                     AND c.relname = ANY (ARRAY[
+                         'agents','contest_state','instruments','market_observations',
+                         'orders','fills','positions','account_balances','final_rankings'
+                     ]::text[])
+               )
+            """, connection, transaction);
+        if (await command.ExecuteScalarAsync(cancellationToken) is true)
+            throw new InvalidOperationException(
+                "The target contains unmanaged AI Stocks tables. Use a clean database; in-place legacy migration is refused.");
     }
 }

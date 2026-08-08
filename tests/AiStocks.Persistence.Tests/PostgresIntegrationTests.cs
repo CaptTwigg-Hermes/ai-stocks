@@ -279,6 +279,29 @@ public sealed class PostgresIntegrationTests
         Assert.Equal(4L, await ScalarLong(connection, "SELECT count(*) FROM final_rankings WHERE reference='final-2026'"));
     }
 
+    [Fact]
+    public async Task MigrationRefusesUnmanagedLegacyApplicationTables()
+    {
+        if (ConnectionString is not { } connectionString) return;
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ResetDatabase(dataSource);
+        try
+        {
+            await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
+            await Execute(connection, "CREATE TABLE orders(id bigint PRIMARY KEY)");
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None));
+            Assert.Contains("clean database", exception.Message, StringComparison.OrdinalIgnoreCase);
+            await using var check = new NpgsqlCommand("SELECT to_regclass('public.schema_migrations') IS NULL", connection);
+            Assert.True(await check.ExecuteScalarAsync(CancellationToken.None) is true);
+        }
+        finally
+        {
+            await ResetDatabase(dataSource);
+        }
+    }
+
     private static async Task ResetDatabase(NpgsqlDataSource source)
     {
         await using var connection = await source.OpenConnectionAsync(CancellationToken.None);
