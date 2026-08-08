@@ -179,13 +179,20 @@ public sealed partial class HermesDiscordPort : IDiscordPort
         }
         var output = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         if (process.ExitCode != 0 || output.Length > 64_000) throw new OperationsException("Hermes delivery failed safely.");
+        return ParseReceipt(output);
+    }
+
+    public static string ParseReceipt(string output)
+    {
         try
         {
             using var document = JsonDocument.Parse(output);
             if (document.RootElement.ValueKind != JsonValueKind.Object ||
-                !document.RootElement.TryGetProperty("ok", out var ok) || !ok.GetBoolean())
-                throw new OperationsException("Hermes delivery did not confirm success.");
-            return output;
+                !document.RootElement.TryGetProperty("success", out var success) || success.ValueKind != JsonValueKind.True ||
+                !document.RootElement.TryGetProperty("message_id", out var messageId) || messageId.ValueKind != JsonValueKind.String ||
+                string.IsNullOrWhiteSpace(messageId.GetString()))
+                throw new OperationsException("Hermes delivery did not return a durable external receipt.");
+            return messageId.GetString()!;
         }
         catch (JsonException exception) { throw new OperationsException("Hermes delivery receipt is invalid.", exception); }
     }

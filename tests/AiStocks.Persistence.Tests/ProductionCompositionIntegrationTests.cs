@@ -8,6 +8,16 @@ namespace AiStocks.Persistence.Tests;
 public sealed class ProductionCompositionIntegrationTests
 {
     [Fact]
+    public void HermesDiscordReceiptRequiresCliSuccessAndExternalMessageIdentity()
+    {
+        Assert.Equal("discord-message-123", HermesDiscordPort.ParseReceipt(
+            "{\"success\":true,\"platform\":\"discord\",\"message_id\":\"discord-message-123\"}"));
+        Assert.Throws<OperationsException>(() => HermesDiscordPort.ParseReceipt("{\"ok\":true}"));
+        Assert.Throws<OperationsException>(() => HermesDiscordPort.ParseReceipt("{\"success\":true}"));
+        Assert.Throws<OperationsException>(() => HermesDiscordPort.ParseReceipt("{\"success\":false,\"message_id\":\"unexpected\"}"));
+    }
+
+    [Fact]
     public async Task AcceptedQueueFlowsThroughFillActionsFinalizationReportAndLeasedDelivery()
     {
         var configured = Environment.GetEnvironmentVariable("AISTOCKS_TEST_DATABASE_URL");
