@@ -63,6 +63,7 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
         if (!Guid.TryParse(completion.ClaimToken, out var token)) throw new InvalidOperationException("Invalid run claim token.");
         if (completion.Outcome == RunAttemptOutcome.Succeeded)
             PostRunAcceptance.EnsureWithinDeadline(completion.Run, completion.CompletedAt);
+        ValidateAttestedBytes(completion.Result);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         int attempt;
@@ -132,7 +133,8 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
             orderId = (Guid)(await submit.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("Order was not persisted."));
         }
         if (attested is not null)
-            await new ResearchAttestationStore().PersistAsync(connection, transaction, CreatePersistableAttestation(attested, runId, orderId), cancellationToken).ConfigureAwait(false);
+            await new ResearchAttestationStore().PersistAsync(connection, transaction,
+                CreatePersistableAttestation(attested, completion.Result!.Decision!, runId, orderId), cancellationToken).ConfigureAwait(false);
         await using (var finish = new NpgsqlCommand("SELECT complete_scheduled_run($1,$2,$3::run_status,$4,$5,$6)", connection, transaction))
         {
             finish.Parameters.AddWithValue(scheduledId); finish.Parameters.AddWithValue(token); finish.Parameters.AddWithValue(Status(completion.Outcome));
@@ -225,7 +227,23 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
     private static void AddNullable(NpgsqlCommand command, object? value, NpgsqlDbType type) =>
         command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = type, Value = value ?? DBNull.Value });
 
-    private static PersistableResearchAttestation CreatePersistableAttestation(AttestedResearchDecision value, Guid runId, Guid? orderId)
+    private static void ValidateAttestedBytes(AgentRunResult? result)
+    {
+        if (result?.Attestation is null) return;
+        if (result.Decision is null || !HashMatches(Encoding.UTF8.GetBytes(result.Decision),
+                result.Attestation.Provenance.StandardOutputSha256))
+            throw new DecisionValidationException("Attested standard output hash does not match the exact decision bytes.");
+        foreach (var evidence in result.Attestation.Decision.Evidence)
+            if (!HashMatches(evidence.ImmutableContent.AsSpan(), evidence.ContentSha256))
+                throw new DecisionValidationException("Attested evidence hash does not match its immutable content bytes.");
+    }
+
+    private static bool HashMatches(ReadOnlySpan<byte> bytes, string expected) =>
+        expected.Length == 64 && StringComparer.Ordinal.Equals(
+            Convert.ToHexStringLower(SHA256.HashData(bytes)), expected);
+
+    private static PersistableResearchAttestation CreatePersistableAttestation(
+        AttestedResearchDecision value, string exactDecisionOutput, Guid runId, Guid? orderId)
     {
         var provenance = value.Provenance;
         var invocation = Canonicalize(JsonSerializer.Serialize(new
@@ -244,6 +262,7 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
             completed_at = provenance.CompletedAt,
             exit_code = provenance.ExitCode,
             standard_output_sha256 = provenance.StandardOutputSha256,
+            standard_output_base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(exactDecisionOutput)),
             standard_error_sha256 = provenance.StandardErrorSha256
         }));
         var evidence = Canonicalize(JsonSerializer.Serialize(value.Decision.Evidence.Select(item => new

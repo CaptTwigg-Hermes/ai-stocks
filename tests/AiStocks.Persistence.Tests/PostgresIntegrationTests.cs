@@ -409,6 +409,8 @@ public sealed class PostgresIntegrationTests
             """, orderA, agent, instrument, orderB);
         var report = System.Text.Encoding.UTF8.GetBytes("{\"model\":\"gpt-5.6-sol\",\"provider\":\"copilot\",\"completed\":true,\"failed\":false,\"api_calls\":1}");
         var reportHash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(report));
+        var decisionOutput = System.Text.Encoding.UTF8.GetBytes("exact decision bytes");
+        var decisionOutputHash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(decisionOutput));
         var invocation = JsonSerializer.Serialize(new Dictionary<string, object>
         {
             ["agent_id"] = agent.ToString(),
@@ -416,18 +418,49 @@ public sealed class PostgresIntegrationTests
             ["requested_provider"] = "copilot",
             ["model_id"] = "gpt-5.6-sol",
             ["provider"] = "copilot",
-            ["runtime_report_sha256"] = reportHash
+            ["runtime_report_sha256"] = reportHash,
+            ["standard_output_sha256"] = decisionOutputHash,
+            ["standard_output_base64"] = Convert.ToBase64String(decisionOutput)
         });
         using var invocationDocument = JsonDocument.Parse(invocation);
         var canonicalInvocation = CanonicalJson.Serialize(invocationDocument.RootElement);
         var invocationHash = CanonicalJson.Sha256(invocationDocument.RootElement);
-        const string evidence = "[]";
+        var evidenceContent = System.Text.Encoding.UTF8.GetBytes("news");
+        var evidence = JsonSerializer.Serialize(new[] { new
+        {
+            content_sha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(evidenceContent)),
+            immutable_content = Convert.ToBase64String(evidenceContent)
+        }});
         using var evidenceDocument = JsonDocument.Parse(evidence);
         var evidenceHash = CanonicalJson.Sha256(evidenceDocument.RootElement);
         var attestation = Guid.NewGuid();
         Assert.Equal(attestation, await ScalarGuid(connection, """
             SELECT persist_research_attestation($1,$2,$3,$4,'gpt-5.6-sol','copilot','gpt-5.6-sol','copilot',$5::jsonb,$6::sha256_hex,$7,$8::sha256_hex,$9::jsonb,$10::sha256_hex,'2026-08-08T09:01:00Z')
             """, attestation, run, orderA, agent, canonicalInvocation, invocationHash, report, reportHash, evidence, evidenceHash));
+        var badOutput = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["agent_id"] = agent.ToString(),
+            ["requested_model_id"] = "gpt-5.6-sol",
+            ["requested_provider"] = "copilot",
+            ["model_id"] = "gpt-5.6-sol",
+            ["provider"] = "copilot",
+            ["runtime_report_sha256"] = reportHash,
+            ["standard_output_sha256"] = new string('0', 64),
+            ["standard_output_base64"] = Convert.ToBase64String(decisionOutput)
+        });
+        using var badOutputJson = JsonDocument.Parse(badOutput);
+        var outputMismatch = await Assert.ThrowsAsync<PostgresException>(() => ScalarGuid(connection, """
+            SELECT persist_research_attestation(gen_random_uuid(),$1,NULL,$2,'gpt-5.6-sol','copilot','gpt-5.6-sol','copilot',$3::jsonb,$4::sha256_hex,$5,$6::sha256_hex,$7::jsonb,$8::sha256_hex,'2026-08-08T09:01:00Z')
+            """, run, agent, CanonicalJson.Serialize(badOutputJson.RootElement), CanonicalJson.Sha256(badOutputJson.RootElement),
+            report, reportHash, evidence, evidenceHash));
+        Assert.Contains("output hash", outputMismatch.MessageText, StringComparison.OrdinalIgnoreCase);
+        const string badEvidence = "[{\"content_sha256\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"immutable_content\":\"bmV3cw==\"}]";
+        using var badEvidenceJson = JsonDocument.Parse(badEvidence);
+        var evidenceMismatch = await Assert.ThrowsAsync<PostgresException>(() => ScalarGuid(connection, """
+            SELECT persist_research_attestation(gen_random_uuid(),$1,NULL,$2,'gpt-5.6-sol','copilot','gpt-5.6-sol','copilot',$3::jsonb,$4::sha256_hex,$5,$6::sha256_hex,$7::jsonb,$8::sha256_hex,'2026-08-08T09:01:00Z')
+            """, run, agent, canonicalInvocation, invocationHash, report, reportHash,
+            badEvidence, CanonicalJson.Sha256(badEvidenceJson.RootElement)));
+        Assert.Contains("evidence content hash", evidenceMismatch.MessageText, StringComparison.OrdinalIgnoreCase);
         var split = await Assert.ThrowsAsync<PostgresException>(() => ScalarGuid(connection, """
             SELECT persist_research_attestation(gen_random_uuid(),$1,$2,$3,'gpt-5.6-sol','copilot','gpt-5.6-sol','copilot',$4::jsonb,$5::sha256_hex,$6,$7::sha256_hex,$8::jsonb,$9::sha256_hex,'2026-08-08T09:01:00Z')
             """, run, orderB, agent, canonicalInvocation, invocationHash, report, reportHash, evidence, evidenceHash));

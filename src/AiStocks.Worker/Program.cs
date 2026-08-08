@@ -7,6 +7,13 @@ using AiStocks.Worker;
 using AiStocks.Worker.Orchestration;
 using Npgsql;
 
+if (args.Contains("--probe-order-path-denial", StringComparer.Ordinal))
+{
+    Console.WriteLine("AISTOCKS_ORDER_PATH_PROBE=" +
+        System.Text.Json.JsonSerializer.Serialize(NoBrokerOrderPathProbe.Run()));
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = PostgresConfiguration.Require(PostgresConfiguration.Environment(), "DATABASE_URL");
 var dataSource = NpgsqlDataSource.Create(connectionString);

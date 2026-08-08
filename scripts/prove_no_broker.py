@@ -7,9 +7,9 @@ import os
 import pathlib
 import re
 import shutil
-import subprocess
+import subprocess  # nosec B404 - fixed local dotnet executable and arguments only
 import sys
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405 - parses repository-owned csproj files only
 from typing import Any, cast
 from urllib.parse import urlparse
 
@@ -21,6 +21,8 @@ FORBIDDEN_CREDENTIAL = re.compile(r"(?:broker|alpaca|ibkr|interactive_?brokers|n
 URL = re.compile(r'https?://[^\s"\'<>]+', re.I)
 ENVIRONMENT = re.compile(r'Environment\.GetEnvironmentVariable\(\s*"([A-Za-z0-9_]+)"')
 CONFIGURATION = re.compile(r'(?:Configuration\s*\[\s*"(?P<index>[A-Za-z0-9_:.-]+)"\s*\]|Configuration\.(?:GetValue|GetSection)\s*\(\s*"(?P<method>[A-Za-z0-9_:.-]+)"|PostgresConfiguration\.Require\s*\([^,]+,\s*"(?P<require>[A-Za-z0-9_:.-]+)")')
+DYNAMIC_CONFIGURATION = re.compile(r'Configuration\s*\[\s*(?!")(?P<index>[^\]]+)\]|PostgresConfiguration\.Require\s*\([^,]+,\s*(?!")(?P<require>[^\)]+)\)')
+BULK_ENVIRONMENT = re.compile(r'(?:PostgresConfiguration\.Environment|(?:System\.)?Environment\.GetEnvironmentVariables)\s*\(\s*\)')
 GROUP = re.compile(r'\bvar\s+(?P<name>[A-Za-z_]\w*)\s*=\s*\w+\.MapGroup\s*\(\s*"(?P<prefix>/[^"?]*)"')
 ROUTE = re.compile(r'\b(?P<receiver>[A-Za-z_]\w*)\.Map(?P<method>Get|Post|Put|Patch|Delete)\s*\(\s*"(?P<path>/[^"?]*)"')
 ROUTE_HELPER = re.compile(r'\bMapControl\s*\(\s*(?P<receiver>[A-Za-z_]\w*)\s*,\s*"(?P<path>/[^"?]*)"')
@@ -33,6 +35,55 @@ SHIPPED_EXECUTABLES = {"AiStocks.Collector", "AiStocks.Web", "AiStocks.Worker"}
 
 def relative(path: pathlib.Path) -> str:
     return path.relative_to(ROOT).as_posix()
+
+
+def configuration_reads(text: str, file: str) -> dict[str, list[dict[str, object]]]:
+    environment = [{"file": file, "line": text.count("\n", 0, match.start()) + 1, "name": match.group(1)}
+                   for match in ENVIRONMENT.finditer(text)]
+    environment.extend({"file": file, "line": text.count("\n", 0, match.start()) + 1, "name": "*"}
+                       for match in BULK_ENVIRONMENT.finditer(text))
+    configuration = [{"file": file, "line": text.count("\n", 0, match.start()) + 1,
+                      "name": next(value for value in match.groupdict().values() if value is not None)}
+                     for match in CONFIGURATION.finditer(text)]
+    dynamic = [{"file": file, "line": text.count("\n", 0, match.start()) + 1,
+                "expression": next(value.strip() for value in match.groupdict().values() if value is not None)}
+               for match in DYNAMIC_CONFIGURATION.finditer(text)
+               if not next(value.strip() for value in match.groupdict().values() if value is not None).startswith('"')]
+    return {"environment": environment, "configuration": configuration, "dynamic": dynamic}
+
+
+def order_path_denial_probe(findings: list[str]) -> dict[str, object]:
+    build = os.environ.get("AISTOCKS_BUILD_CONFIGURATION", "Release")
+    dll = SOURCE / "AiStocks.Worker" / "bin" / build / "net10.0" / "AiStocks.Worker.dll"
+    dotnet = shutil.which("dotnet") or ("/opt/data/dotnet/dotnet" if pathlib.Path("/opt/data/dotnet/dotnet").is_file() else None)
+    unavailable = {"ok": False, "executed": False, "paper_order_count": 0, "network_events": []}
+    if dotnet is None or not dll.is_file():
+        findings.append("executable order-path denial probe unavailable; build AiStocks.Worker first")
+        return unavailable
+    environment = os.environ.copy()
+    environment.update({"http_proxy": "http://127.0.0.1:1", "https_proxy": "http://127.0.0.1:1", "NO_PROXY": ""})
+    try:
+        result = subprocess.run(  # noqa: S603  # nosec B603
+            [dotnet, str(dll), "--probe-order-path-denial"], cwd=ROOT, env=environment,
+            text=True, capture_output=True, check=False, timeout=10)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        findings.append(f"executable order-path denial probe failed: {error}")
+        return unavailable
+    marker = next((line.removeprefix("AISTOCKS_ORDER_PATH_PROBE=") for line in result.stdout.splitlines()
+                   if line.startswith("AISTOCKS_ORDER_PATH_PROBE=")), None)
+    if result.returncode != 0 or marker is None:
+        findings.append(f"executable order-path denial probe failed: exit {result.returncode}")
+        return unavailable
+    try:
+        probe = cast(dict[str, object], json.loads(marker))
+    except json.JSONDecodeError as error:
+        findings.append(f"executable order-path denial probe malformed: {error}")
+        return unavailable
+    if probe.get("ok") is not True or probe.get("executed") is not True or probe.get("paper_order_count") != 1:
+        findings.append("executable order-path denial probe did not execute one isolated paper order")
+    if probe.get("network_events") != []:
+        findings.append("order path attempted DNS/socket/HTTP network capability")
+    return probe
 
 
 def runtime_endpoint_table(executable: str, findings: list[str]) -> dict[str, object]:
@@ -52,8 +103,9 @@ def runtime_endpoint_table(executable: str, findings: list[str]) -> dict[str, ob
         "ARTIFACT_ROOT": str(ROOT),
     })
     try:
-        result = subprocess.run([dotnet, str(dll), "--print-endpoints"], cwd=ROOT, env=environment,
-                                text=True, capture_output=True, check=False, timeout=10)  # noqa: S603
+        result = subprocess.run(  # noqa: S603  # nosec B603
+            [dotnet, str(dll), "--print-endpoints"], cwd=ROOT, env=environment,
+            text=True, capture_output=True, check=False, timeout=10)
     except (OSError, subprocess.TimeoutExpired) as error:
         findings.append(f"runtime endpoint inventory failed for {executable}: {error}")
         return {"executable": executable, "routes": []}
@@ -81,6 +133,7 @@ def inventory() -> dict[str, object]:
     urls: list[dict[str, object]] = []
     environment: list[dict[str, object]] = []
     configuration: list[dict[str, object]] = []
+    dynamic_configuration: list[dict[str, object]] = []
     processes: list[dict[str, object]] = []
     routes: list[dict[str, object]] = []
 
@@ -100,7 +153,7 @@ def inventory() -> dict[str, object]:
 
     for project in sorted(SOURCE.glob("*/**/*.csproj")):
         try:
-            root = ET.parse(project).getroot()
+            root = ET.parse(project).getroot()  # noqa: S314  # nosec B314 - repository-owned XML
         except ET.ParseError as error:
             findings.append(f"invalid project XML: {relative(project)}: {error}")
             continue
@@ -125,38 +178,51 @@ def inventory() -> dict[str, object]:
             urls.append({"file": rel, "line": line, "value": value})
             if host in FORBIDDEN_HOSTS or any(host.endswith("." + item) for item in FORBIDDEN_HOSTS):
                 findings.append(f"forbidden broker host at {rel}:{line}: {host}")
-        for match in ENVIRONMENT.finditer(text):
-            name = match.group(1); line = text.count("\n", 0, match.start()) + 1
-            environment.append({"file": rel, "line": line, "name": name})
-            if FORBIDDEN_CREDENTIAL.search(name): findings.append(f"forbidden broker credential read at {rel}:{line}: {name}")
-        for match in CONFIGURATION.finditer(text):
-            name = next(value for value in match.groupdict().values() if value is not None)
-            line = text.count("\n", 0, match.start()) + 1
-            configuration.append({"file": rel, "line": line, "name": name})
-            if FORBIDDEN_CREDENTIAL.search(name): findings.append(f"forbidden broker configuration read at {rel}:{line}: {name}")
+        reads = configuration_reads(text, rel)
+        environment.extend(reads["environment"])
+        configuration.extend(reads["configuration"])
+        unresolved = reads["dynamic"]
+        if rel == "src/AiStocks.Web/Program.cs":
+            names = sorted(set(re.findall(r'\bRequired\(\s*"([A-Za-z0-9_:.-]+)"\s*\)', text)))
+            configuration.extend({"file": rel, "line": item["line"], "name": name, "via": "Required(name)"}
+                                 for item in unresolved if item["expression"] == "name" for name in names)
+            unresolved = [item for item in unresolved if item["expression"] != "name" or not names]
+        if rel == "src/AiStocks.Operations/Program.cs":
+            names = sorted(set(re.findall(r'"((?:MIGRATOR_)?DATABASE_URL)"', text)))
+            configuration.extend({"file": rel, "line": item["line"], "name": name, "via": "migratorKey"}
+                                 for item in unresolved if item["expression"] == "migratorKey" for name in names)
+            unresolved = [item for item in unresolved if item["expression"] != "migratorKey" or not names]
+        dynamic_configuration.extend(unresolved)
+        for item in reads["environment"] + reads["configuration"]:
+            if FORBIDDEN_CREDENTIAL.search(str(item["name"])):
+                findings.append(f"forbidden broker configuration read at {rel}:{item['line']}: {item['name']}")
         for match in PROCESS.finditer(text):
             line = text.count("\n", 0, match.start()) + 1
             processes.append({"file": rel, "line": line})
-            if project not in ALLOWED_PROCESS_PROJECTS: findings.append(f"unexpected process capability at {rel}:{line}")
+            if project not in ALLOWED_PROCESS_PROJECTS:
+                findings.append(f"unexpected process capability at {rel}:{line}")
         for match in ROUTE.finditer(text):
-            method = match.group("method").upper(); route_path = groups.get(match.group("receiver"), "") + match.group("path")
+            method = match.group("method").upper()
+            route_path = groups.get(match.group("receiver"), "") + match.group("path")
             line = text.count("\n", 0, match.start()) + 1
             routes.append({"executable": project, "method": method, "path": route_path})
-            if method != "GET" and route_path not in ALLOWED_MUTATIONS: findings.append(f"unapproved HTTP mutation route at {rel}:{line}: {method} {route_path}")
+            if method != "GET" and route_path not in ALLOWED_MUTATIONS:
+                findings.append(f"unapproved HTTP mutation route at {rel}:{line}: {method} {route_path}")
         for match in ROUTE_HELPER.finditer(text):
             route_path = groups.get(match.group("receiver"), "") + match.group("path")
             line = text.count("\n", 0, match.start()) + 1
             routes.append({"executable": project, "method": "POST", "path": route_path})
-            if route_path not in ALLOWED_MUTATIONS: findings.append(f"unapproved HTTP mutation route at {rel}:{line}: POST {route_path}")
+            if route_path not in ALLOWED_MUTATIONS:
+                findings.append(f"unapproved HTTP mutation route at {rel}:{line}: POST {route_path}")
 
     endpoint_tables = [runtime_endpoint_table(executable, findings) for executable in sorted(SHIPPED_EXECUTABLES)]
-    worker_path = SOURCE / "AiStocks.Worker" / "PostgresWorkerRuntime.cs"
-    worker_text = worker_path.read_text(encoding="utf-8")
-    network_tokens = sorted(set(NETWORK_API.findall(worker_text)))
     worker_packages = {item["name"].casefold() for item in resolved if item["file"] == "src/AiStocks.Worker/packages.lock.json"}
-    order_findings = network_tokens + sorted(worker_packages & FORBIDDEN_PACKAGES)
-    if "submit_order(" not in worker_text: order_findings.append("paper submit_order path missing")
-    if order_findings: findings.append("order-path socket/provider denial probe failed: " + ", ".join(order_findings))
+    if worker_packages & FORBIDDEN_PACKAGES:
+        findings.append("order-path provider denial failed: " + ", ".join(sorted(worker_packages & FORBIDDEN_PACKAGES)))
+    if dynamic_configuration:
+        findings.extend(f"unresolved dynamic configuration read at {item['file']}:{item['line']}: {item['expression']}"
+                        for item in dynamic_configuration)
+    order_probe = order_path_denial_probe(findings)
 
     flat_routes = [{"method": method, "path": path} for path, method in sorted({
         (str(route["path"]), str(route["method"])) for table in endpoint_tables
@@ -167,10 +233,10 @@ def inventory() -> dict[str, object]:
             "url_constants": sorted(urls, key=lambda i: (str(i["file"]), str(i["line"]))),
             "environment_reads": sorted(environment, key=lambda i: (str(i["file"]), str(i["line"]))),
             "configuration_reads": sorted(configuration, key=lambda i: (str(i["file"]), str(i["line"]))),
+            "dynamic_configuration_reads": sorted(dynamic_configuration, key=lambda i: (str(i["file"]), str(i["line"]))),
             "process_calls": sorted(processes, key=lambda i: (str(i["file"]), str(i["line"]))),
             "endpoint_tables": endpoint_tables,
-            "order_path_denial_probe": {"ok": not order_findings, "network_api_tokens": network_tokens,
-                                         "forbidden_provider_packages": sorted(worker_packages & FORBIDDEN_PACKAGES)},
+            "order_path_denial_probe": order_probe,
             "routes": flat_routes}
 
 

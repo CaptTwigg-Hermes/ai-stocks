@@ -53,6 +53,25 @@ public sealed class EvidenceVerifierTests
             verifier.VerifyAsync(Claim("https://example.com", "Exact catalyst text"), CancellationToken.None));
     }
 
+    [Theory]
+    [InlineData("<p style=\"font-size:0\">Exact catalyst text</p>")]
+    [InlineData("<p style=\"color:transparent\">Exact catalyst text</p>")]
+    [InlineData("<div style=\"color:transparent\"><p style=\"color:currentColor;opacity:.01\">Exact catalyst text</p></div>")]
+    [InlineData("<p style=\"clip-path:inset(100%)\">Exact catalyst text</p>")]
+    [InlineData("<p style=\"width:0;height:0;overflow:hidden\">Exact catalyst text</p>")]
+    [InlineData("<p style=\"position:absolute;left:-99999px\">Exact catalyst text</p>")]
+    [InlineData("<style>@media screen { .concealed { display:none } }</style><p class=\"concealed\">Exact catalyst text</p>")]
+    public async Task VerifyAsync_RejectsAmbiguousCssVisibility(string body)
+    {
+        var html = ValidHtml.Replace("Exact catalyst text", body);
+
+        var exception = await Assert.ThrowsAsync<EvidenceVerificationException>(() =>
+            Verifier(Response(HttpStatusCode.OK, html)).VerifyAsync(
+                Claim("https://example.com", "Exact catalyst text"), CancellationToken.None));
+
+        Assert.Contains("CSS", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task VerifyAsync_RejectsHtmlWhoseVisibilityDependsOnExternalCss()
     {

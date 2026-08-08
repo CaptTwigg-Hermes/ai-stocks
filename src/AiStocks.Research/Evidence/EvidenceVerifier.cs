@@ -364,6 +364,8 @@ public sealed partial class EvidenceVerifier : IEvidenceVerifier
                 (link.GetAttribute("rel") ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .Contains("stylesheet", StringComparer.OrdinalIgnoreCase)))
                 throw new EvidenceVerificationException("Evidence HTML depends on an external stylesheet, so visible text cannot be proven from the retained representation.");
+            if (document.QuerySelector("style, [style]") is not null)
+                throw new EvidenceVerificationException("Evidence HTML contains CSS whose browser visibility cannot be proven from the retained representation.");
             var roots = new List<IElement>();
             if (document.Body is not null) roots.Add(document.Body);
             roots.AddRange(document.QuerySelectorAll(string.Join(',', BlockElements)));

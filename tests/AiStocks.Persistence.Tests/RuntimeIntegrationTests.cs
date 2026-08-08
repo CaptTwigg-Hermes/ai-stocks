@@ -102,7 +102,8 @@ public sealed class RuntimeIntegrationTests
             """;
         var parsed = new StrictDecisionJsonParser().Parse(decision, claimed.Run.AgentId, claimed.Run.ModelId);
         var verifiedEvidence = parsed.Evidence.Select(claim => new VerifiedEvidence(
-            claim.Url, claim.PublishedAt, claimed.Run.ScheduledAt, new string('e', 64), claim.ExactExcerpt)
+            claim.Url, claim.PublishedAt, claimed.Run.ScheduledAt,
+            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(claim.ExactExcerpt))), claim.ExactExcerpt)
         {
             VerificationStartedAt = claimed.Run.ScheduledAt,
             Hops = [],
@@ -138,6 +139,19 @@ public sealed class RuntimeIntegrationTests
         var attestation = new AttestedResearchDecision(orderDecision, provenance);
         var attestedResult = AgentRunResult.Success(decision, attestation);
         Assert.True(await worker.TryAcceptWhileRunningAsync(claimed.Run, attestedResult, default));
+        var badOutput = AgentRunResult.Success(decision, new AttestedResearchDecision(orderDecision,
+            provenance with { StandardOutputSha256 = new string('0', 64) }));
+        await Assert.ThrowsAsync<DecisionValidationException>(() => worker.CompleteAsync(new RunCompletion(
+            claimed.Run, claimed.ClaimToken, RunAttemptOutcome.Succeeded,
+            session.OpenAt.AddHours(-1).AddMinutes(1), null, null, badOutput), default));
+        var corruptEvidence = orderDecision with
+        {
+            Evidence = [verifiedEvidence[0] with { ContentSha256 = new string('0', 64) }]
+        };
+        var badEvidence = AgentRunResult.Success(decision, new AttestedResearchDecision(corruptEvidence, provenance));
+        await Assert.ThrowsAsync<DecisionValidationException>(() => worker.CompleteAsync(new RunCompletion(
+            claimed.Run, claimed.ClaimToken, RunAttemptOutcome.Succeeded,
+            session.OpenAt.AddHours(-1).AddMinutes(1), null, null, badEvidence), default));
         await worker.CompleteAsync(new RunCompletion(claimed.Run, claimed.ClaimToken, RunAttemptOutcome.Succeeded,
             session.OpenAt.AddHours(-1).AddMinutes(1), null, null, attestedResult), default);
         var paused = await dashboard.ControlAsync(new(ContestControlAction.Pause, "owner@example.com", "pause-1"), default);

@@ -2,6 +2,29 @@
 -- transaction as the associated run and paper order.
 SET LOCAL ROLE ai_stocks_migrator;
 
+CREATE FUNCTION research_invocation_output_hash_valid(value jsonb) RETURNS boolean
+LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+    RETURN value ? 'standard_output_sha256' AND value ? 'standard_output_base64'
+       AND value->>'standard_output_sha256' = encode(digest(decode(value->>'standard_output_base64','base64'),'sha256'),'hex');
+EXCEPTION WHEN OTHERS THEN RETURN false;
+END $$;
+
+CREATE FUNCTION research_evidence_hashes_valid(value jsonb) RETURNS boolean
+LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE item jsonb;
+BEGIN
+    IF jsonb_typeof(value) <> 'array' THEN RETURN false; END IF;
+    FOR item IN SELECT element FROM jsonb_array_elements(value) AS elements(element) LOOP
+        IF jsonb_typeof(item) <> 'object' OR NOT (item ? 'content_sha256') OR NOT (item ? 'immutable_content')
+           OR item->>'content_sha256' <> encode(digest(decode(item->>'immutable_content','base64'),'sha256'),'hex') THEN
+            RETURN false;
+        END IF;
+    END LOOP;
+    RETURN true;
+EXCEPTION WHEN OTHERS THEN RETURN false;
+END $$;
+
 CREATE TABLE research_attestations (
     id uuid PRIMARY KEY,
     agent_run_id uuid REFERENCES agent_runs(id) ON DELETE RESTRICT,
@@ -27,6 +50,8 @@ CREATE TABLE research_attestations (
     CHECK (invocation_json->>'model_id' = actual_model_id),
     CHECK (invocation_json->>'provider' = actual_provider),
     CHECK (invocation_json->>'runtime_report_sha256' = runtime_report_hash::text),
+    CHECK (research_invocation_output_hash_valid(invocation_json)),
+    CHECK (research_evidence_hashes_valid(evidence_json)),
     UNIQUE (agent_run_id),
     UNIQUE (order_id)
 );
@@ -60,6 +85,12 @@ BEGIN
     END IF;
     IF p_evidence_hash <> canonical_jsonb_sha256(p_evidence) THEN
         RAISE EXCEPTION 'attestation evidence hash mismatch';
+    END IF;
+    IF NOT research_invocation_output_hash_valid(p_invocation) THEN
+        RAISE EXCEPTION 'attestation decision output hash mismatch';
+    END IF;
+    IF NOT research_evidence_hashes_valid(p_evidence) THEN
+        RAISE EXCEPTION 'attestation immutable evidence content hash mismatch';
     END IF;
     IF p_agent_run_id IS NOT NULL THEN
         PERFORM 1 FROM agent_runs WHERE id=p_agent_run_id AND agent_id=p_agent_id AND model_id=p_actual_model FOR KEY SHARE;
