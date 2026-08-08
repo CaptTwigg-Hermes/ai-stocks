@@ -68,7 +68,7 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         int attempt;
         Guid scheduledId;
-        await using (var lookup = new NpgsqlCommand("SELECT id,attempt_count FROM scheduled_agent_runs WHERE run_key=$1 FOR UPDATE", connection, transaction))
+        await using (var lookup = new NpgsqlCommand("SELECT id,attempt_count FROM scheduled_agent_runs WHERE run_key=$1", connection, transaction))
         {
             lookup.Parameters.AddWithValue(completion.Run.RunKey);
             await using var reader = await lookup.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -115,7 +115,7 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
         {
             if (decision.Action == DecisionAction.CancelPending)
                 throw new DecisionValidationException("cancelPending requires an explicit persisted order identity and is unavailable in this response contract.");
-            await using (var state = new NpgsqlCommand("SELECT status::text FROM contest_state WHERE singleton FOR SHARE", connection, transaction))
+            await using (var state = new NpgsqlCommand("SELECT status::text FROM contest_state WHERE singleton", connection, transaction))
                 if (!StringComparer.Ordinal.Equals((string?)await state.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), "RUNNING"))
                     throw new DecisionValidationException("Contest paused before the decision transaction committed.");
             await using var instrument = new NpgsqlCommand("SELECT id FROM instruments WHERE isin=$1 AND order_book_id=$2 AND mic='XSTO'", connection, transaction);
@@ -338,6 +338,7 @@ public sealed class HermesAgentRunner(HermesResearchRunner runner, ResearchDecis
 public sealed class WorkerRuntimeService(
     PostgresWorkerState state,
     DurableOrchestrator orchestrator,
+    QueuedExecutionCoordinator queuedExecution,
     TimeProvider timeProvider,
     IConfiguration configuration,
     ILogger<WorkerRuntimeService> logger) : BackgroundService
@@ -355,6 +356,7 @@ public sealed class WorkerRuntimeService(
                 if (await state.ContestStartedAtAsync(stoppingToken).ConfigureAwait(false) is { } startedAt)
                     await state.EnsureAtomicallyAsync(WorkerScheduleRecovery.Create(startedAt, now), stoppingToken).ConfigureAwait(false);
                 while (await orchestrator.TickAsync(stoppingToken).ConfigureAwait(false)) { }
+                await queuedExecution.ExecuteAllAsync(stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception exception) { logger.LogError(exception, "Worker iteration failed closed"); }

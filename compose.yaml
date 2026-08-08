@@ -85,7 +85,6 @@ services:
       NASDAQ_ARCHIVE_PATH: /data/nasdaq
       NASDAQ_STATUS_PATH: /data/status
       WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-5}
-      DISCORD_TARGET: "${DISCORD_TARGET:?set the Hermes Discord delivery target}"
     volumes:
       - ${HERMES_AUTH_DIR:?set a UID-10001 private Hermes auth directory}:/run/hermes-auth:ro
       - ${NASDAQ_ARCHIVE_DIR:?set the Nasdaq archive dataset}:/data/nasdaq:ro
@@ -98,6 +97,26 @@ services:
       timeout: 5s
       retries: 4
       start_period: 30s
+    networks: [egress]
+
+  reporter:
+    <<: *runtime-security
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: reporter
+    environment:
+      APP_ENV: production
+      DATABASE_URL: ${OPERATIONS_DATABASE_URL:?set the operations PostgreSQL URL}
+      TZ: Europe/Stockholm
+      HERMES_HOME: /run/hermes-auth
+      HERMES_EXECUTABLE: /opt/hermes/bin/hermes
+      DISCORD_REPORT_TARGET: "${DISCORD_REPORT_TARGET:?set the numeric Hermes Discord target}"
+      OPERATIONS_POLL_SECONDS: ${OPERATIONS_POLL_SECONDS:-30}
+    volumes:
+      - ${HERMES_AUTH_DIR:?set a UID-10001 private Hermes auth directory}:/run/hermes-auth:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
     networks: [egress]
 
   migrate:

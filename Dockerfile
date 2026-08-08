@@ -83,3 +83,7 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
 USER app
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "AiStocks.Worker.dll"]
+
+FROM worker AS reporter
+COPY --from=build --chown=app:app /out/operations /app
+ENTRYPOINT ["dotnet", "AiStocks.Operations.dll", "runtime"]

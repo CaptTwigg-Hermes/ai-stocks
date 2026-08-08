@@ -39,6 +39,9 @@ builder.Services.AddSingleton(services => new HermesResearchRunner(
     }));
 builder.Services.AddSingleton<IAgentRunner, HermesAgentRunner>();
 builder.Services.AddSingleton<DurableOrchestrator>();
+builder.Services.AddSingleton<PostgresQueuedExecutionPort>();
+builder.Services.AddSingleton<IQueuedExecutionPort>(services => services.GetRequiredService<PostgresQueuedExecutionPort>());
+builder.Services.AddSingleton<QueuedExecutionCoordinator>();
 builder.Services.AddHostedService<WorkerRuntimeService>();
 
 var app = builder.Build();
