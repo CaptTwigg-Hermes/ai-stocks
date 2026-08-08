@@ -33,6 +33,7 @@ python3 scripts/prove_no_broker.py
 
 env \
   WEB_DATABASE_URL='Host=db;Database=ai_stocks;Username=web;Password=x' \
+  COLLECTOR_DATABASE_URL='Host=db;Database=ai_stocks;Username=collector;Password=x' \
   WORKER_DATABASE_URL='Host=db;Database=ai_stocks;Username=worker;Password=x' \
   OPERATIONS_DATABASE_URL='Host=db;Database=ai_stocks;Username=operations;Password=x' \
   MIGRATOR_DATABASE_URL='Host=db;Database=ai_stocks;Username=migrator;Password=x' \
@@ -41,6 +42,7 @@ env \
   HERMES_AUTH_DIR=/tmp/hermes \
   NASDAQ_ARCHIVE_DIR=/tmp/archive \
   NASDAQ_STATUS_DIR=/tmp/status \
+  STATUS_PINNED_KEY_ID=test-status-key \
   ACCESS_TEAM_DOMAIN=https://example.cloudflareaccess.com \
   ACCESS_AUD=test-aud \
   PUBLIC_ORIGIN=https://ai-stocks.example \

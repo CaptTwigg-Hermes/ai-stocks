@@ -76,7 +76,7 @@ public sealed class PersistenceContractTests
     [Fact]
     public void MigrationChecksumIsStableAndSha256()
     {
-        Assert.Equal(4, MigrationCatalog.All.Count);
+        Assert.Equal(5, MigrationCatalog.All.Count);
         foreach (var migration in MigrationCatalog.All)
         {
             Assert.Matches("^[0-9a-f]{64}$", migration.Sha256);

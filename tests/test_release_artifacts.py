@@ -69,5 +69,5 @@ def test_release_gate_and_restore_fail_closed_with_scheduled_backup():
     assert "AISTOCKS_TEST_DATABASE_URL is required" in verify
     assert "restored migration checksums or contest invariants failed verification" in restore
     assert "120000" in restore
-    assert "backup-cycle failed" in cycle
+    assert "backup or restore verification failed" in cycle
     assert "backup-scheduler" in compose["services"]

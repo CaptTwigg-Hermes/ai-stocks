@@ -36,13 +36,21 @@ def relative(path: pathlib.Path) -> str:
 
 
 def runtime_endpoint_table(executable: str, findings: list[str]) -> dict[str, object]:
-    dll = SOURCE / executable / "bin" / "Debug" / "net10.0" / f"{executable}.dll"
+    configuration = os.environ.get("AISTOCKS_BUILD_CONFIGURATION", "Release")
+    dll = SOURCE / executable / "bin" / configuration / "net10.0" / f"{executable}.dll"
     dotnet = shutil.which("dotnet") or ("/opt/data/dotnet/dotnet" if pathlib.Path("/opt/data/dotnet/dotnet").is_file() else None)
     if dotnet is None or not dll.is_file():
         findings.append(f"runtime endpoint inventory unavailable for {executable}; build the shipped executables first")
         return {"executable": executable, "routes": []}
     environment = os.environ.copy()
-    environment.update({"DOTNET_ENVIRONMENT": "Testing", "DATABASE_URL": "Host=127.0.0.1;Database=aistocks_endpoint_inventory;Username=denied;Password=denied", "ArtifactRoot": str(ROOT)})
+    denied_database = "Host=127.0.0.1;Database=aistocks_endpoint_inventory;Username=denied;Password=denied"
+    environment.update({
+        "DOTNET_ENVIRONMENT": "Testing",
+        "DATABASE_URL": denied_database,
+        "COLLECTOR_DATABASE_URL": denied_database,
+        "STATUS_PINNED_KEY_ID": "endpoint-inventory",
+        "ARTIFACT_ROOT": str(ROOT),
+    })
     try:
         result = subprocess.run([dotnet, str(dll), "--print-endpoints"], cwd=ROOT, env=environment,
                                 text=True, capture_output=True, check=False, timeout=10)  # noqa: S603
