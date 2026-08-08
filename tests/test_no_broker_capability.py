@@ -34,4 +34,5 @@ def test_executable_negative_capability_inventory_passes():
         {"method": "GET", "path": "/api/portfolios"},
         {"method": "GET", "path": "/api/queued-orders"},
         {"method": "GET", "path": "/healthz"},
+        {"method": "GET", "path": "/readyz"},
     ]
