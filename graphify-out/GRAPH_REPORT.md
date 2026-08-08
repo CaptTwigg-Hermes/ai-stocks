@@ -1,16 +1,16 @@
 # Graph Report - coordinator  (2026-08-08)
 
 ## Corpus Check
-- 180 files · ~103,075 words
+- 180 files · ~103,097 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2825 nodes · 6291 edges · 221 communities (201 shown, 20 thin omitted)
+- 2825 nodes · 6291 edges · 218 communities (198 shown, 20 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 250 edges (avg confidence: 0.57)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `4cf410da`
+- Built from commit: `c3396147`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -215,11 +215,9 @@
 - [[_COMMUNITY_Community 204|Community 204]]
 - [[_COMMUNITY_Community 205|Community 205]]
 - [[_COMMUNITY_Community 206|Community 206]]
-- [[_COMMUNITY_Community 207|Community 207]]
 - [[_COMMUNITY_Community 208|Community 208]]
 - [[_COMMUNITY_Community 209|Community 209]]
 - [[_COMMUNITY_Community 210|Community 210]]
-- [[_COMMUNITY_Community 211|Community 211]]
 - [[_COMMUNITY_Community 212|Community 212]]
 - [[_COMMUNITY_Community 213|Community 213]]
 - [[_COMMUNITY_Community 214|Community 214]]
@@ -227,7 +225,6 @@
 - [[_COMMUNITY_Community 216|Community 216]]
 - [[_COMMUNITY_Community 217|Community 217]]
 - [[_COMMUNITY_Community 218|Community 218]]
-- [[_COMMUNITY_Community 219|Community 219]]
 - [[_COMMUNITY_Community 220|Community 220]]
 
 ## God Nodes (most connected - your core abstractions)
@@ -257,7 +254,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (221 total, 20 thin omitted)
+## Communities (218 total, 20 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.08
@@ -336,12 +333,12 @@ Cohesion: 0.17
 Nodes (7): HermesResearchRunner, ImmutableDictionary, ImmutableHashSet, ResearchExecutionOptions, ResearchExecutionResult, RuntimeReport, UTF8Encoding
 
 ### Community 31 - "Community 31"
-Cohesion: 0.05
-Nodes (49): Microsoft.Extensions.Configuration, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.Configuration.FileExtensions, Microsoft.Extensions.Configuration.Json, Microsoft.Extensions.Diagnostics.Abstractions, Microsoft.Extensions.FileProviders.Abstractions, Microsoft.Extensions.FileProviders.Physical, Microsoft.Extensions.FileSystemGlobbing (+41 more)
+Cohesion: 0.06
+Nodes (42): Microsoft.Extensions.Configuration, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.Configuration.FileExtensions, Microsoft.Extensions.Configuration.Json, Microsoft.Extensions.FileProviders.Abstractions, Microsoft.Extensions.FileProviders.Physical, Microsoft.Extensions.FileSystemGlobbing, contentHash (+34 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.05
-Nodes (43): type, dependencies, net10.0, contentHash, resolved, type, contentHash, resolved (+35 more)
+Cohesion: 0.04
+Nodes (46): type, dependencies, net10.0, contentHash, resolved, type, contentHash, resolved (+38 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.05
@@ -373,7 +370,7 @@ Nodes (17): PostgresCollectorPersistence, PostgresMigrationRunner, PostgresDashb
 
 ### Community 40 - "Community 40"
 Cohesion: 0.09
-Nodes (19): FakeBootstrapPort, FakeDeliveryStore, Acquired(), AlreadyCompleted(), AuditedDiscordDelivery, Busy(), Conflict(), ContestBootstrapper (+11 more)
+Nodes (18): FakeBootstrapPort, FakeDeliveryStore, Acquired(), AlreadyCompleted(), AuditedDiscordDelivery, Busy(), Conflict(), ContestBootstrapper (+10 more)
 
 ### Community 41 - "Community 41"
 Cohesion: 0.27
@@ -412,8 +409,8 @@ Cohesion: 0.18
 Nodes (7): StubHandler, TemporaryDirectory, StubHandler, TemporaryDirectory, StubHandler, HttpMessageHandler, IDisposable
 
 ### Community 51 - "Community 51"
-Cohesion: 0.29
-Nodes (4): ResearchAttestationStore, NpgsqlCommand, PersistableResearchAttestation, ReadOnlySpan
+Cohesion: 0.22
+Nodes (5): ResearchAttestationStore, NpgsqlCommand, NpgsqlDbType, PersistableResearchAttestation, ReadOnlySpan
 
 ### Community 52 - "Community 52"
 Cohesion: 0.15
@@ -428,8 +425,8 @@ Cohesion: 0.20
 Nodes (7): TradingSession, ImmutableArchive, SessionManifestStore, SessionManifest, CompleteSessionManifest, JsonSerializerOptions, VerifiedSessionManifest
 
 ### Community 55 - "Community 55"
-Cohesion: 0.12
-Nodes (18): dependencies, type, dependencies, type, dependencies, type, dependencies, type (+10 more)
+Cohesion: 0.29
+Nodes (7): dependencies, type, dependencies, type, AiStocks.Persistence, aistocks.operations, aistocks.web
 
 ### Community 56 - "Community 56"
 Cohesion: 0.25
@@ -504,16 +501,16 @@ Cohesion: 0.08
 Nodes (11): RunWindow, CollectorWorker, FakeSchedulePort, DurableScheduleRegistrar, IDurableRunSchedulePort, RunSchedule, PostgresWorkerState, PostRunAcceptance (+3 more)
 
 ### Community 74 - "Community 74"
-Cohesion: 0.14
-Nodes (13): type, dependencies, net10.0, contentHash, resolved, type, aistocks.core, Microsoft.TestPlatform.ObjectModel (+5 more)
+Cohesion: 0.11
+Nodes (17): type, type, type, dependencies, net10.0, contentHash, resolved, type (+9 more)
 
 ### Community 76 - "Community 76"
 Cohesion: 0.20
 Nodes (9): type, dependencies, type, dependencies, AiStocks.Core, net10.0, aistocks.core, aistocks.trading (+1 more)
 
 ### Community 77 - "Community 77"
-Cohesion: 0.20
-Nodes (9): net10.0, Microsoft.NET.Sdk, net10.0, Microsoft.NET.Sdk.Web, net10.0, Npgsql (10.0.0), Microsoft.NET.Sdk, net10.0 (+1 more)
+Cohesion: 0.18
+Nodes (11): net10.0, Microsoft.NET.Sdk, net10.0, Microsoft.NET.Sdk, net10.0, Npgsql (10.0.0), Microsoft.NET.Sdk, net10.0 (+3 more)
 
 ### Community 78 - "Community 78"
 Cohesion: 0.28
@@ -560,16 +557,16 @@ Cohesion: 0.18
 Nodes (11): dependencies, type, contentHash, dependencies, resolved, type, AiStocks.Core, AngleSharp (+3 more)
 
 ### Community 92 - "Community 92"
-Cohesion: 0.25
-Nodes (7): Microsoft.AspNetCore.Mvc.Testing (10.0.0), net10.0, coverlet.collector (6.0.4), Microsoft.NET.Test.Sdk (17.14.1), xunit (2.9.3), xunit.runner.visualstudio (3.1.4), Microsoft.NET.Sdk
+Cohesion: 0.18
+Nodes (9): Microsoft.AspNetCore.Mvc.Testing (10.0.0), net10.0, Microsoft.NET.Sdk.Web, net10.0, coverlet.collector (6.0.4), Microsoft.NET.Test.Sdk (17.14.1), xunit (2.9.3), xunit.runner.visualstudio (3.1.4) (+1 more)
 
 ### Community 93 - "Community 93"
 Cohesion: 0.13
 Nodes (14): type, dependencies, type, dependencies, AiStocks.Core, net10.0, aistocks.core, aistocks.marketdata (+6 more)
 
 ### Community 94 - "Community 94"
-Cohesion: 0.29
-Nodes (6): net10.0, coverlet.collector (6.0.4), Microsoft.NET.Test.Sdk (17.14.1), xunit (2.9.3), xunit.runner.visualstudio (3.1.4), Microsoft.NET.Sdk
+Cohesion: 0.20
+Nodes (8): net10.0, Microsoft.NET.Sdk.Web, net10.0, coverlet.collector (6.0.4), Microsoft.NET.Test.Sdk (17.14.1), xunit (2.9.3), xunit.runner.visualstudio (3.1.4), Microsoft.NET.Sdk
 
 ### Community 95 - "Community 95"
 Cohesion: 0.20
@@ -589,7 +586,7 @@ Nodes (21): AgentOrchestrator, Durably claim fixed-model windows and retain one 
 
 ### Community 99 - "Community 99"
 Cohesion: 0.20
-Nodes (9): type, dependencies, net10.0, aistocks.core, xunit.analyzers, version, contentHash, resolved (+1 more)
+Nodes (9): type, dependencies, net10.0, aistocks.core, xunit.assert, version, contentHash, resolved (+1 more)
 
 ### Community 100 - "Community 100"
 Cohesion: 0.20
@@ -652,8 +649,8 @@ Cohesion: 0.25
 Nodes (8): Microsoft.CodeCoverage, Microsoft.TestPlatform.TestHost, contentHash, dependencies, requested, resolved, type, Microsoft.NET.Test.Sdk
 
 ### Community 116 - "Community 116"
-Cohesion: 0.25
-Nodes (7): net10.0, coverlet.collector (6.0.4), Microsoft.NET.Test.Sdk (17.14.1), Npgsql (10.0.0), xunit (2.9.3), xunit.runner.visualstudio (3.1.4), Microsoft.NET.Sdk
+Cohesion: 0.17
+Nodes (10): net10.0, Npgsql (10.0.0), Microsoft.NET.Sdk.Web, net10.0, coverlet.collector (6.0.4), Microsoft.NET.Test.Sdk (17.14.1), Npgsql (10.0.0), xunit (2.9.3) (+2 more)
 
 ### Community 117 - "Community 117"
 Cohesion: 0.25
@@ -676,8 +673,8 @@ Cohesion: 0.25
 Nodes (8): Microsoft.CodeCoverage, Microsoft.TestPlatform.TestHost, contentHash, dependencies, requested, resolved, type, Microsoft.NET.Test.Sdk
 
 ### Community 122 - "Community 122"
-Cohesion: 0.29
-Nodes (5): net10.0, Npgsql (10.0.0), Microsoft.NET.Sdk.Web, net10.0, Microsoft.NET.Sdk
+Cohesion: 0.40
+Nodes (5): xunit.runner.visualstudio, contentHash, requested, resolved, type
 
 ### Community 123 - "Community 123"
 Cohesion: 0.29
@@ -956,8 +953,8 @@ Cohesion: 0.50
 Nodes (4): contentHash, resolved, type, Microsoft.Extensions.FileSystemGlobbing
 
 ### Community 195 - "Community 195"
-Cohesion: 0.50
-Nodes (4): contentHash, resolved, type, Microsoft.Extensions.Hosting.Abstractions
+Cohesion: 0.18
+Nodes (11): Microsoft.Extensions.Diagnostics.Abstractions, contentHash, dependencies, resolved, type, contentHash, dependencies, resolved (+3 more)
 
 ### Community 196 - "Community 196"
 Cohesion: 0.50
@@ -973,7 +970,7 @@ Nodes (4): contentHash, resolved, type, Microsoft.Extensions.Logging
 
 ### Community 199 - "Community 199"
 Cohesion: 0.50
-Nodes (4): xunit.abstractions, contentHash, resolved, type
+Nodes (4): xunit.analyzers, contentHash, resolved, type
 
 ### Community 200 - "Community 200"
 Cohesion: 0.50
@@ -987,13 +984,9 @@ Nodes (4): contentHash, resolved, type, Microsoft.Extensions.Primitives
 Cohesion: 0.50
 Nodes (4): Newtonsoft.Json, contentHash, resolved, type
 
-### Community 207 - "Community 207"
-Cohesion: 0.50
-Nodes (4): xunit.analyzers, contentHash, resolved, type
-
 ### Community 208 - "Community 208"
-Cohesion: 0.19
-Nodes (13): dependencies, type, dependencies, type, dependencies, type, AiStocks.MarketData, AiStocks.Research (+5 more)
+Cohesion: 0.12
+Nodes (20): dependencies, type, dependencies, type, dependencies, type, dependencies, dependencies (+12 more)
 
 ### Community 209 - "Community 209"
 Cohesion: 0.20
@@ -1002,10 +995,6 @@ Nodes (6): DenyNetworkEventListener, NoBrokerOrderPathProbe, ConcurrentBag, Even
 ### Community 210 - "Community 210"
 Cohesion: 0.13
 Nodes (5): OversizedReportStream, NeverEndingStream, long, Memory, SeekOrigin
-
-### Community 211 - "Community 211"
-Cohesion: 0.33
-Nodes (4): net10.0, Microsoft.NET.Sdk, net10.0, Microsoft.NET.Sdk.Web
 
 ### Community 213 - "Community 213"
 Cohesion: 0.50
@@ -1026,10 +1015,6 @@ Nodes (4): contentHash, resolved, type, Microsoft.Extensions.Logging.Debug
 ### Community 218 - "Community 218"
 Cohesion: 0.50
 Nodes (4): xunit.analyzers, contentHash, resolved, type
-
-### Community 219 - "Community 219"
-Cohesion: 0.50
-Nodes (4): xunit.assert, contentHash, resolved, type
 
 ### Community 220 - "Community 220"
 Cohesion: 0.50

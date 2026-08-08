@@ -33,26 +33,26 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble@sha256:f1126d438ccc359f51cc6d470
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl \
  && rm -rf /var/lib/apt/lists/* \
- && groupadd --system --gid 10001 app \
- && useradd --system --uid 10001 --gid app --home-dir /app app
+ && groupadd --system --gid 10001 aistocks \
+ && useradd --system --uid 10001 --gid aistocks --home-dir /app aistocks
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
     DOTNET_EnableDiagnostics=0 \
     DOTNET_CLI_TELEMETRY_OPTOUT=1
-USER app
+USER aistocks
 
 FROM runtime AS app
-COPY --from=build --chown=app:app /out/web ./
+COPY --from=build --chown=aistocks:aistocks /out/web ./
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "AiStocks.Web.dll"]
 
 FROM runtime AS collector
-COPY --from=build --chown=app:app /out/collector ./
+COPY --from=build --chown=aistocks:aistocks /out/collector ./
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "AiStocks.Collector.dll"]
 
 FROM runtime AS operations
-COPY --from=build --chown=app:app /out/operations ./
+COPY --from=build --chown=aistocks:aistocks /out/operations ./
 ENTRYPOINT ["dotnet", "AiStocks.Operations.dll"]
 
 FROM postgres:18.4-bookworm@sha256:882236b897e39051d2368c5ccc6cda944904723506b2dfc97f2a8f5bc9afa382 AS backup-operations
@@ -69,21 +69,21 @@ FROM python:3.13.5-slim-bookworm@sha256:4c2cf9917bd1cbacc5e9b07320025bdb7cdf2df7
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl \
  && rm -rf /var/lib/apt/lists/* \
- && groupadd --system --gid 10001 app \
- && useradd --system --uid 10001 --gid app --home-dir /app app
+ && groupadd --system --gid 10001 aistocks \
+ && useradd --system --uid 10001 --gid aistocks --home-dir /app aistocks
 COPY --from=runtime /usr/share/dotnet /usr/share/dotnet
 RUN ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet
-COPY --from=hermes-builder --chown=app:app /opt/hermes /opt/hermes
-COPY --from=build --chown=app:app /out/worker /app
+COPY --from=hermes-builder --chown=aistocks:aistocks /opt/hermes /opt/hermes
+COPY --from=build --chown=aistocks:aistocks /out/worker /app
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
     DOTNET_EnableDiagnostics=0 \
     DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     HERMES_EXECUTABLE=/opt/hermes/bin/hermes
-USER app
+USER aistocks
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "AiStocks.Worker.dll"]
 
 FROM worker AS reporter
-COPY --from=build --chown=app:app /out/operations /app
+COPY --from=build --chown=aistocks:aistocks /out/operations /app
 ENTRYPOINT ["dotnet", "AiStocks.Operations.dll", "runtime"]

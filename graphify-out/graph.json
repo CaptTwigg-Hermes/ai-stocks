@@ -20,7 +20,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "aistocks_collector_aistocks_collector",
-      "community": 122,
+      "community": 116,
       "norm_label": "aistocks.collector.csproj"
     },
     {
@@ -40,7 +40,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "aistocks_marketdata_aistocks_marketdata",
-      "community": 122,
+      "community": 77,
       "norm_label": "aistocks.marketdata.csproj"
     },
     {
@@ -50,7 +50,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "aistocks_operations_aistocks_operations",
-      "community": 77,
+      "community": 94,
       "norm_label": "aistocks.operations.csproj"
     },
     {
@@ -80,7 +80,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "aistocks_trading_aistocks_trading",
-      "community": 211,
+      "community": 77,
       "norm_label": "aistocks.trading.csproj"
     },
     {
@@ -90,7 +90,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "aistocks_web_aistocks_web",
-      "community": 77,
+      "community": 92,
       "norm_label": "aistocks.web.csproj"
     },
     {
@@ -100,7 +100,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "aistocks_worker_aistocks_worker",
-      "community": 211,
+      "community": 77,
       "norm_label": "aistocks.worker.csproj"
     },
     {
@@ -4299,7 +4299,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_collector_aistocks_collector_csproj_framework_net10_0",
-      "community": 122,
+      "community": 116,
       "norm_label": "net10.0"
     },
     {
@@ -4309,7 +4309,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_collector_aistocks_collector_csproj_nuget_npgsql",
-      "community": 122,
+      "community": 116,
       "norm_label": "npgsql (10.0.0)"
     },
     {
@@ -4319,7 +4319,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_collector_aistocks_collector_csproj_sdk_microsoft_net_sdk_web",
-      "community": 122,
+      "community": 116,
       "norm_label": "microsoft.net.sdk.web"
     },
     {
@@ -5289,7 +5289,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_marketdata_aistocks_marketdata_csproj_framework_net10_0",
-      "community": 122,
+      "community": 77,
       "norm_label": "net10.0"
     },
     {
@@ -5299,7 +5299,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_marketdata_aistocks_marketdata_csproj_sdk_microsoft_net_sdk",
-      "community": 122,
+      "community": 77,
       "norm_label": "microsoft.net.sdk"
     },
     {
@@ -6769,7 +6769,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_operations_aistocks_operations_csproj_framework_net10_0",
-      "community": 77,
+      "community": 94,
       "norm_label": "net10.0"
     },
     {
@@ -6779,7 +6779,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_operations_aistocks_operations_csproj_sdk_microsoft_net_sdk_web",
-      "community": 77,
+      "community": 94,
       "norm_label": "microsoft.net.sdk.web"
     },
     {
@@ -7509,7 +7509,7 @@
       "source_location": "L180",
       "_origin": "ast",
       "id": "aistocks_operations_postgresoperations_postgresdeliveryauditport_addnullable",
-      "community": 40,
+      "community": 51,
       "norm_label": ".addnullable()"
     },
     {
@@ -7529,7 +7529,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "npgsqldbtype",
-      "community": 40,
+      "community": 51,
       "norm_label": "npgsqldbtype"
     },
     {
@@ -10479,7 +10479,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_trading_aistocks_trading_csproj_framework_net10_0",
-      "community": 211,
+      "community": 77,
       "norm_label": "net10.0"
     },
     {
@@ -10489,7 +10489,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_trading_aistocks_trading_csproj_sdk_microsoft_net_sdk",
-      "community": 211,
+      "community": 77,
       "norm_label": "microsoft.net.sdk"
     },
     {
@@ -11419,7 +11419,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_web_aistocks_web_csproj_framework_net10_0",
-      "community": 77,
+      "community": 92,
       "norm_label": "net10.0"
     },
     {
@@ -11429,7 +11429,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_web_aistocks_web_csproj_sdk_microsoft_net_sdk_web",
-      "community": 77,
+      "community": 92,
       "norm_label": "microsoft.net.sdk.web"
     },
     {
@@ -12459,7 +12459,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_worker_aistocks_worker_csproj_framework_net10_0",
-      "community": 211,
+      "community": 77,
       "norm_label": "net10.0"
     },
     {
@@ -12469,7 +12469,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "src_aistocks_worker_aistocks_worker_csproj_sdk_microsoft_net_sdk_web",
-      "community": 211,
+      "community": 77,
       "norm_label": "microsoft.net.sdk.web"
     },
     {
@@ -13119,7 +13119,7 @@
       "source_location": "L256",
       "_origin": "ast",
       "id": "aistocks_worker_postgresworkerruntime_postgresworkerstate_addnullable",
-      "community": 73,
+      "community": 51,
       "norm_label": ".addnullable()"
     },
     {
@@ -19279,7 +19279,7 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_net10_0_aistocks_marketdata",
-      "community": 55,
+      "community": 208,
       "norm_label": "aistocks.marketdata"
     },
     {
@@ -19289,7 +19289,7 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_aistocks_marketdata_type",
-      "community": 55,
+      "community": 208,
       "norm_label": "type"
     },
     {
@@ -19299,7 +19299,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_aistocks_marketdata_dependencies",
-      "community": 55,
+      "community": 208,
       "norm_label": "dependencies"
     },
     {
@@ -19309,7 +19309,7 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_dependencies_aistocks_core",
-      "community": 55,
+      "community": 208,
       "norm_label": "aistocks.core"
     },
     {
@@ -19409,7 +19409,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_net10_0_aistocks_research",
-      "community": 55,
+      "community": 74,
       "norm_label": "aistocks.research"
     },
     {
@@ -19419,7 +19419,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_aistocks_research_type",
-      "community": 55,
+      "community": 74,
       "norm_label": "type"
     },
     {
@@ -19429,7 +19429,7 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_aistocks_research_dependencies",
-      "community": 55,
+      "community": 208,
       "norm_label": "dependencies"
     },
     {
@@ -19439,7 +19439,7 @@
       "source_location": "L175",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_dependencies_anglesharp_css",
-      "community": 55,
+      "community": 208,
       "norm_label": "anglesharp.css"
     },
     {
@@ -19449,7 +19449,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_net10_0_aistocks_trading",
-      "community": 55,
+      "community": 208,
       "norm_label": "aistocks.trading"
     },
     {
@@ -19459,7 +19459,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_aistocks_trading_type",
-      "community": 55,
+      "community": 208,
       "norm_label": "type"
     },
     {
@@ -19469,7 +19469,7 @@
       "source_location": "L180",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_aistocks_trading_dependencies",
-      "community": 55,
+      "community": 208,
       "norm_label": "dependencies"
     },
     {
@@ -19509,7 +19509,7 @@
       "source_location": "L191",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_net10_0_aistocks_worker",
-      "community": 208,
+      "community": 74,
       "norm_label": "aistocks.worker"
     },
     {
@@ -19519,7 +19519,7 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_packages_lock_aistocks_worker_type",
-      "community": 208,
+      "community": 74,
       "norm_label": "type"
     },
     {
@@ -21069,7 +21069,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_net10_0_xunit_analyzers",
-      "community": 99,
+      "community": 199,
       "norm_label": "xunit.analyzers"
     },
     {
@@ -21079,7 +21079,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_analyzers_type",
-      "community": 99,
+      "community": 199,
       "norm_label": "type"
     },
     {
@@ -21089,7 +21089,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_analyzers_resolved",
-      "community": 99,
+      "community": 199,
       "norm_label": "resolved"
     },
     {
@@ -21099,7 +21099,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_analyzers_contenthash",
-      "community": 99,
+      "community": 199,
       "norm_label": "contenthash"
     },
     {
@@ -21109,7 +21109,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_net10_0_xunit_assert",
-      "community": 219,
+      "community": 99,
       "norm_label": "xunit.assert"
     },
     {
@@ -21119,7 +21119,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_assert_type",
-      "community": 219,
+      "community": 99,
       "norm_label": "type"
     },
     {
@@ -21129,7 +21129,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_assert_resolved",
-      "community": 219,
+      "community": 99,
       "norm_label": "resolved"
     },
     {
@@ -21139,7 +21139,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_assert_contenthash",
-      "community": 219,
+      "community": 99,
       "norm_label": "contenthash"
     },
     {
@@ -23709,7 +23709,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_net10_0_xunit_runner_visualstudio",
-      "community": 32,
+      "community": 122,
       "norm_label": "xunit.runner.visualstudio"
     },
     {
@@ -23719,7 +23719,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_runner_visualstudio_type",
-      "community": 32,
+      "community": 122,
       "norm_label": "type"
     },
     {
@@ -23729,7 +23729,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_runner_visualstudio_requested",
-      "community": 32,
+      "community": 122,
       "norm_label": "requested"
     },
     {
@@ -23739,7 +23739,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_runner_visualstudio_resolved",
-      "community": 32,
+      "community": 122,
       "norm_label": "resolved"
     },
     {
@@ -23749,7 +23749,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_runner_visualstudio_contenthash",
-      "community": 32,
+      "community": 122,
       "norm_label": "contenthash"
     },
     {
@@ -24549,7 +24549,7 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_net10_0_microsoft_extensions_diagnostics",
-      "community": 31,
+      "community": 195,
       "norm_label": "microsoft.extensions.diagnostics"
     },
     {
@@ -24559,7 +24559,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_diagnostics_type",
-      "community": 31,
+      "community": 195,
       "norm_label": "type"
     },
     {
@@ -24569,7 +24569,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_diagnostics_resolved",
-      "community": 31,
+      "community": 195,
       "norm_label": "resolved"
     },
     {
@@ -24579,7 +24579,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_diagnostics_contenthash",
-      "community": 31,
+      "community": 195,
       "norm_label": "contenthash"
     },
     {
@@ -24589,7 +24589,7 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_diagnostics_dependencies",
-      "community": 31,
+      "community": 195,
       "norm_label": "dependencies"
     },
     {
@@ -24599,7 +24599,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_dependencies_microsoft_extensions_diagnostics_abstractions",
-      "community": 31,
+      "community": 195,
       "norm_label": "microsoft.extensions.diagnostics.abstractions"
     },
     {
@@ -25059,7 +25059,7 @@
       "source_location": "L243",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_hosting_abstractions_dependencies",
-      "community": 31,
+      "community": 195,
       "norm_label": "dependencies"
     },
     {
@@ -25809,7 +25809,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_net10_0_xunit_abstractions",
-      "community": 199,
+      "community": 32,
       "norm_label": "xunit.abstractions"
     },
     {
@@ -25819,7 +25819,7 @@
       "source_location": "L389",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_abstractions_type",
-      "community": 199,
+      "community": 32,
       "norm_label": "type"
     },
     {
@@ -25829,7 +25829,7 @@
       "source_location": "L390",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_abstractions_resolved",
-      "community": 199,
+      "community": 32,
       "norm_label": "resolved"
     },
     {
@@ -25839,7 +25839,7 @@
       "source_location": "L391",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_abstractions_contenthash",
-      "community": 199,
+      "community": 32,
       "norm_label": "contenthash"
     },
     {
@@ -25849,7 +25849,7 @@
       "source_location": "L393",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_net10_0_xunit_analyzers",
-      "community": 207,
+      "community": 32,
       "norm_label": "xunit.analyzers"
     },
     {
@@ -25859,7 +25859,7 @@
       "source_location": "L394",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_analyzers_type",
-      "community": 207,
+      "community": 32,
       "norm_label": "type"
     },
     {
@@ -25869,7 +25869,7 @@
       "source_location": "L395",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_analyzers_resolved",
-      "community": 207,
+      "community": 32,
       "norm_label": "resolved"
     },
     {
@@ -25879,7 +25879,7 @@
       "source_location": "L396",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_analyzers_contenthash",
-      "community": 207,
+      "community": 32,
       "norm_label": "contenthash"
     },
     {
@@ -27326,7 +27326,7 @@
       "label": "test_github_publishes_every_dockge_image_target()",
       "file_type": "code",
       "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L92",
+      "source_location": "L95",
       "_origin": "ast",
       "id": "tests_test_release_artifacts_test_github_publishes_every_dockge_image_target",
       "community": 16,
@@ -27336,7 +27336,7 @@
       "label": "test_release_gate_and_restore_fail_closed_with_scheduled_backup()",
       "file_type": "code",
       "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L103",
+      "source_location": "L106",
       "_origin": "ast",
       "id": "tests_test_release_artifacts_test_release_gate_and_restore_fail_closed_with_scheduled_backup",
       "community": 16,
@@ -27346,7 +27346,7 @@
       "label": "test_clean_start_documents_composed_reference_acquisition_not_preseed_importer_magic()",
       "file_type": "code",
       "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L115",
+      "source_location": "L118",
       "_origin": "ast",
       "id": "tests_test_release_artifacts_test_clean_start_documents_composed_reference_acquisition_not_preseed_importer_magic",
       "community": 16,
@@ -93252,9 +93252,9 @@
       "source_file": "tests/test_release_artifacts.py",
       "source_location": "L92",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "tests_test_release_artifacts",
-      "target": "tests_test_release_artifacts_test_github_publishes_every_dockge_image_target",
-      "confidence_score": 1.0
+      "target": "tests_test_release_artifacts_test_github_publishes_every_dockge_image_target"
     },
     {
       "relation": "contains",
@@ -94512,5 +94512,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "4cf410da0ee2a3202403d6d3711f8f23cba8d283"
+  "built_at_commit": "c339614786a90efed9367d82d1912effc69f708d"
 }
