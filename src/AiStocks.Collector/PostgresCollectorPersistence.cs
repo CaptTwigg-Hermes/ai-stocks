@@ -13,8 +13,8 @@ public sealed class PostgresCollectorPersistence(
     SessionManifestStore manifests,
     DurableFirdsStore firds,
     NasdaqStatusMachine statuses,
-    string statusSeedPayloadPath,
-    string statusSeedSignaturePath)
+    string? statusSeedPayloadPath,
+    string? statusSeedSignaturePath)
 {
     public async Task PollStartedAsync(DateTimeOffset at, CancellationToken cancellationToken) =>
         await UpdateStateAsync("last_poll_started_at=$1,last_error=NULL", at, null, cancellationToken).ConfigureAwait(false);
@@ -123,8 +123,19 @@ public sealed class PostgresCollectorPersistence(
 
     private async Task PersistStatusAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, IReadOnlyList<FirdsInstrument> instruments, CancellationToken cancellationToken)
     {
-        var payload = await File.ReadAllBytesAsync(statusSeedPayloadPath, cancellationToken).ConfigureAwait(false);
-        var signature = await File.ReadAllBytesAsync(statusSeedSignaturePath, cancellationToken).ConfigureAwait(false);
+        byte[] payload;
+        byte[] signature;
+        if (statusSeedPayloadPath is null && statusSeedSignaturePath is null && statuses.SignerKeyId == "public-rss-best-effort")
+        {
+            payload = statuses.BestEffortBootstrapPayload();
+            signature = Encoding.UTF8.GetBytes("UNSIGNED-PAPER-ONLY-PUBLIC-RSS");
+        }
+        else if (statusSeedPayloadPath is not null && statusSeedSignaturePath is not null)
+        {
+            payload = await File.ReadAllBytesAsync(statusSeedPayloadPath, cancellationToken).ConfigureAwait(false);
+            signature = await File.ReadAllBytesAsync(statusSeedSignaturePath, cancellationToken).ConfigureAwait(false);
+        }
+        else throw new MarketDataException("Status authority configuration is incomplete");
         var payloadHash = Convert.ToHexStringLower(SHA256.HashData(payload));
         await using (var seed = new NpgsqlCommand("""
             INSERT INTO market_status_snapshots(seed_as_of,signer_key_id,signer_key_sha256,payload,payload_hash,signature)

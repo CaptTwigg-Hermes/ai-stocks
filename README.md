@@ -69,10 +69,9 @@ and an `owner:*` approval/time. The collector is the sole production ingester;
 PostgreSQL rejects missing/mismatched evidence, conflicting replay, or direct
 runtime writes and retains the exact immutable input bytes and hash.
 
-`MARKET_BOOTSTRAP_DIR` is read-only configuration, not a preseeded data volume.
-It must contain the reviewed `status-seed.json`, detached `status-seed.sig`,
-pinned `status-seed-public.der`, and `firds-plan.json`. The plan is an ordered,
-checksummed acquisition manifest; the collector downloads every unapplied ESMA
+`MARKET_BOOTSTRAP_DIR` is read-only configuration and needs only
+`firds-plan.json`. The plan is an ordered, checksummed acquisition manifest;
+the collector downloads every unapplied ESMA
 artifact itself and applies the initial `full` followed by contiguous `delta`
 entries. Example:
 
@@ -85,11 +84,15 @@ entries. Example:
 ```
 
 The collector also fetches Nasdaq Main Markets RSS on every poll, archives the
-immutable raw XML by SHA-256, applies new notices to signed durable status, and
-persists FIRDS/RSS provenance transactionally with trade authority. Add reviewed
-delta entries to the mounted plan before their effective session. A clean
-`NASDAQ_ARCHIVE_DIR` is supported; missing/invalid plan, seed, signature, key,
-checksum, cursor, or upstream bytes keeps `/readyz` closed.
+immutable raw XML by SHA-256, and applies suspension, observation, warning, and
+resumption notices to durable status. For this private paper-only deployment,
+eligible FIRDS common shares begin `Clear` unless the fetched public RSS snapshot
+says otherwise. This best-effort bootstrap can miss an older active status omitted
+from the finite RSS window; it is intentionally unsuitable for real-money or
+regulated trading. FIRDS/RSS provenance remains transactional with trade authority.
+Add reviewed delta entries to the mounted plan before their effective session. A
+clean `NASDAQ_ARCHIVE_DIR` is supported; a missing or invalid plan, checksum,
+cursor, RSS response, or upstream artifact keeps `/readyz` closed.
 
 Before deployment, verify that the Dockge host owns
 `192.168.50.2`, that port `3232` is free, and that the existing

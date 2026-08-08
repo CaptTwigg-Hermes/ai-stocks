@@ -60,12 +60,13 @@ public sealed partial class NasdaqStatusMachine
         _events = events?.ToList() ?? [];
         _rssArtifacts = rssArtifacts?.ToList() ?? [];
         _eventIds = _events.Select(x => x.Id).ToHashSet(StringComparer.Ordinal);
-        _latestPublishedAt = _events.Count == 0 ? seedAsOf : _events.Max(x => x.PublishedAt);
+        _latestPublishedAt = _events.Count == 0 ? seedAsOf : DateTimeOffset.Compare(seedAsOf, _events.Max(x => x.PublishedAt)) >= 0
+            ? seedAsOf : _events.Max(x => x.PublishedAt);
     }
 
     public IReadOnlyList<NasdaqStatusEvent> Events => _events;
     public IReadOnlyList<NasdaqRssArtifact> RssArtifacts => _rssArtifacts;
-    public DateTimeOffset SeedAsOf { get; }
+    public DateTimeOffset SeedAsOf { get; private set; }
     public string SignerKeyId { get; }
     public string SignerKeySha256 { get; }
     public InstrumentTradingState StateOf(string isin) => _states.GetValueOrDefault(isin, InstrumentTradingState.Unknown);
@@ -82,6 +83,51 @@ public sealed partial class NasdaqStatusMachine
     public DateTimeOffset LatestPublishedAt => _latestPublishedAt;
     public bool IsFreshAt(DateTimeOffset asOf, TimeSpan maximumAge) =>
         asOf >= _latestPublishedAt && asOf - _latestPublishedAt <= maximumAge;
+
+    public static NasdaqStatusMachine LoadPublicRssBestEffort(string durableStatePath)
+    {
+        var path = Path.GetFullPath(durableStatePath);
+        if (!File.Exists(path))
+            return new([], DateTimeOffset.MinValue, "public-rss-best-effort", new string('0', 64), path, []);
+        try
+        {
+            var envelope = JsonSerializer.Deserialize<StatusEnvelope>(File.ReadAllBytes(path), JsonOptions) ?? throw new JsonException();
+            var stateBytes = JsonSerializer.SerializeToUtf8Bytes(envelope.State, JsonOptions);
+            var actual = Convert.ToHexStringLower(SHA256.HashData(stateBytes));
+            if (envelope.Sha256 != actual || envelope.State.SignerKeyId != "public-rss-best-effort" ||
+                envelope.State.SignerKeySha256 != new string('0', 64) || envelope.State.SeedStates is null)
+                throw new MarketDataException("Durable best-effort status state identity or checksum mismatch");
+            return new(envelope.State.States.ToDictionary(StringComparer.Ordinal), envelope.State.SeedAsOf,
+                envelope.State.SignerKeyId, envelope.State.SignerKeySha256, path,
+                envelope.State.SeedStates.ToDictionary(StringComparer.Ordinal), envelope.State.Events, envelope.State.RssArtifacts);
+        }
+        catch (MarketDataException) { throw; }
+        catch (Exception exception) when (exception is IOException or JsonException)
+        { throw new MarketDataException("Durable best-effort status state is malformed", exception); }
+    }
+
+    public void InitializeBestEffortUniverse(IEnumerable<string> isins, DateTimeOffset asOf)
+    {
+        if (SignerKeyId != "public-rss-best-effort" || asOf == default)
+            throw new MarketDataException("Best-effort status initialization is invalid");
+        var reviewed = isins.Distinct(StringComparer.Ordinal).ToArray();
+        if (reviewed.Any(isin => IsinPattern().Match(isin).Value != isin))
+            throw new MarketDataException("Best-effort status universe contains an invalid ISIN");
+        foreach (var isin in reviewed)
+        {
+            _seedStates.TryAdd(isin, InstrumentTradingState.Clear);
+            _states.TryAdd(isin, InstrumentTradingState.Clear);
+        }
+        if (asOf > _latestPublishedAt) _latestPublishedAt = asOf;
+        Persist();
+    }
+
+    public byte[] BestEffortBootstrapPayload() => JsonSerializer.SerializeToUtf8Bytes(new
+    {
+        mode = SignerKeyId,
+        asOf = SeedAsOf,
+        defaultEligibleFirdsState = InstrumentTradingState.Clear.ToString()
+    }, JsonOptions);
 
     internal static NasdaqStatusMachine LoadVerifiedSeed(string payload, string keyId, string keySha256, string durableStatePath)
     {
@@ -173,7 +219,8 @@ public sealed partial class NasdaqStatusMachine
     private void Persist()
     {
         var state = new StatusState(SeedAsOf, SignerKeyId, SignerKeySha256,
-            _states.OrderBy(x => x.Key, StringComparer.Ordinal).ToDictionary(), _events.ToArray(), _rssArtifacts.ToArray());
+            _states.OrderBy(x => x.Key, StringComparer.Ordinal).ToDictionary(), _events.ToArray(), _rssArtifacts.ToArray(),
+            SignerKeyId == "public-rss-best-effort" ? _seedStates.OrderBy(x => x.Key, StringComparer.Ordinal).ToDictionary() : null);
         var checksum = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(state, JsonOptions)));
         AtomicFile.Write(_durableStatePath, JsonSerializer.SerializeToUtf8Bytes(new StatusEnvelope(checksum, state), JsonOptions));
     }
@@ -222,9 +269,14 @@ public sealed partial class NasdaqStatusMachine
 
     private sealed record StatusState(DateTimeOffset SeedAsOf, string SignerKeyId, string SignerKeySha256,
         Dictionary<string, InstrumentTradingState> States, IReadOnlyList<NasdaqStatusEvent> Events,
-        IReadOnlyList<NasdaqRssArtifact>? RssArtifacts = null);
+        IReadOnlyList<NasdaqRssArtifact>? RssArtifacts = null,
+        Dictionary<string, InstrumentTradingState>? SeedStates = null);
     private sealed record StatusEnvelope(string Sha256, StatusState State);
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
     [GeneratedRegex(@"\b[A-Z]{2}[A-Z0-9]{9}[0-9]\b", RegexOptions.CultureInvariant)] private static partial Regex IsinPattern();
 }
 

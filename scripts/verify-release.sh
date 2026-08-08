@@ -44,7 +44,6 @@ env \
   NASDAQ_STATUS_DIR=/tmp/status \
   MARKET_BOOTSTRAP_DIR=/tmp/market-bootstrap \
   CORPORATE_ACTION_INPUT_DIR=/tmp/corporate-actions \
-  STATUS_PINNED_KEY_ID=test-status-key \
   ACCESS_TEAM_DOMAIN=https://example.cloudflareaccess.com \
   ACCESS_AUD=test-aud \
   PUBLIC_ORIGIN=https://ai-stocks.example \

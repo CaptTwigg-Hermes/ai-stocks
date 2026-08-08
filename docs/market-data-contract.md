@@ -35,6 +35,12 @@ Never replace the trading timestamp with retrieval, publication,
 file-generation, or chart-bucket time. No matching post-decision
 trade means no fill.
 
+For this private paper-only deployment, active eligible FIRDS common
+shares begin clear and archived Nasdaq Main Markets RSS notices override
+that baseline. This is a deliberate convenience trade-off: the finite
+public RSS window may omit an older active status. It must never be reused
+for real-money or regulated execution.
+
 ## Universe and reference data
 
 Nasdaq's website screener and instrument endpoints are technically
@@ -42,7 +48,9 @@ available but its general legal terms restrict automated capture.
 They are not authorized production dependencies without written
 permission. Until permission exists, use a reviewed, checksummed
 universe artifact derived from official Nasdaq list/change files.
-Track instruments by ISIN plus XSTO order-book identity.
+Track instruments by ISIN plus XSTO order-book identity. ESMA's
+official FIRDS full files do not publish a separate venue instrument ID, so
+this deployment uses the ISIN itself as the deterministic XSTO identity.
 
 Allowed: Nasdaq Stockholm Large, Mid, and Small Cap common shares.
 Reject preference shares, SDB/SDR depositary receipts, SPACs, funds,

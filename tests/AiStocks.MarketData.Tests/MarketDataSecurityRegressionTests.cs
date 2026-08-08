@@ -94,6 +94,28 @@ public sealed class MarketDataSecurityRegressionTests
     }
 
     [Fact]
+    public void PublicRssBestEffortStatusBootstrapsFirdsUniverseWithoutSigningKeys()
+    {
+        using var temp = new TemporaryDirectory();
+        var statePath = Path.Combine(temp.Path, "status.json");
+        var machine = NasdaqStatusMachine.LoadPublicRssBestEffort(statePath);
+        machine.ApplyRss(Rss("existing-suspension", "Thu, 06 Aug 2026 08:00:00 GMT", "suspension"));
+
+        machine.InitializeBestEffortUniverse(
+            ["SE0000108656", "SE0000112233"],
+            DateTimeOffset.Parse("2026-08-06T09:00:00Z"));
+
+        Assert.False(machine.IsEligible("SE0000108656"));
+        Assert.True(machine.IsEligible("SE0000112233"));
+        Assert.Equal("public-rss-best-effort", machine.SignerKeyId);
+        Assert.Equal(new string('0', 64), machine.SignerKeySha256);
+
+        var restarted = NasdaqStatusMachine.LoadPublicRssBestEffort(statePath);
+        Assert.Equal(InstrumentTradingState.Suspended, restarted.StateOf("SE0000108656"));
+        Assert.Equal(InstrumentTradingState.Clear, restarted.StateOf("SE0000112233"));
+    }
+
+    [Fact]
     public void StatusHistoryProjectsSuspensionAndResumptionAtEachTradeTimestamp()
     {
         using var temp = new TemporaryDirectory();
@@ -281,6 +303,34 @@ public sealed class MarketDataSecurityRegressionTests
         var artifact = statuses.RssArtifacts[0];
         Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(rss)), artifact.Sha256);
         Assert.True(File.Exists(artifact.RawPath));
+    }
+
+    [Fact]
+    public async Task CleanStartBestEffortMarksEligibleFirdsSharesClearWithoutSeedFiles()
+    {
+        using var temp = new TemporaryDirectory();
+        var statuses = NasdaqStatusMachine.LoadPublicRssBestEffort(Path.Combine(temp.Path, "status-state.json"));
+        var full = File.ReadAllBytes(Fixture("firds-full.xml"));
+        var fullHash = Convert.ToHexStringLower(SHA256.HashData(full));
+        var planPath = Path.Combine(temp.Path, "firds-plan.json");
+        await File.WriteAllTextAsync(planPath, $$"""
+            {"artifacts":[{"kind":"full","sourceUrl":"https://firds.esma.europa.eu/firds/FULINS_E_20260806_01of01.zip","sha256":"{{fullHash}}","version":"full-20260806","cursor":1,"effectiveAt":"2026-08-06"}]}
+            """);
+        var rss = Encoding.UTF8.GetBytes("""
+            <rss><channel><link>https://api.news.eu.nasdaq.com/news/rss/mainMarketNotices</link>
+              <item><guid>unrelated</guid><title>Weekly Exercise</title><description>Derivatives</description><pubDate>Thu, 06 Aug 2026 08:00:00 GMT</pubDate><link>https://view.news.eu.nasdaq.com/view?id=unrelated</link></item>
+            </channel></rss>
+            """);
+        using var http = new HttpClient(new StubHandler(request => request.RequestUri!.Host == "firds.esma.europa.eu"
+            ? new(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(full) }
+            : new(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(rss) }));
+        var firds = new DurableFirdsStore(Path.Combine(temp.Path, "firds-state.json"));
+
+        await new MarketReferenceAcquirer(http, firds, statuses, planPath, Path.Combine(temp.Path, "status-rss"))
+            .AcquireAsync(DateTimeOffset.Parse("2026-08-06T09:00:00Z"), CancellationToken.None);
+
+        Assert.True(statuses.IsEligible("SE0000108656"));
+        Assert.Equal(DateTimeOffset.MinValue, statuses.SeedAsOf);
     }
 
     [Fact]

@@ -23,15 +23,14 @@ def test_dockge_compose_separates_and_hardens_services():
     assert services["worker"]["build"]["target"] == "worker"
     assert services["collector"]["volumes"] == [
         "${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq",
-        "${MARKET_BOOTSTRAP_DIR:?set the reviewed signed seed and FIRDS plan directory}:/run/market-bootstrap:ro",
+        "${MARKET_BOOTSTRAP_DIR:?set the reviewed FIRDS plan directory}:/run/market-bootstrap:ro",
         "${CORPORATE_ACTION_INPUT_DIR:?set the reviewed corporate-action input directory}:/run/corporate-actions:ro",
     ]
     collector_environment = services["collector"]["environment"]
     assert collector_environment["CORPORATE_ACTION_INPUT_PATH"] == "/run/corporate-actions"
     assert collector_environment["FIRDS_ACQUISITION_PLAN_PATH"] == "/run/market-bootstrap/firds-plan.json"
-    assert collector_environment["STATUS_SEED_PAYLOAD_PATH"] == "/run/market-bootstrap/status-seed.json"
-    assert collector_environment["STATUS_SEED_SIGNATURE_PATH"] == "/run/market-bootstrap/status-seed.sig"
-    assert collector_environment["STATUS_PINNED_PUBLIC_KEY_PATH"] == "/run/market-bootstrap/status-seed-public.der"
+    assert not any(name.startswith("STATUS_SEED_") for name in collector_environment)
+    assert "STATUS_PINNED_KEY_ID" not in collector_environment
     assert (
         "${NASDAQ_ARCHIVE_DIR:?set the Nasdaq archive dataset}:/data/nasdaq:ro"
         in services["worker"]["volumes"]
@@ -55,8 +54,9 @@ def test_example_environment_renders_compose_with_fail_closed_proxy_configuratio
     assert compose["services"]["app"]["environment"]["TRUSTED_PROXY_IPS"].startswith(
         "${TRUSTED_PROXY_IPS:?"
     )
-    for name in ("TRUSTED_PROXY_IPS", "COLLECTOR_DATABASE_URL", "STATUS_PINNED_KEY_ID"):
+    for name in ("TRUSTED_PROXY_IPS", "COLLECTOR_DATABASE_URL"):
         assert f"{name}=" in example
+    assert "STATUS_PINNED_KEY_ID=" not in example
 
 
 def test_backup_and_restore_handoff_exports_libpq_urls():

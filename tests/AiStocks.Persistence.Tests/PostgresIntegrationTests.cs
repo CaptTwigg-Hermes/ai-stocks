@@ -413,13 +413,7 @@ public sealed class PostgresIntegrationTests
             var full = await File.ReadAllBytesAsync(Path.Combine(fixtures, "firds-full.xml"));
             firds.ApplyFull(new MemoryStream(full), new DateOnly(2026, 8, 6), new Uri("https://firds.esma.europa.eu/firds/FULINS_E_20260806_01of01.zip"),
                 Convert.ToHexStringLower(SHA256.HashData(full)), "full-20260806", 1);
-            using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-            var payload = "{\"asOf\":\"2026-08-06T07:00:00Z\",\"states\":{\"SE0000108656\":\"Clear\"}}";
-            var payloadPath = Path.Combine(root, "seed.json"); var signaturePath = Path.Combine(root, "seed.sig");
-            await File.WriteAllTextAsync(payloadPath, payload);
-            await File.WriteAllBytesAsync(signaturePath, key.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256));
-            var statuses = new PinnedStatusSeedVerifier("test-key", key.ExportSubjectPublicKeyInfo())
-                .Load(payload, await File.ReadAllBytesAsync(signaturePath), Path.Combine(root, "status.json"));
+            var statuses = NasdaqStatusMachine.LoadPublicRssBestEffort(Path.Combine(root, "status.json"));
             var rss = Encoding.UTF8.GetBytes("""
                 <rss><channel><link>https://api.news.eu.nasdaq.com/news/rss/mainMarketNotices</link>
                   <item><guid>suspend-at-ten</guid><title>SE0000108656 suspension</title><description>suspension</description><pubDate>Thu, 06 Aug 2026 10:00:00 GMT</pubDate><link>https://view.news.eu.nasdaq.com/view?id=suspend-at-ten</link></item>
@@ -431,6 +425,8 @@ public sealed class PostgresIntegrationTests
             await File.WriteAllBytesAsync(rssPath, rss);
             statuses.ApplyRssSnapshot(new MemoryStream(rss), new Uri("https://api.news.eu.nasdaq.com/news/rss/mainMarketNotices"),
                 DateTimeOffset.Parse("2026-08-06T12:00:00Z"), rssHash, rssPath);
+            statuses.InitializeBestEffortUniverse(firds.LoadVerified().Instruments.Select(x => x.Isin),
+                DateTimeOffset.Parse("2026-08-06T12:00:00Z"));
             var session = StockholmCalendar.GetSession(new DateOnly(2026, 8, 6))!;
             var csv = await File.ReadAllBytesAsync(Path.Combine(fixtures, "nasdaq-posttrade.csv"));
             var reports = SessionManifest.ExpectedReports(session).Select(name => archive.Archive(name, csv,
@@ -450,7 +446,7 @@ public sealed class PostgresIntegrationTests
             var replay = await new NasdaqCollector(new NasdaqPostTradeClient(http, archive), archive, manifests)
                 .CollectOnceAsync(session.Close.AddHours(1), CancellationToken.None);
             Assert.Equal(new[] { manifestPath }, replay.FinalizedManifests);
-            var persistence = new PostgresCollectorPersistence(connectionString, archive, manifests, firds, statuses, payloadPath, signaturePath);
+            var persistence = new PostgresCollectorPersistence(connectionString, archive, manifests, firds, statuses, null, null);
             await persistence.PollStartedAsync(session.Close.AddHours(1), CancellationToken.None);
             await persistence.PersistAsync(replay, session.Close.AddHours(1), CancellationToken.None);
             await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);

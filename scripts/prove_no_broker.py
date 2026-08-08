@@ -100,7 +100,6 @@ def runtime_endpoint_table(executable: str, findings: list[str]) -> dict[str, ob
         "DATABASE_URL": denied_database,
         "COLLECTOR_DATABASE_URL": denied_database,
         "FIRDS_ACQUISITION_PLAN_PATH": str(ROOT / "tests" / "AiStocks.MarketData.Tests" / "Fixtures" / "firds-plan-unused.json"),
-        "STATUS_PINNED_KEY_ID": "endpoint-inventory",
         "ARTIFACT_ROOT": str(ROOT),
     })
     try:

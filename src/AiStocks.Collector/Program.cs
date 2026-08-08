@@ -9,17 +9,12 @@ var databaseUrl = builder.Configuration["COLLECTOR_DATABASE_URL"]
 var firdsPath = builder.Configuration["FIRDS_STATE_PATH"] ?? Path.Combine(archivePath, "firds-state.json");
 var firdsPlanPath = builder.Configuration["FIRDS_ACQUISITION_PLAN_PATH"]
     ?? throw new InvalidOperationException("FIRDS_ACQUISITION_PLAN_PATH is required");
-var seedPayloadPath = builder.Configuration["STATUS_SEED_PAYLOAD_PATH"] ?? Path.Combine(archivePath, "status-seed.json");
-var seedSignaturePath = builder.Configuration["STATUS_SEED_SIGNATURE_PATH"] ?? Path.Combine(archivePath, "status-seed.sig");
-var pinnedPublicKeyPath = builder.Configuration["STATUS_PINNED_PUBLIC_KEY_PATH"] ?? Path.Combine(archivePath, "status-seed-public.der");
-var pinnedKeyId = builder.Configuration["STATUS_PINNED_KEY_ID"] ?? throw new InvalidOperationException("STATUS_PINNED_KEY_ID is required");
 StockholmCalendar.VerifyPinnedArtifacts(artifactRoot);
 
 builder.Services.AddSingleton(new ImmutableArchive(archivePath));
 builder.Services.AddSingleton(new SessionManifestStore(archivePath));
 builder.Services.AddSingleton(new DurableFirdsStore(firdsPath));
-builder.Services.AddSingleton(_ => new PinnedStatusSeedVerifier(pinnedKeyId, File.ReadAllBytes(pinnedPublicKeyPath))
-    .Load(File.ReadAllText(seedPayloadPath), File.ReadAllBytes(seedSignaturePath), Path.Combine(archivePath, "status-state.json")));
+builder.Services.AddSingleton(_ => NasdaqStatusMachine.LoadPublicRssBestEffort(Path.Combine(archivePath, "status-state.json")));
 builder.Services.AddSingleton(new CollectorHealth(TimeSpan.FromSeconds(120)));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient<NasdaqPostTradeClient>(client =>
@@ -45,7 +40,7 @@ builder.Services.AddSingleton(serviceProvider => new NasdaqCollector(
 builder.Services.AddSingleton(serviceProvider => new PostgresCollectorPersistence(databaseUrl,
     serviceProvider.GetRequiredService<ImmutableArchive>(), serviceProvider.GetRequiredService<SessionManifestStore>(),
     serviceProvider.GetRequiredService<DurableFirdsStore>(), serviceProvider.GetRequiredService<NasdaqStatusMachine>(),
-    seedPayloadPath, seedSignaturePath));
+    null, null));
 builder.Services.AddSingleton(new PostgresCorporateActionIngestion(databaseUrl));
 builder.Services.AddSingleton(new PostgresCollectorReadiness(databaseUrl));
 builder.Services.AddHostedService<CollectorWorker>();

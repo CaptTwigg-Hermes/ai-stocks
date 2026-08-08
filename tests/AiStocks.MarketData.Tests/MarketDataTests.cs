@@ -100,6 +100,26 @@ public sealed class MarketDataTests
     }
 
     [Fact]
+    public void FirdsOfficialFullFileRefDataUsesIsinAsStableXstoIdentity()
+    {
+        const string xml = """
+            <Document xmlns="urn:iso:std:iso:20022:tech:xsd:auth.017.001.02"><RefData>
+              <FinInstrmGnlAttrbts><Id>SE0000118952</Id><FullNm>NCC AB ser. A</FullNm><ClssfctnTp>ESEUFR</ClssfctnTp><NtnlCcy>SEK</NtnlCcy></FinInstrmGnlAttrbts>
+              <Issr>213800WRGLW3CY4MHW53</Issr>
+              <TradgVnRltdAttrbts><Id>XSTO</Id><FrstTradDt>1998-10-04T06:00:00Z</FrstTradDt></TradgVnRltdAttrbts>
+            </RefData></Document>
+            """;
+
+        var instruments = new FirdsUniverseParser().ParseFull(
+            new MemoryStream(Encoding.UTF8.GetBytes(xml)), FullDay);
+
+        var instrument = Assert.Single(instruments);
+        Assert.Equal("SE0000118952", instrument.Isin);
+        Assert.Equal("SE0000118952", instrument.OrderBookId);
+        Assert.Equal(new DateOnly(1998, 10, 4), instrument.FirstTradeDate);
+    }
+
+    [Fact]
     public void FirdsCfiEligibilityAdmitsOnlyDefinedCommonOrdinaryShareSubtypes()
     {
         var instruments = new FirdsUniverseParser().ParseFull(

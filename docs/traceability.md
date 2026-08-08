@@ -31,7 +31,7 @@ This matrix is a release gate. A requirement is not complete because code exists
 The following cannot be replaced by fixtures:
 
 1. Twenty complete archived XSTO sessions for every eligible instrument.
-2. Reviewed signed initial instrument-status snapshot, followed by live RSS continuity.
+2. Archived initial Nasdaq Main Markets RSS snapshot, followed by monotonic live RSS continuity; the private paper-only baseline assumes eligible FIRDS common shares are clear when the snapshot contains no blocking notice.
 3. Live Nasdaq post-trade transport/schema smoke from the production network.
 4. Successful safe-mode calls to all four exact Copilot model IDs.
 5. Production PostgreSQL migration, concurrency, and restricted-role proof.

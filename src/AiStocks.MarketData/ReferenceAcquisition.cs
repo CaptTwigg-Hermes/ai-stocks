@@ -46,6 +46,8 @@ public sealed class MarketReferenceAcquirer(
             throw new MarketDataException("Nasdaq RSS raw archive conflicts");
         if (!File.Exists(rawPath)) AtomicFile.Write(rawPath, rss);
         statuses.ApplyRssSnapshot(new MemoryStream(rss, writable: false), StatusRss, fetchedAt, hash, rawPath);
+        if (statuses.SignerKeyId == "public-rss-best-effort")
+            statuses.InitializeBestEffortUniverse(current.Instruments.Select(x => x.Isin), fetchedAt);
     }
 
     private async Task<FirdsPlan> LoadPlanAsync(CancellationToken cancellationToken)

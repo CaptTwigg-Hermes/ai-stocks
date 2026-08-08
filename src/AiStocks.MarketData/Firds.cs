@@ -37,7 +37,7 @@ public sealed class FirdsUniverseParser
         var found = false;
         while (reader.Read())
         {
-            if (reader.NodeType != XmlNodeType.Element || reader.LocalName is not ("NewRcrd" or "ModfdRcrd" or "TermntdRcrd")) continue;
+            if (reader.NodeType != XmlNodeType.Element || reader.LocalName is not ("RefData" or "NewRcrd" or "ModfdRcrd" or "TermntdRcrd")) continue;
             found = true;
             var operation = reader.LocalName == "TermntdRcrd" ? Operation.Delete : Operation.Upsert;
             using var subtree = reader.ReadSubtree();
@@ -49,15 +49,23 @@ public sealed class FirdsUniverseParser
     private static FirdsInstrument Parse(XElement record)
     {
         string Value(string name) => record.Descendants().FirstOrDefault(x => x.Name.LocalName == name)?.Value.Trim() ?? string.Empty;
-        DateOnly? Date(string name) => DateOnly.TryParse(Value(name), out var result) ? result : null;
+        DateOnly? Date(string name)
+        {
+            var value = Value(name);
+            if (DateOnly.TryParse(value, out var date)) return date;
+            return DateTimeOffset.TryParse(value, out var timestamp) ? DateOnly.FromDateTime(timestamp.Date) : null;
+        }
         var general = record.Descendants().FirstOrDefault(x => x.Name.LocalName == "FinInstrmGnlAttrbts") ?? throw new MarketDataException("FIRDS general attributes are missing");
         string General(string name) => general.Elements().FirstOrDefault(x => x.Name.LocalName == name)?.Value.Trim() ?? string.Empty;
         var venueAttributes = record.Descendants().FirstOrDefault(x => x.Name.LocalName == "TradgVnRltdAttrbts")
             ?? throw new MarketDataException("FIRDS venue attributes are missing");
         string VenueValue(string name) => venueAttributes.Elements()
             .FirstOrDefault(x => x.Name.LocalName == name)?.Value.Trim() ?? string.Empty;
+        var isin = General("Id");
+        var orderBookId = VenueValue("TradgVnInstrmId");
+        if (string.IsNullOrWhiteSpace(orderBookId)) orderBookId = isin;
         var item = new FirdsInstrument(
-            General("Id"), VenueValue("TradgVnInstrmId"), Value("Issr"), General("FullNm"),
+            isin, orderBookId, Value("Issr"), General("FullNm"),
             General("ClssfctnTp"), General("NtnlCcy"), VenueValue("Id"),
             Date("FrstTradDt"), Date("TermntnDt"));
         if (item.Isin.Length != 12 || item.IssuerId.Length != 20 || item.Cfi.Length != 6 ||
