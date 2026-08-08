@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace AiStocks.MarketData;
@@ -15,9 +16,16 @@ public sealed class ImmutableArchive(string root)
         ValidateSource(sourceUrl, report);
         if (bytes.Length is <= 0 or > 52_428_800 || !StartsWithSeparator(bytes)) throw new MarketDataException("Nasdaq report body is invalid");
         Directory.CreateDirectory(_root);
-        var final = Path.Combine(_root, report);
-        if (Directory.Exists(final)) return Verify(report);
         var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        var final = Path.Combine(_root, report);
+        if (Directory.Exists(final))
+        {
+            var existing = Verify(report);
+            if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(existing.Sha256), Convert.FromHexString(hash)) ||
+                existing.Bytes != bytes.LongLength || existing.SourceUrl != sourceUrl)
+                throw new MarketDataException("Conflicting immutable report replay");
+            return existing;
+        }
         var metadata = new ArchiveMetadata(report, hash, bytes.LongLength, sourceUrl.AbsoluteUri, fetchedAt);
         var temporary = Path.Combine(_root, $".{report}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(temporary);
@@ -97,6 +105,7 @@ public sealed class ImmutableArchive(string root)
 public sealed record ManifestReport(string Report, string Sha256);
 public sealed record CompleteSessionManifest(int SchemaVersion, bool Complete, string SessionId, DateTimeOffset SessionOpen,
     DateTimeOffset SessionClose, DateTimeOffset FinalizedAt, string SourceListingUrl, IReadOnlyList<ManifestReport> Reports);
+public sealed record VerifiedSessionManifest(string Path, string Sha256, CompleteSessionManifest Manifest);
 
 public sealed class SessionManifestStore(string archiveRoot)
 {
@@ -114,12 +123,34 @@ public sealed class SessionManifestStore(string archiveRoot)
             rows.Select(x => new ManifestReport(x.Report, x.Sha256)).ToArray());
         Directory.CreateDirectory(_directory);
         var path = Path.Combine(_directory, manifest.SessionId + ".json");
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, options);
-        if (File.Exists(path)) { ValidateExisting(path, manifest, session, options); return path; }
-        try { using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None); stream.Write(bytes); stream.Flush(true); }
-        catch (IOException) { ValidateExisting(path, manifest, session, options); }
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);
+        if (File.Exists(path)) { ValidateExisting(path, manifest, session, JsonOptions); return path; }
+        AtomicFile.Write(path + ".sha256", Encoding.UTF8.GetBytes(Convert.ToHexStringLower(SHA256.HashData(bytes)) + "\n"));
+        AtomicFile.Write(path, bytes);
+        _ = Verify(session);
         return path;
+    }
+
+    public VerifiedSessionManifest? TryVerify(TradingSession session) => File.Exists(PathFor(session)) ? Verify(session) : null;
+
+    public VerifiedSessionManifest Verify(TradingSession session)
+    {
+        var path = PathFor(session);
+        try
+        {
+            var bytes = File.ReadAllBytes(path);
+            var expected = File.ReadAllText(path + ".sha256").Trim();
+            var actual = Convert.ToHexStringLower(SHA256.HashData(bytes));
+            if (expected.Length != 64 || !expected.All(Uri.IsHexDigit) || !CryptographicOperations.FixedTimeEquals(Convert.FromHexString(expected), Convert.FromHexString(actual)))
+                throw new MarketDataException("Session manifest checksum mismatch");
+            var manifest = JsonSerializer.Deserialize<CompleteSessionManifest>(bytes, JsonOptions) ?? throw new JsonException();
+            ValidateManifestIdentity(manifest, session);
+            SessionManifest.ValidateComplete(session, manifest.Reports.ToDictionary(x => x.Report, x => x.Sha256, StringComparer.Ordinal));
+            return new(path, actual, manifest);
+        }
+        catch (MarketDataException) { throw; }
+        catch (Exception exception) when (exception is IOException or JsonException or ArgumentException)
+        { throw new MarketDataException("Session manifest is missing or malformed", exception); }
     }
 
     private static void ValidateExisting(string path, CompleteSessionManifest candidate, TradingSession session, JsonSerializerOptions options)
@@ -134,5 +165,18 @@ public sealed class SessionManifestStore(string archiveRoot)
             existing.SessionId != candidate.SessionId || existing.SessionOpen != candidate.SessionOpen || existing.SessionClose != candidate.SessionClose ||
             existing.SourceListingUrl != candidate.SourceListingUrl || !existing.Reports.SequenceEqual(candidate.Reports))
             throw new MarketDataException("Conflicting immutable session manifest");
+        var checksumPath = path + ".sha256";
+        if (!File.Exists(checksumPath)) throw new MarketDataException("Existing session manifest checksum is missing");
     }
+
+    private string PathFor(TradingSession session) => Path.Combine(_directory, $"XSTO-{session.Day:yyyy-MM-dd}.json");
+    private static void ValidateManifestIdentity(CompleteSessionManifest manifest, TradingSession session)
+    {
+        var delay = manifest.FinalizedAt - session.Close;
+        if (!manifest.Complete || manifest.SchemaVersion != 1 || manifest.SessionId != $"XSTO-{session.Day:yyyy-MM-dd}" ||
+            manifest.SessionOpen != session.Open || manifest.SessionClose != session.Close || delay < TimeSpan.FromMinutes(15) || delay > TimeSpan.FromMinutes(20) ||
+            manifest.SourceListingUrl != "https://tradereports.nasdaq.com/api/regulatory/trade-reports?type=POST_TRADE&assetClass=EQUITY")
+            throw new MarketDataException("Session manifest identity is invalid");
+    }
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 }

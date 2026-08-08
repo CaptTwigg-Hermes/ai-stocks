@@ -85,7 +85,10 @@ public sealed record VerifiedMarketObservation(
     string SessionId,
     string RawSha256,
     bool HasWarning,
-    bool IsSuspended);
+    bool IsSuspended,
+    string RawReportName,
+    Uri RawSourceUrl,
+    string ManifestSha256);
 
 public sealed record OrderDecision(
     string DecisionId,

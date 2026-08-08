@@ -31,7 +31,10 @@ internal static class TestData
         long quantity = 1_000_000) =>
         new(instrument ?? Volvo, price, bid, ask, quantity, adv, sessions,
             tradedAt ?? Open.AddHours(1), (tradedAt ?? Open.AddHours(1)).AddMinutes(15),
-            Session.Id, new string('c', 64), warning, suspended);
+            Session.Id, new string('c', 64), warning, suspended,
+            "NordicEquity-posttrade-2026-08-06T1015",
+            new Uri("https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName=NordicEquity-posttrade-2026-08-06T1015"),
+            new string('d', 64));
 
     internal static IReadOnlyDictionary<InstrumentId, decimal> Marks(params (InstrumentId Instrument, decimal Price)[] marks) =>
         marks.ToDictionary(mark => mark.Instrument, mark => mark.Price);

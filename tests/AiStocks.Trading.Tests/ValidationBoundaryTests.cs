@@ -102,4 +102,17 @@ public sealed class ValidationBoundaryTests
             TestData.Marks())).Code);
         Assert.Empty(engine.Orders);
     }
+
+    [Fact]
+    public void SyntacticRawHashWithoutOfficialArchiveAndManifestIdentityIsRejected()
+    {
+        var quote = TestData.Quote() with
+        {
+            RawSourceUrl = new Uri("https://evil.example/report"),
+            ManifestSha256 = new string('d', 64)
+        };
+        var error = Assert.Throws<TradingException>(() => PaperTradingEngine.CreateContest().Submit(
+            TestData.Decision(), quote, TestData.Session, TestData.Marks()));
+        Assert.Equal("market-data", error.Code);
+    }
 }

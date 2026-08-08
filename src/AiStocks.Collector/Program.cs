@@ -18,11 +18,24 @@ builder.Services.AddHttpClient<NasdaqPostTradeClient>(client =>
 });
 builder.Services.AddSingleton<NasdaqCollector>();
 builder.Services.AddHostedService<CollectorWorker>();
+builder.Services.AddSingleton(new ConfiguredMarketDataReadiness(
+    archivePath,
+    builder.Configuration["FirdsStatePath"] ?? Path.Combine(archivePath, "firds-state.json"),
+    builder.Configuration["ObservationStatePath"] ?? Path.Combine(archivePath, "observation-state.json"),
+    builder.Configuration["StatusSeedPayloadPath"] ?? Path.Combine(archivePath, "status-seed.json"),
+    builder.Configuration["StatusSeedSignaturePath"] ?? Path.Combine(archivePath, "status-seed.sig"),
+    builder.Configuration["StatusPinnedPublicKeyPath"] ?? Path.Combine(archivePath, "status-seed-public.der"),
+    builder.Configuration["StatusPinnedKeyId"] ?? string.Empty));
 
 var app = builder.Build();
 app.MapGet("/healthz", (CollectorHealth health) => health.IsHealthy(DateTimeOffset.UtcNow)
     ? Results.Ok(new { status = "healthy" })
     : Results.Json(new { status = "unhealthy", failure = health.Failure }, statusCode: StatusCodes.Status503ServiceUnavailable));
+app.MapGet("/readyz", (ConfiguredMarketDataReadiness readiness) =>
+{
+    var result = readiness.Evaluate(DateOnly.FromDateTime(DateTime.UtcNow));
+    return result.Ready ? Results.Ok(new { status = "ready" }) : Results.Json(new { status = "not-ready", failures = result.Failures }, statusCode: StatusCodes.Status503ServiceUnavailable);
+});
 app.Run();
 
 public partial class Program;

@@ -78,21 +78,24 @@ public static class NasdaqCsvParser
         var row = new List<string>();
         var field = new StringBuilder();
         var quoted = false;
+        var quoteClosed = false;
         for (var i = 0; i < text.Length; i++)
         {
             var c = text[i];
             if (quoted)
             {
                 if (c == '"' && i + 1 < text.Length && text[i + 1] == '"') { field.Append('"'); i++; }
-                else if (c == '"') quoted = false;
+                else if (c == '"') { quoted = false; quoteClosed = true; }
                 else field.Append(c);
             }
-            else if (c == '"' && field.Length == 0) quoted = true;
-            else if (c == ';') { row.Add(field.ToString()); field.Clear(); }
+            else if (quoteClosed && c is not (';' or '\r' or '\n')) throw new MarketDataException("Nasdaq CSV contains characters after a closing quote");
+            else if (c == '"' && field.Length == 0 && !quoteClosed) quoted = true;
+            else if (c == '"') throw new MarketDataException("Nasdaq CSV contains a quote in an unquoted field");
+            else if (c == ';') { row.Add(field.ToString()); field.Clear(); quoteClosed = false; }
             else if (c is '\r' or '\n')
             {
                 if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
-                row.Add(field.ToString()); field.Clear(); records.Add(row); row = [];
+                row.Add(field.ToString()); field.Clear(); quoteClosed = false; records.Add(row); row = [];
             }
             else field.Append(c);
         }
@@ -107,10 +110,10 @@ public static class NasdaqTradeSelection
     public static NasdaqTrade FirstEligible(IEnumerable<NasdaqTrade> rows, string isin, DateTimeOffset decisionAt, TradingSession session, NasdaqStatusMachine statuses)
     {
         if (!statuses.IsEligible(isin)) throw new MarketDataException("Instrument status is unknown or ineligible");
-        return FirstEligible(rows, isin, decisionAt, session);
+        return FirstEligibleCore(rows, isin, decisionAt, session);
     }
 
-    public static NasdaqTrade FirstEligible(IEnumerable<NasdaqTrade> rows, string isin, DateTimeOffset decisionAt, TradingSession session)
+    private static NasdaqTrade FirstEligibleCore(IEnumerable<NasdaqTrade> rows, string isin, DateTimeOffset decisionAt, TradingSession session)
     {
         return rows.Where(x => x.Isin == isin && x.Venue == "XSTO" && x.Currency == "SEK" && x.PriceNotation == "MONE" &&
                 x.ExecutedAt >= decisionAt && session.Contains(x.ExecutedAt))

@@ -33,20 +33,28 @@ public static class SessionManifest
     public static void ValidateComplete(TradingSession session, IReadOnlyDictionary<string, string> reports)
     {
         var expected = ExpectedReports(session);
-        if (reports.Count != expected.Count || expected.Any(x => !reports.TryGetValue(x, out var hash) || hash.Length != 64))
+        if (reports.Count != expected.Count || expected.Any(x => !reports.TryGetValue(x, out var hash) ||
+            hash.Length != 64 || !hash.All(Uri.IsHexDigit)))
             throw new MarketDataException("Session manifest is incomplete or invalid");
     }
 }
 
-public sealed record SessionTradedValue(DateOnly Session, decimal TradedValue, bool Complete);
+public sealed record SessionTradedValue(DateOnly Session, decimal TradedValue, bool Complete, string ManifestChecksum = "legacy");
 
 public static class AverageDailyValue
 {
     public static decimal Calculate20(IEnumerable<SessionTradedValue> sessions)
     {
         var ordered = sessions.OrderBy(x => x.Session).ToArray();
-        if (ordered.Length != 20 || ordered.Any(x => !x.Complete || x.TradedValue < 0) || ordered.Select(x => x.Session).Distinct().Count() != 20)
-            throw new MarketDataException("ADV requires exactly 20 distinct complete sessions");
+        if (ordered.Length != 20 || ordered.Any(x => !x.Complete || x.TradedValue < 0 || string.IsNullOrWhiteSpace(x.ManifestChecksum)) ||
+            ordered.Select(x => x.Session).Distinct().Count() != 20 || ordered.Any(x => StockholmCalendar.GetSession(x.Session) is null))
+            throw new MarketDataException("ADV requires exactly 20 manifest-bound complete XSTO sessions");
+        var expected = new List<DateOnly>();
+        for (var day = ordered[^1].Session; expected.Count < 20; day = day.AddDays(-1))
+            if (StockholmCalendar.GetSession(day) is not null) expected.Add(day);
+        expected.Reverse();
+        if (!ordered.Select(x => x.Session).SequenceEqual(expected))
+            throw new MarketDataException("ADV sessions must be consecutive expected XSTO sessions");
         return ordered.Sum(x => x.TradedValue) / 20m;
     }
 }

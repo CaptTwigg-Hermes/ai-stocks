@@ -38,9 +38,14 @@ public sealed class MarketDataTests
     [Fact]
     public void StrictCsvFindsFirstPostDecisionTradeAndClosingPats()
     {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var temp = new TemporaryDirectory();
+        var payload = "{\"asOf\":\"2026-08-06T07:00:00Z\",\"states\":{\"SE0000108656\":\"Clear\"}}";
+        var statuses = new PinnedStatusSeedVerifier("test-key", key.ExportSubjectPublicKeyInfo()).Load(payload,
+            key.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256), Path.Combine(temp.Path, "status.json"));
         var rows = NasdaqCsvParser.Parse(File.ReadAllBytes(Fixture("nasdaq-posttrade.csv")), DateTimeOffset.Parse("2026-08-06T16:00:00Z"));
         var session = StockholmCalendar.GetSession(FullDay)!;
-        var trade = NasdaqTradeSelection.FirstEligible(rows, "SE0000108656", DateTimeOffset.Parse("2026-08-06T10:00:00Z"), session);
+        var trade = NasdaqTradeSelection.FirstEligible(rows, "SE0000108656", DateTimeOffset.Parse("2026-08-06T10:00:00Z"), session, statuses);
         Assert.Equal(96.95m, trade.Price);
         Assert.Equal("3", trade.TransactionId);
         Assert.Equal(98.10m, NasdaqTradeSelection.ClosingAuctionPrice(rows, "SE0000108656", session));
@@ -72,7 +77,10 @@ public sealed class MarketDataTests
     [Fact]
     public void CompleteManifestAndAdvRequireExactlyTwentyBoundSessions()
     {
-        var days = Enumerable.Range(0, 20).Select(i => new DateOnly(2026, 7, 1).AddDays(i)).ToArray();
+        var days = new List<DateOnly>();
+        for (var day = new DateOnly(2026, 7, 31); days.Count < 20; day = day.AddDays(-1))
+            if (StockholmCalendar.GetSession(day) is not null) days.Add(day);
+        days.Reverse();
         var values = days.Select((day, i) => new SessionTradedValue(day, 1000m + i, true)).ToArray();
         Assert.Equal(1009.5m, AverageDailyValue.Calculate20(values));
         Assert.Throws<MarketDataException>(() => AverageDailyValue.Calculate20(values[..19]));
@@ -95,9 +103,11 @@ public sealed class MarketDataTests
     public void OfficialNoticeStateStartsUnknownUsesSignedSeedAndRejectsReplay()
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var temp = new TemporaryDirectory();
         var payload = "{\"asOf\":\"2026-08-06T07:00:00Z\",\"states\":{\"SE0000108656\":\"Clear\"}}";
         var signature = key.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256);
-        var machine = NasdaqStatusMachine.FromSignedSeed(payload, signature, key.ExportSubjectPublicKeyInfo());
+        var machine = new PinnedStatusSeedVerifier("test-key", key.ExportSubjectPublicKeyInfo())
+            .Load(payload, signature, Path.Combine(temp.Path, "status.json"));
         Assert.True(machine.IsEligible("SE0000108656"));
         Assert.False(machine.IsEligible("SE9999999999"));
         machine.ApplyRss(File.OpenRead(Fixture("nasdaq-status-rss.xml")));

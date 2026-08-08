@@ -57,6 +57,15 @@ public sealed class NasdaqCollector(NasdaqPostTradeClient client, ImmutableArchi
         foreach (var day in days)
         {
             if (StockholmCalendar.GetSession(day) is not { } session) continue;
+            if (manifests.TryVerify(session) is { } complete)
+            {
+                foreach (var report in complete.Manifest.Reports)
+                {
+                    var archivedReport = archive.Verify(report.Report);
+                    if (archivedReport.Sha256 != report.Sha256) throw new MarketDataException("Finalized manifest archive provenance mismatch");
+                }
+                continue;
+            }
             foreach (var report in listing.Where(x =>
             {
                 var timestamp = NasdaqReportName.ParseTimestamp(x);
@@ -70,7 +79,7 @@ public sealed class NasdaqCollector(NasdaqPostTradeClient client, ImmutableArchi
             var expected = SessionManifest.ExpectedReports(session);
             var absent = expected.Where(x => !listed.Contains(x)).ToArray();
             if (absent.Length > 0) { missing.AddRange(absent); continue; }
-            if (now > session.Close.AddMinutes(20)) throw new MarketDataException("Complete session was not finalized within the verified feed window");
+            if (now > session.Close.AddMinutes(20)) continue;
             var archived = expected.Select(archive.Verify).ToArray();
             finalized = manifests.Save(session, archived, now);
         }

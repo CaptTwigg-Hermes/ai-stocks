@@ -605,7 +605,7 @@ public sealed class PaperTradingEngine
         if (quote.Price <= 0m || quote.Quantity <= 0 || quote.AverageDailyValue20 <= 0m ||
             quote.RetrievedAt < quote.TradedAt || quote.RetrievedAt - quote.TradedAt < TimeSpan.FromMinutes(15) ||
             quote.RetrievedAt - quote.TradedAt > TimeSpan.FromMinutes(20) ||
-            quote.SessionId != session.Id || !session.Contains(quote.TradedAt) || !Sha256.IsMatch(quote.RawSha256))
+            quote.SessionId != session.Id || !session.Contains(quote.TradedAt) || !HasArchiveProvenance(quote))
             throw new TradingException("market-data", "Quote provenance is invalid.");
         if (quote.TradedAt < decision.DecisionAt)
             throw new TradingException("quote-time", "Quote precedes eligible decision time.");
@@ -617,6 +617,16 @@ public sealed class PaperTradingEngine
 
     }
 
+    private static bool HasArchiveProvenance(VerifiedMarketObservation quote)
+    {
+        if (!Sha256.IsMatch(quote.RawSha256) || !Sha256.IsMatch(quote.ManifestSha256) ||
+            quote.RawSourceUrl.Scheme != Uri.UriSchemeHttps || quote.RawSourceUrl.Host != "tradereports.nasdaq.com" ||
+            quote.RawSourceUrl.AbsolutePath != "/api/regulatory/trade-report/download" ||
+            !Regex.IsMatch(quote.RawReportName, "^NordicEquity-posttrade-2026-[0-9]{2}-[0-9]{2}T[0-9]{4}$", RegexOptions.CultureInvariant)) return false;
+        var expected = $"type=POST_TRADE&assetClass=EQUITY&fileName={quote.RawReportName}";
+        return Uri.UnescapeDataString(quote.RawSourceUrl.Query.TrimStart('?')) == expected;
+    }
+
     private static void ValidateClosingQuote(InstrumentId instrument, VerifiedMarketObservation quote,
         TradingSession session, DateTimeOffset finalizedAt)
     {
@@ -624,7 +634,7 @@ public sealed class PaperTradingEngine
             quote.AverageDailyValue20 <= 0m || quote.SessionId != session.Id ||
             quote.TradedAt != session.CloseAt || quote.RetrievedAt - quote.TradedAt < TimeSpan.FromMinutes(15) ||
             quote.RetrievedAt - quote.TradedAt > TimeSpan.FromMinutes(20) ||
-            quote.RetrievedAt > finalizedAt || !Sha256.IsMatch(quote.RawSha256) ||
+            quote.RetrievedAt > finalizedAt || !HasArchiveProvenance(quote) ||
             quote.HasWarning || quote.IsSuspended || (quote.Bid is null) != (quote.Ask is null) ||
             quote.Bid is not null && (quote.Bid <= 0m || quote.Ask < quote.Bid))
             throw new TradingException("closing-quote", "Official closing-auction quote is invalid.");
