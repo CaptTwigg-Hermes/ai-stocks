@@ -24,7 +24,7 @@ Do not start the contest until every release gate in
 ## Dockge preparation
 
 This stack requires Docker Compose, OpenSSL, and an existing
-PostgreSQL 18/PostGIS instance with separate production and test
+PostgreSQL 18 instance with separate production and test
 roles/databases.
 
 ```bash
@@ -70,22 +70,24 @@ Equivalent CLI verification:
 docker compose config --quiet
 docker compose build --pull app
 docker compose --profile operations run --rm migrate
+docker compose --profile operations run --rm migrate bootstrap
+docker compose --profile operations run --rm migrate preflight
 docker compose up -d app worker collector
 docker compose ps
 docker compose logs --tail=100 app worker collector
 ```
 
-The migration service runs production preflight first, applies
-Alembic, then idempotently bootstraps the fixed four agents and
-SEK 30,000 ledgers. A preflight failure must stop before migration
-or bootstrap effects.
+The migration runner applies checksum-locked SQL migrations. Those
+migrations idempotently create the fixed four agents and SEK 30,000
+ledgers. The explicit bootstrap command verifies that exact state;
+the final preflight command must pass before runtime services start.
 
 Verify separately:
 
 1. all three runtime services are healthy;
 2. unauthenticated direct-origin requests fail closed;
 3. an authorized Access session reaches the dashboard;
-4. only `mike@familien-jahn.dk` can use contest controls;
+4. only identities in `ACCESS_OWNER_EMAILS` can use contest controls;
 5. worker and collector logs contain no credentials;
 6. all four exact models work from the production-built image.
 
