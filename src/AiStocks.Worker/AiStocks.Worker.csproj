@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AiStocks.Core\AiStocks.Core.csproj" />
+    <ProjectReference Include="..\AiStocks.Persistence\AiStocks.Persistence.csproj" />
+    <ProjectReference Include="..\AiStocks.Trading\AiStocks.Trading.csproj" />
+    <ProjectReference Include="..\AiStocks.MarketData\AiStocks.MarketData.csproj" />
+    <ProjectReference Include="..\AiStocks.Research\AiStocks.Research.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
