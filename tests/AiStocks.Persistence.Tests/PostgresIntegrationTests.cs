@@ -630,6 +630,42 @@ public sealed class PostgresIntegrationTests
     }
 
     [Fact]
+    public async Task RealPostgresEnqueuesMultiModelAuthenticationAlertFromProductionAuditShape()
+    {
+        if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ResetDatabase(dataSource);
+        await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
+        await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
+
+        await Execute(connection, """
+            INSERT INTO scheduled_agent_runs(
+              id,run_key,agent_id,model_id,scheduled_at,deadline_at,status,
+              attempt_count,next_attempt_at,completed_at)
+            SELECT gen_random_uuid(),'auth-outage-'||id,id,model_id,
+              '2026-08-08T09:00:00Z','2026-08-08T09:10:00Z','FAILED',1,
+              '2026-08-08T09:00:00Z','2026-08-08T09:01:00Z'
+            FROM agents
+            """);
+        await Execute(connection, """
+            INSERT INTO agent_runs(
+              id,scheduled_run_id,attempt,agent_id,model_id,prompt_id,
+              started_at,ended_at,status,audit_json,audit_hash)
+            SELECT gen_random_uuid(),scheduled.id,1,scheduled.agent_id,scheduled.model_id,
+              (SELECT id FROM prompts ORDER BY version LIMIT 1),
+              '2026-08-08T09:00:00Z','2026-08-08T09:01:00Z','FAILED',
+              '{"Reason":"authentication failed"}'::jsonb,
+              canonical_jsonb_sha256('{"Reason":"authentication failed"}'::jsonb)
+            FROM scheduled_agent_runs scheduled
+            WHERE scheduled.run_key LIKE 'auth-outage-%'
+            """);
+
+        Assert.Equal(1L, await ScalarLong(connection,
+            "SELECT count(*) FROM immediate_alerts WHERE kind='MultiModelAuthenticationOutage'"));
+    }
+
+    [Fact]
     public async Task RealPostgresDeniesCollectorAndWebRunAccountingResetAndFinalizationAuthority()
     {
         if (ConnectionString is not { } connectionString) return;

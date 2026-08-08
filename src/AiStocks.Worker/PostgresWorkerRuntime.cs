@@ -91,7 +91,7 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
             completion.Run.AgentId,
             completion.Run.ModelId,
             outcome = completion.Outcome.ToString(),
-            completion.Reason,
+            reason = completion.Reason,
             decision = completion.Result?.Decision,
             ok = completion.Result?.Ok,
             attestation = attested is null ? null : new { attested.Provenance.RuntimeReportSha256, evidence_count = decision!.Evidence.Count }

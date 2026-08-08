@@ -169,10 +169,11 @@ FOR EACH ROW EXECUTE FUNCTION enqueue_pause_alert();
 CREATE FUNCTION enqueue_multi_model_auth_alert() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE affected integer;
 BEGIN
-  IF NEW.status IN ('FAILED','MISSED') AND lower(coalesce(NEW.audit_json->>'reason','')) LIKE '%auth%' THEN
+  IF NEW.status IN ('FAILED','MISSED')
+     AND lower(coalesce(NEW.audit_json->>'reason',NEW.audit_json->>'Reason','')) LIKE '%auth%' THEN
     SELECT count(DISTINCT run.agent_id) INTO affected FROM agent_runs run
      WHERE run.status IN ('FAILED','MISSED')
-       AND lower(coalesce(run.audit_json->>'reason','')) LIKE '%auth%'
+       AND lower(coalesce(run.audit_json->>'reason',run.audit_json->>'Reason','')) LIKE '%auth%'
        AND run.ended_at BETWEEN NEW.ended_at-interval '15 minutes' AND NEW.ended_at;
     IF affected=4 THEN
       PERFORM enqueue_immediate_alert('MultiModelAuthenticationOutage',

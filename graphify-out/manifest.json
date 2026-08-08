@@ -285,7 +285,7 @@
     "semantic_hash": ""
   },
   "tests/test_release_artifacts.py": {
-    "mtime": 1786208168.2292495,
+    "mtime": 1786208666.835343,
     "ast_hash": "c7be8334bb9db178a9b55e2cb9a90aaf",
     "semantic_hash": ""
   },
@@ -645,8 +645,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Worker/PostgresWorkerRuntime.cs": {
-    "mtime": 1786208011.0820699,
-    "ast_hash": "940d84b9de4241ccceafb85ca9de9e0c",
+    "mtime": 1786208699.0360286,
+    "ast_hash": "15a2bfc4ea65f7adbc79da44dc66a20a",
     "semantic_hash": ""
   },
   "src/AiStocks.Worker/Program.cs": {
@@ -720,8 +720,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs": {
-    "mtime": 1786208011.0820699,
-    "ast_hash": "f40b081a6e15d86336e4f4404e2b40a3",
+    "mtime": 1786208682.4596756,
+    "ast_hash": "de37cc49789870e54f1ebc75bb243388",
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/RuntimeIntegrationTests.cs": {
@@ -900,8 +900,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/007_corporate_action_ingestion.sql": {
-    "mtime": 1786208007.3099935,
-    "ast_hash": "2b62c90c6006d9809e9b4a3d4039532f",
+    "mtime": 1786208699.1120303,
+    "ast_hash": "c9ac9929a43326a912a5693be681aa5f",
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/008_trading_authority.sql": {
