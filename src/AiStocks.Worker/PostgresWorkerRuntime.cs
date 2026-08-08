@@ -161,7 +161,7 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
         submit.Parameters.AddWithValue($"run:{run.RunKey}:{decision.DecisionId}");
         submit.Parameters.AddWithValue(decision.Action == DecisionAction.Buy ? "BUY" : "SELL");
         submit.Parameters.AddWithValue(instrumentId);
-        submit.Parameters.AddWithValue((long)decision.Quantity);
+        submit.Parameters.AddWithValue(decision.Quantity);
         submit.Parameters.AddWithValue(decision.DecisionAt);
         submit.Parameters.AddWithValue(decision.ObservedPrice!.Value);
         submit.Parameters.AddWithValue(requestJson);

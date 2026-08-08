@@ -67,8 +67,8 @@ public sealed class RuntimeIntegrationTests
         Assert.False(started.Paused);
         await using (var setup = await source.OpenConnectionAsync())
         await using (var instrument = new NpgsqlCommand("""
-            INSERT INTO instruments(id,isin,order_book_id,mic,symbol,cfi,active_from,source_json,source_hash)
-            VALUES(gen_random_uuid(),'SE0000000001','book-runtime','XSTO','RUNTIME','ESVUFR','2026-01-01',
+            INSERT INTO instruments(id,isin,issuer_id,order_book_id,mic,symbol,cfi,active_from,source_json,source_hash)
+            VALUES(gen_random_uuid(),'SE0000000001','RUNTIMEISSUER0000001','book-runtime','XSTO','RUNTIME','ESVUFR','2026-01-01',
                    '{"source":"runtime-test"}',canonical_jsonb_sha256('{"source":"runtime-test"}'))
             """, setup))
             await instrument.ExecuteNonQueryAsync();
