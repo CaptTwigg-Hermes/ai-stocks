@@ -1,0 +1,19 @@
+{
+  "artifact_version": 1,
+  "instruments": [
+    {
+      "currency": "SEK",
+      "instrument_type": "COMMON_SHARE",
+      "isin": "SE0000108656",
+      "order_book_id": "ERIC-B-XSTO",
+      "segment": "LARGE_CAP",
+      "symbol": "ERIC-B",
+      "venue": "XSTO"
+    }
+  ],
+  "provenance": {
+    "reviewed_at": "2026-08-06T00:00:00Z",
+    "source": "Reviewed Nasdaq Stockholm main-market list/change files",
+    "source_url": "https://www.nasdaq.com/solutions/european-market-data/reference-data"
+  }
+}

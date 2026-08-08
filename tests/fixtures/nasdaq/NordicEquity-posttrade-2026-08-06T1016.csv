@@ -1,0 +1,5 @@
+"sep=;"
+Trading date and time;Instrument identification code;Price;Missing Price;Price currency;Price notation;Quantity;Venue of execution;Trading system;Publication date and time;Venue of publication;Transaction identification code;Flags
+2026-08-06T09:59:59.000000Z;SE0000108656;96.90;;SEK;MONE;10;XSTO;CLOB;2026-08-06T10:14:59.000000Z;XSTO;1;---
+2026-08-06T10:00:01.000000Z;SE0000108656;97.00;;SEK;MONE;20;XSTO;CLOB;2026-08-06T10:15:01.000000Z;XSTO;2;---
+2026-08-06T10:00:00.500000Z;SE0000108656;96.95;;SEK;MONE;15;XSTO;CLOB;2026-08-06T10:15:00.500000Z;XSTO;3;---

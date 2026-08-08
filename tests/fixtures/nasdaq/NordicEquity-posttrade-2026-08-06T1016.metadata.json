@@ -1,0 +1,6 @@
+{
+  "fixture": "Captured official Nasdaq Nordic delayed post-trade schema excerpt",
+  "retrieved_at": "2026-08-06T10:16:00Z",
+  "sha256": "01710f8d8f473eaafd1edf46e3caf51589e8ee8123bc958c987526c7fb5ddda7",
+  "source_url": "https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName=NordicEquity-posttrade-2026-08-06T1016"
+}

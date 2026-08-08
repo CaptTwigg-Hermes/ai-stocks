@@ -1,0 +1,11 @@
+.env
+secrets/
+backups/
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.coverage
+htmlcov/
+*.db
+graphify-out/cache/

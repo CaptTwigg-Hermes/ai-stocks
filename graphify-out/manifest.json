@@ -1,0 +1,342 @@
+{
+  "ai_stocks/__init__.py": {
+    "mtime": 1786037702.8806343,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "ai_stocks/app.py": {
+    "mtime": 1786090029.5671039,
+    "ast_hash": "2b96332d81331f85fdcb19c8b902fff9",
+    "semantic_hash": ""
+  },
+  "ai_stocks/dayrun.py": {
+    "mtime": 1786037866.275893,
+    "ast_hash": "5bcb3a89a6cd2abbb6681b5e429a8ba2",
+    "semantic_hash": ""
+  },
+  "ai_stocks/db.py": {
+    "mtime": 1786037832.4992163,
+    "ast_hash": "16deb2759f7de2cf86f328dce6b2d38b",
+    "semantic_hash": ""
+  },
+  "ai_stocks/market.py": {
+    "mtime": 1786046447.2694602,
+    "ast_hash": "a3b4728a838db0cf9bb19d900bbeb84d",
+    "semantic_hash": ""
+  },
+  "ai_stocks/models.py": {
+    "mtime": 1786047038.7091517,
+    "ast_hash": "3b03f1cedb0a71c68341d9737ab8e4fb",
+    "semantic_hash": ""
+  },
+  "ai_stocks/nasdaq_feed.py": {
+    "mtime": 1786039679.8202326,
+    "ast_hash": "20eba950f05eb4f258edff98b9d67f9e",
+    "semantic_hash": ""
+  },
+  "ai_stocks/reports.py": {
+    "mtime": 1786037832.4992163,
+    "ast_hash": "429b002bf6232451d0c0035542eb5351",
+    "semantic_hash": ""
+  },
+  "ai_stocks/trading.py": {
+    "mtime": 1786089972.9139328,
+    "ast_hash": "92c5b48bdc40645a7db44fa3137d9984",
+    "semantic_hash": ""
+  },
+  "alembic/env.py": {
+    "mtime": 1786037832.5232167,
+    "ast_hash": "95af75702b23ff7d25b880547ad07518",
+    "semantic_hash": ""
+  },
+  "alembic/versions/ab3aa6da9692_initial_immutable_contest_schema.py": {
+    "mtime": 1786041523.2567852,
+    "ast_hash": "ab38cc1913000d871423c9c8eab70bd9",
+    "semantic_hash": ""
+  },
+  "pyproject.toml": {
+    "mtime": 1786039104.8967376,
+    "ast_hash": "f5da0d189babc7a50a5fc50d74208445",
+    "semantic_hash": ""
+  },
+  "scripts/backup.sh": {
+    "mtime": 1786089255.5075433,
+    "ast_hash": "a1e5edaf1c295244e737154f2aeb07c5",
+    "semantic_hash": ""
+  },
+  "scripts/entrypoint.sh": {
+    "mtime": 1786084321.5583,
+    "ast_hash": "103e76f865472fb51385b3d8db4aeee2",
+    "semantic_hash": ""
+  },
+  "scripts/restore-test.sh": {
+    "mtime": 1786071863.0684435,
+    "ast_hash": "2023d4372a1686bb00c6ccb0078216aa",
+    "semantic_hash": ""
+  },
+  "tests/test_app_and_day.py": {
+    "mtime": 1786090010.806716,
+    "ast_hash": "68e8f1600559275192a466b3efc963b6",
+    "semantic_hash": ""
+  },
+  "tests/test_corporate_actions.py": {
+    "mtime": 1786043705.4992871,
+    "ast_hash": "1b3b6c3f607f4547d2fd043f05c77aef",
+    "semantic_hash": ""
+  },
+  "tests/test_trading.py": {
+    "mtime": 1786086277.6596491,
+    "ast_hash": "2cc663b80eb4a3e62e39d94a98f6d41d",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1786037507.276738,
+    "ast_hash": "df98d55dae5306d674957ee34ad64af1",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1786089255.7595482,
+    "ast_hash": "aca17723089753005dc6fb33e059c2a7",
+    "semantic_hash": ""
+  },
+  "compose.yaml": {
+    "mtime": 1786090350.905745,
+    "ast_hash": "4f9482c4a5af373f457938a211d5b108",
+    "semantic_hash": ""
+  },
+  "docs/acceptance-contract.md": {
+    "mtime": 1786039317.08498,
+    "ast_hash": "efc0469512be388b51ec342b9b078f35",
+    "semantic_hash": ""
+  },
+  "docs/hermes-runner.md": {
+    "mtime": 1786041612.6865482,
+    "ast_hash": "3679ab02be15808e87daec745158612f",
+    "semantic_hash": ""
+  },
+  "docs/market-data-contract.md": {
+    "mtime": 1786041724.1927466,
+    "ast_hash": "09f522c7672c6f88656822981b86deea",
+    "semantic_hash": ""
+  },
+  "ai_stocks/auth.py": {
+    "mtime": 1786044768.25626,
+    "ast_hash": "1c329b793d1dbe77d855f6516b990336",
+    "semantic_hash": ""
+  },
+  "ai_stocks/calendar.py": {
+    "mtime": 1786084706.765634,
+    "ast_hash": "e650a550d89e25cc55cd43f4e9d56c78",
+    "semantic_hash": ""
+  },
+  "ai_stocks/delivery.py": {
+    "mtime": 1786041543.345181,
+    "ast_hash": "c0f62d739948d84d54166bc963bc7243",
+    "semantic_hash": ""
+  },
+  "ai_stocks/nasdaq_acquisition.py": {
+    "mtime": 1786086869.1550522,
+    "ast_hash": "eaaaaa516b8998e5a31a2468842d9c92",
+    "semantic_hash": ""
+  },
+  "ai_stocks/preflight.py": {
+    "mtime": 1786044748.4398675,
+    "ast_hash": "579516b61bce1cc9c1349b5e070aa89d",
+    "semantic_hash": ""
+  },
+  "ai_stocks/runner.py": {
+    "mtime": 1786086252.0671585,
+    "ast_hash": "c48be5b811dafbd8ca5502e2633a7c8b",
+    "semantic_hash": ""
+  },
+  "ai_stocks/schedule.py": {
+    "mtime": 1786046185.6642888,
+    "ast_hash": "fc1877119502c8f84d4e4904b77c998f",
+    "semantic_hash": ""
+  },
+  "scripts/prove_no_broker.py": {
+    "mtime": 1786040525.7330594,
+    "ast_hash": "7793b0c2b7f3e7276d7c178462bd5e3b",
+    "semantic_hash": ""
+  },
+  "tests/test_auth.py": {
+    "mtime": 1786044768.25626,
+    "ast_hash": "82c1aec1ea657e83ca4f340faf45c7e6",
+    "semantic_hash": ""
+  },
+  "tests/test_calendar.py": {
+    "mtime": 1786088570.9931304,
+    "ast_hash": "c4b4d14060a3ff6fd069c6be5d311579",
+    "semantic_hash": ""
+  },
+  "tests/test_delivery.py": {
+    "mtime": 1786039749.8376327,
+    "ast_hash": "5a5b57ca2f24af8e7223ceedc050a73c",
+    "semantic_hash": ""
+  },
+  "tests/test_nasdaq_acquisition.py": {
+    "mtime": 1786083856.2294385,
+    "ast_hash": "fe37ff8efb5e9b48c4838ba843414801",
+    "semantic_hash": ""
+  },
+  "tests/test_nasdaq_feed.py": {
+    "mtime": 1786039749.8376327,
+    "ast_hash": "29a462087c777281fc42875b5c75409e",
+    "semantic_hash": ""
+  },
+  "tests/test_no_broker_capability.py": {
+    "mtime": 1786088556.5448244,
+    "ast_hash": "d2c46838b8550c60292a2c22217318ea",
+    "semantic_hash": ""
+  },
+  "tests/test_runner.py": {
+    "mtime": 1786043705.503287,
+    "ast_hash": "22c7cefc48be55ee3945517e2157dbb6",
+    "semantic_hash": ""
+  },
+  "tests/test_schedule.py": {
+    "mtime": 1786040417.0149007,
+    "ast_hash": "658f9115ed963a83800e2a22825bf580",
+    "semantic_hash": ""
+  },
+  "tests/test_trading_migration.py": {
+    "mtime": 1786069472.5821114,
+    "ast_hash": "7262b24981b8c2d7af5184657eb263ef",
+    "semantic_hash": ""
+  },
+  "docs/nasdaq-trading-hours.html": {
+    "mtime": 1786039602.4466856,
+    "ast_hash": "a4cc86318eb5e8d80def6d189a7760a3",
+    "semantic_hash": ""
+  },
+  "ai_stocks/nasdaq_market.py": {
+    "mtime": 1786089854.2474804,
+    "ast_hash": "3408289c25279452b19e948ea99d90f6",
+    "semantic_hash": ""
+  },
+  "ai_stocks/operations.py": {
+    "mtime": 1786084100.6540933,
+    "ast_hash": "7c973cc53fe6e60b7f93b5f2df42cd9e",
+    "semantic_hash": ""
+  },
+  "ai_stocks/orchestration.py": {
+    "mtime": 1786086794.8376148,
+    "ast_hash": "5ff3695904805328eed299c206526e39",
+    "semantic_hash": ""
+  },
+  "alembic/versions/c7d4a8f21b09_durable_agent_run_orchestration.py": {
+    "mtime": 1786046185.6642888,
+    "ast_hash": "b1b839444e9605fcab161fb192cb40de",
+    "semantic_hash": ""
+  },
+  "alembic/versions/d7b9e31c24a1_lifecycle_audit_and_final_rankings.py": {
+    "mtime": 1786047038.7091517,
+    "ast_hash": "64a6fdb070c3b5bf783f6b7b89386887",
+    "semantic_hash": ""
+  },
+  "alembic/versions/e7c1a4d82f30_contest_operations_reporting.py": {
+    "mtime": 1786047038.6531506,
+    "ast_hash": "2cc7138838a1065f652e423a8c61c35b",
+    "semantic_hash": ""
+  },
+  "config/nasdaq-stockholm-main-market-universe.json": {
+    "mtime": 1786048369.8033643,
+    "ast_hash": "82ea61fcadcd2200b90e4fe5d610ecf2",
+    "semantic_hash": ""
+  },
+  "tests/fixtures/nasdaq/NordicEquity-posttrade-2026-08-06T1016.metadata.json": {
+    "mtime": 1786046437.1852608,
+    "ast_hash": "f1c86b3b227e7533f937a636212fc266",
+    "semantic_hash": ""
+  },
+  "tests/test_lifecycle.py": {
+    "mtime": 1786046366.6598666,
+    "ast_hash": "462039b4d6ce809faf653ec662a251f4",
+    "semantic_hash": ""
+  },
+  "tests/test_orchestration.py": {
+    "mtime": 1786088675.1953897,
+    "ast_hash": "ffa58b5326a790d69242f43cb1aa1cc7",
+    "semantic_hash": ""
+  },
+  "tests/test_postgres_concurrency.py": {
+    "mtime": 1786088675.1953897,
+    "ast_hash": "90b42e50253101ddd1852938a3eadb1b",
+    "semantic_hash": ""
+  },
+  "ai_stocks/collector.py": {
+    "mtime": 1786090361.4819636,
+    "ast_hash": "ad31daa865ab76fdaded9ac057af3947",
+    "semantic_hash": ""
+  },
+  "ai_stocks/worker.py": {
+    "mtime": 1786089973.5099452,
+    "ast_hash": "401a2e37facff863515fb448639fa69d",
+    "semantic_hash": ""
+  },
+  "ai_stocks/worker_cli.py": {
+    "mtime": 1786090361.9419732,
+    "ast_hash": "b589285ec0428b71ff5bc57121c6d422",
+    "semantic_hash": ""
+  },
+  "tests/test_collector.py": {
+    "mtime": 1786086277.6556492,
+    "ast_hash": "29291ec0e9af64e1777c1a58f90f38c3",
+    "semantic_hash": ""
+  },
+  "tests/test_release_artifacts.py": {
+    "mtime": 1786090303.4727647,
+    "ast_hash": "1deb2992bb2f60207cb0ba60ba1e56fe",
+    "semantic_hash": ""
+  },
+  "tests/test_worker.py": {
+    "mtime": 1786090426.5953095,
+    "ast_hash": "80988a58db792bb564b67539a47db97d",
+    "semantic_hash": ""
+  },
+  "tests/test_worker_cli.py": {
+    "mtime": 1786083856.2294385,
+    "ast_hash": "5bf3b7148d2aac06d993b7593436ec34",
+    "semantic_hash": ""
+  },
+  "ai_stocks/bootstrap.py": {
+    "mtime": 1786084296.1938171,
+    "ast_hash": "c75de5eab8d6dd6b0270a2e2bcf9da78",
+    "semantic_hash": ""
+  },
+  "ai_stocks/research.py": {
+    "mtime": 1786090426.5953095,
+    "ast_hash": "b97cd7a0fe46c39ded055fde02fbd066",
+    "semantic_hash": ""
+  },
+  "scripts/migrate.sh": {
+    "mtime": 1786084325.126368,
+    "ast_hash": "422628ba11a248bd5191d896efb577cb",
+    "semantic_hash": ""
+  },
+  "tests/test_research.py": {
+    "mtime": 1786090426.5953095,
+    "ast_hash": "3252cf6f8cd31ad8b47f490e53c62e45",
+    "semantic_hash": ""
+  },
+  "ai_stocks/health.py": {
+    "mtime": 1786090408.1829288,
+    "ast_hash": "3cb099b6c5fb5c8c7e2661b8d379ee7a",
+    "semantic_hash": ""
+  },
+  "tests/test_bootstrap.py": {
+    "mtime": 1786089760.5935447,
+    "ast_hash": "b2bcd952ce94876c8adce51ce5e44eef",
+    "semantic_hash": ""
+  },
+  "tests/test_health.py": {
+    "mtime": 1786090408.282931,
+    "ast_hash": "105f2171205d8f187baec4c1ce751d77",
+    "semantic_hash": ""
+  },
+  "tests/test_nasdaq_market.py": {
+    "mtime": 1786090426.5953095,
+    "ast_hash": "a22f09bf2412e6154c811e46226643ad",
+    "semantic_hash": ""
+  }
+}
