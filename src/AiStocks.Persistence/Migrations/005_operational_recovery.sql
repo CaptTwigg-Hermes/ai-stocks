@@ -1,4 +1,6 @@
 -- Crash-safe run claiming and Discord delivery leasing.
+SET LOCAL ROLE ai_stocks_migrator;
+
 CREATE OR REPLACE FUNCTION claim_scheduled_run(p_now timestamptz,p_lease interval,p_token uuid)
 RETURNS SETOF scheduled_agent_runs LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE claimed scheduled_agent_runs%ROWTYPE;
@@ -72,6 +74,12 @@ BEGIN
   END IF;
 END $$;
 
+REVOKE ALL ON FUNCTION claim_scheduled_run(timestamptz,interval,uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION reserve_delivery(text,sha256_hex,timestamptz,interval) FROM PUBLIC;
+REVOKE ALL ON FUNCTION begin_delivery_send(text,sha256_hex,uuid,timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION record_delivery(uuid,text,sha256_hex,delivery_status,text,text,timestamptz,uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION claim_scheduled_run(timestamptz,interval,uuid) TO ai_stocks_runtime;
 GRANT EXECUTE ON FUNCTION reserve_delivery(text,sha256_hex,timestamptz,interval) TO ai_stocks_runtime;
 GRANT EXECUTE ON FUNCTION begin_delivery_send(text,sha256_hex,uuid,timestamptz) TO ai_stocks_runtime;
 GRANT EXECUTE ON FUNCTION record_delivery(uuid,text,sha256_hex,delivery_status,text,text,timestamptz,uuid) TO ai_stocks_runtime;
+RESET ROLE;

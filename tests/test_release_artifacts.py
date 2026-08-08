@@ -41,6 +41,16 @@ def test_dockge_compose_separates_and_hardens_services():
     assert services["collector"]["healthcheck"]["test"] == expected_health
 
 
+def test_example_environment_renders_compose_with_fail_closed_proxy_configuration():
+    compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
+    example = (ROOT / ".env.example").read_text()
+    assert compose["services"]["app"]["environment"]["TRUSTED_PROXY_IPS"].startswith(
+        "${TRUSTED_PROXY_IPS:?"
+    )
+    for name in ("TRUSTED_PROXY_IPS", "COLLECTOR_DATABASE_URL", "STATUS_PINNED_KEY_ID"):
+        assert f"{name}=" in example
+
+
 def test_backup_and_restore_handoff_exports_libpq_urls():
     example = (ROOT / ".env.example").read_text()
     readme = (ROOT / "README.md").read_text()

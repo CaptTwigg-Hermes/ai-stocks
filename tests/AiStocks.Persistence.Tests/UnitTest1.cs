@@ -108,4 +108,18 @@ public sealed class PersistenceContractTests
         Assert.Contains("REVOKE INSERT ON instruments,trading_sessions,instrument_session_stats,raw_market_reports,market_observations FROM ai_stocks_runtime", sql, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("GRANT UPDATE ON market_session_manifests", sql, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void PostRunAcceptanceRejectsResultsCompletedAfterImmutableDeadline()
+    {
+        var deadline = DateTimeOffset.Parse("2026-08-08T09:15:00Z");
+        var run = new AiStocks.Worker.Orchestration.RunWindow(
+            "deadline", Guid.Parse("11111111-1111-1111-1111-111111111111"), "gpt-5.6-sol", 0,
+            deadline.AddMinutes(-15), deadline);
+
+        var exception = Assert.Throws<AiStocks.Research.Decisions.DecisionValidationException>(() =>
+            AiStocks.Worker.PostRunAcceptance.EnsureWithinDeadline(run, deadline.AddTicks(1)));
+
+        Assert.Contains("deadline", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }

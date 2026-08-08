@@ -48,6 +48,7 @@ env \
   PUBLIC_ORIGIN=https://ai-stocks.example \
   ACCESS_OWNER_EMAILS=owner@example.com \
   ACCESS_VIEWER_EMAILS=viewer@example.com \
+  TRUSTED_PROXY_IPS=127.0.0.1 \
   DISCORD_TARGET='discord:#ai-stocks' \
   BACKUP_ALERT_WEBHOOK_URL='https://discord.com/api/webhooks/test/test' \
   "$COMPOSE" config -q

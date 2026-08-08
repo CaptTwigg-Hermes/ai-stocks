@@ -61,6 +61,8 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
     public async Task CompleteAsync(RunCompletion completion, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(completion.ClaimToken, out var token)) throw new InvalidOperationException("Invalid run claim token.");
+        if (completion.Outcome == RunAttemptOutcome.Succeeded)
+            PostRunAcceptance.EnsureWithinDeadline(completion.Run, completion.CompletedAt);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         int attempt;
@@ -80,6 +82,8 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
         if (attested is not null && (decision!.AgentId != completion.Run.AgentId ||
             !StringComparer.Ordinal.Equals(decision.ExactModelId, completion.Run.ModelId) || decision.DecisionAt != completion.Run.ScheduledAt))
             throw new DecisionValidationException("Attested decision identity does not match the immutable run.");
+        if (attested is not null)
+            PostRunAcceptance.EnsureWithinDeadline(completion.Run, attested.Provenance.CompletedAt);
         using var auditDocument = JsonDocument.Parse(JsonSerializer.Serialize(new
         {
             completion.Run.RunKey,
@@ -169,6 +173,7 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
         if (result.Decision is null || result.Attestation is null)
             throw new DecisionValidationException("Runner output did not contain an attested decision.");
         var decision = result.Attestation.Decision;
+        PostRunAcceptance.EnsureWithinDeadline(run, result.Attestation.Provenance.CompletedAt);
         if (decision.AgentId != run.AgentId || !StringComparer.Ordinal.Equals(decision.ExactModelId, run.ModelId) || decision.DecisionAt != run.ScheduledAt)
             throw new DecisionValidationException("Decision identity must equal the immutable run identity.");
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -283,6 +288,15 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
 
     private static string Sha256(string canonicalJson) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalJson)));
+}
+
+public static class PostRunAcceptance
+{
+    public static void EnsureWithinDeadline(RunWindow run, DateTimeOffset completedAt)
+    {
+        if (completedAt > run.DeadlineAt)
+            throw new DecisionValidationException("Run result completed after the immutable retry deadline.");
+    }
 }
 
 public sealed class HermesAgentRunner(HermesResearchRunner runner, ResearchDecisionAttestor attestor) : IAgentRunner

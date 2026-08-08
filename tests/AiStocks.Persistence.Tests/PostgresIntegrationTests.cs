@@ -434,6 +434,68 @@ public sealed class PostgresIntegrationTests
         Assert.Contains("split", split.MessageText, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task RealPostgresDeniesCollectorAndWebRunAccountingResetAndFinalizationAuthority()
+    {
+        if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ResetDatabase(dataSource);
+        await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
+        await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
+        await Execute(connection, "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_stocks_web_authority_test') THEN CREATE ROLE ai_stocks_web_authority_test NOLOGIN NOINHERIT; END IF; END $$; GRANT USAGE ON SCHEMA public TO ai_stocks_web_authority_test");
+
+        foreach (var role in new[] { "ai_stocks_collector", "ai_stocks_web_authority_test" })
+        {
+            await Execute(connection, $"SET ROLE {role}");
+            try
+            {
+                await AssertInsufficientPrivilege(connection, "SELECT * FROM public.claim_scheduled_run('2026-08-08T09:00:00Z'::timestamptz,interval '1 minute','00000000-0000-0000-0000-000000000001'::uuid)");
+                await AssertInsufficientPrivilege(connection, $"SELECT public.prestart_reset('00000000-0000-0000-0000-000000000001'::uuid,'test'::text,'test'::text,'{{}}'::jsonb,'{new string('a', 64)}'::public.sha256_hex,'2026-08-08T09:00:00Z'::timestamptz)");
+                await AssertInsufficientPrivilege(connection, "UPDATE public.account_balances SET cash=cash+1");
+                await AssertInsufficientPrivilege(connection, $"SELECT public.finalize_contest('x'::text,'00000000-0000-0000-0000-000000000001'::uuid,'x'::text,'{{}}'::jsonb,'{new string('a', 64)}'::public.sha256_hex,'2026-08-08T09:00:00Z'::timestamptz)");
+            }
+            finally { await Execute(connection, "RESET ROLE"); }
+        }
+    }
+
+    [Fact]
+    public async Task RealPostgresRejectsSuccessfulCompletionAfterImmutableDeadline()
+    {
+        if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ResetDatabase(dataSource);
+        await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
+        await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
+        var id = Guid.NewGuid();
+        var token = Guid.NewGuid();
+        await Execute(connection, """
+            INSERT INTO scheduled_agent_runs(id,run_key,agent_id,model_id,scheduled_at,deadline_at,status,next_attempt_at,claim_token,lease_until)
+            VALUES($1,'expired-completion','11111111-1111-1111-1111-111111111111','gpt-5.6-sol',
+              '2026-08-08T09:00:00Z','2026-08-08T09:15:00Z','CLAIMED','2026-08-08T09:00:00Z',$2,'2026-08-08T09:20:00Z')
+            """, id, token);
+        await Execute(connection, """
+            INSERT INTO instruments(id,isin,issuer_id,order_book_id,mic,symbol,cfi,active_from,source_json,source_hash)
+            VALUES('00000000-0000-0000-0000-000000000099','SE0000000099','DEADLINEISSUER000001','deadline-book','XSTO','DEAD','ESVUFR','2026-01-01','{}',canonical_jsonb_sha256('{}'))
+            """);
+
+        await using (var transaction = await connection.BeginTransactionAsync(CancellationToken.None))
+        {
+            await Execute(connection, """
+                INSERT INTO orders(id,agent_id,decision_id,idempotency_key,side,instrument_id,quantity,decision_at,observed_price,request_json,request_hash)
+                VALUES('00000000-0000-0000-0000-000000000098','11111111-1111-1111-1111-111111111111','expired','expired','BUY',
+                  '00000000-0000-0000-0000-000000000099',1,'2026-08-08T09:00:00Z',100,'{}',canonical_jsonb_sha256('{}'))
+                """);
+            var rejected = await Assert.ThrowsAsync<PostgresException>(() => Execute(connection,
+                "SELECT complete_scheduled_run($1,$2,'SUCCEEDED','2026-08-08T09:15:00.000001Z',NULL,NULL)", id, token));
+            Assert.Equal(PostgresErrorCodes.RaiseException, rejected.SqlState);
+            await transaction.RollbackAsync(CancellationToken.None);
+        }
+        Assert.Equal("CLAIMED", await Scalar(connection, "SELECT status::text FROM scheduled_agent_runs WHERE id=$1", id));
+        Assert.Equal(0L, await ScalarLong(connection, "SELECT count(*) FROM orders WHERE decision_id='expired'"));
+    }
+
     private static async Task ResetDatabase(NpgsqlDataSource source)
     {
         await using var connection = await source.OpenConnectionAsync(CancellationToken.None);
@@ -492,6 +554,12 @@ public sealed class PostgresIntegrationTests
         await using var command = new NpgsqlCommand(sql, connection);
         for (var i = 0; i < values.Length; i++) command.Parameters.AddWithValue(values[i]);
         await command.ExecuteNonQueryAsync(CancellationToken.None);
+    }
+
+    private static async Task AssertInsufficientPrivilege(NpgsqlConnection connection, string sql)
+    {
+        var exception = await Assert.ThrowsAsync<PostgresException>(() => Execute(connection, sql));
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, exception.SqlState);
     }
 
     private static async Task<long> ScalarLong(NpgsqlConnection connection, string sql, params object[] values)

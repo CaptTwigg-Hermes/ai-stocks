@@ -1,4 +1,6 @@
 -- Runtime integration state omitted from the initial domain schema.
+SET LOCAL ROLE ai_stocks_migrator;
+
 CREATE TYPE delivery_status AS ENUM ('RESERVED','SUCCEEDED','FAILED');
 
 CREATE TABLE delivery_reservations (
@@ -80,7 +82,11 @@ BEGIN
   RETURN p_event_id;
 END $$;
 
+REVOKE ALL ON FUNCTION reserve_delivery(text,sha256_hex,timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION record_delivery(uuid,text,sha256_hex,delivery_status,text,text,timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION prestart_reset(uuid,text,text,jsonb,sha256_hex,timestamptz) FROM PUBLIC;
 GRANT SELECT ON schema_migrations,delivery_reservations,delivery_audits TO ai_stocks_runtime;
 GRANT EXECUTE ON FUNCTION reserve_delivery(text,sha256_hex,timestamptz) TO ai_stocks_runtime;
 GRANT EXECUTE ON FUNCTION record_delivery(uuid,text,sha256_hex,delivery_status,text,text,timestamptz) TO ai_stocks_runtime;
 GRANT EXECUTE ON FUNCTION prestart_reset(uuid,text,text,jsonb,sha256_hex,timestamptz) TO ai_stocks_runtime;
+RESET ROLE;

@@ -25,6 +25,7 @@ services:
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set the exact public HTTPS origin}
       ACCESS_OWNER_EMAILS: ${ACCESS_OWNER_EMAILS:?set the owner email allowlist}
       ACCESS_VIEWER_EMAILS: ${ACCESS_VIEWER_EMAILS:?set the viewer email allowlist}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:?set the exact trusted reverse-proxy IP addresses}
     ports:
       - "${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8080"
     tmpfs:

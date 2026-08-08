@@ -823,6 +823,9 @@ DECLARE r scheduled_agent_runs%ROWTYPE;
 BEGIN
  SELECT * INTO STRICT r FROM scheduled_agent_runs WHERE id=p_id FOR UPDATE;
  IF r.status<>'CLAIMED' OR r.claim_token<>p_token THEN RAISE EXCEPTION 'run claim lost'; END IF;
+ IF p_now>r.deadline_at AND p_status<>'MISSED' THEN
+   RAISE EXCEPTION 'run completion exceeded immutable deadline';
+ END IF;
  IF p_status='FAILED' AND p_retry_at IS NOT NULL AND p_retry_at<=r.deadline_at THEN
    UPDATE scheduled_agent_runs SET status='PENDING',claim_token=NULL,lease_until=NULL,
      next_attempt_at=p_retry_at,last_error=p_error WHERE id=p_id;
