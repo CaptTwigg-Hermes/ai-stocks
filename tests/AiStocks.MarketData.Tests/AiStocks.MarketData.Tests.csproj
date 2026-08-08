@@ -22,4 +22,8 @@
     <ProjectReference Include="..\..\src\AiStocks.MarketData\AiStocks.MarketData.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
