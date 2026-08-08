@@ -1,16 +1,16 @@
 # Graph Report - coordinator  (2026-08-08)
 
 ## Corpus Check
-- 177 files · ~98,397 words
+- 180 files · ~102,144 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2780 nodes · 6131 edges · 215 communities (196 shown, 19 thin omitted)
+- 2817 nodes · 6267 edges · 214 communities (192 shown, 22 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 250 edges (avg confidence: 0.57)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `8d38ef5d`
+- Built from commit: `453a1ce3`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -216,7 +216,6 @@
 - [[_COMMUNITY_Community 205|Community 205]]
 - [[_COMMUNITY_Community 206|Community 206]]
 - [[_COMMUNITY_Community 207|Community 207]]
-- [[_COMMUNITY_Community 208|Community 208]]
 - [[_COMMUNITY_Community 209|Community 209]]
 - [[_COMMUNITY_Community 210|Community 210]]
 - [[_COMMUNITY_Community 211|Community 211]]
@@ -251,31 +250,31 @@
 ## Import Cycles
 - None detected.
 
-## Communities (215 total, 19 thin omitted)
+## Communities (214 total, 22 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.16
-Nodes (6): uid(), money(), TradingError, TradingService, decimal, test_all_corporate_actions_replay_deterministically_and_conflict_per_agent()
+Nodes (5): uid(), money(), TradingError, TradingService, decimal
 
 ### Community 1 - "Community 1"
 Cohesion: 0.07
-Nodes (51): check_heartbeat(), HealthError, heartbeat_path(), main(), Container liveness heartbeats for non-HTTP services., write_heartbeat(), _Archive, _aware() (+43 more)
+Nodes (52): check_heartbeat(), HealthError, heartbeat_path(), main(), Container liveness heartbeats for non-HTTP services., write_heartbeat(), SessionWindow, _Archive (+44 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.12
-Nodes (23): create_app(), AccessConfig, _normal_email(), _validated_emails(), _validated_origin(), run_deterministic_day(), AgentRun, main() (+15 more)
+Cohesion: 0.13
+Nodes (20): create_app(), AccessConfig, run_deterministic_day(), AgentRun, main(), Fail-closed production configuration validation with no database side effects., validate_production_environment(), AlertSink (+12 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.16
-Nodes (15): FakeMarket, quote(), request(), test_cancel_is_immutable_idempotent_and_prevents_later_execution(), test_final_liquidation_uses_adverse_slippage_fees_and_freezes_ranking(), test_replace_cancels_original_and_is_idempotent_before_quote(), _quote(), _race() (+7 more)
+Cohesion: 0.14
+Nodes (14): FakeMarket, MarketProvider, Quote, Protocol, Session, _quote(), _race(), _request() (+6 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.14
 Nodes (13): AI Swedish Paper-Trading Contest — Grill Outcome, Competitors and isolation, Evidence and audit, Fees, tax, income, and corporate actions, Goal, Human control, Launch gate, Orders and execution (+5 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.16
-Nodes (30): build_prompt(), DecisionValidationError, _evidence(), _exact_keys(), execute_process(), _json(), _kill_process_group(), _optional_string() (+22 more)
+Cohesion: 0.05
+Nodes (87): contest_final_session(), next_full_session(), Pinned Nasdaq Stockholm equity calendar for the 2026 contest., session_for(), SessionKind, six_run_times(), verify_source_artifacts(), ScheduledAgentRun (+79 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.25
@@ -290,40 +289,40 @@ Cohesion: 0.62
 Nodes (6): restore-test.sh script, assert_test_database(), cleanup(), clear_test_database(), fail(), pg_tool()
 
 ### Community 17 - "Community 17"
-Cohesion: 0.13
-Nodes (18): MarketProvider, AgentContext, Decision, State for exactly one competitor; callers must create one context per agent., _iso(), _portfolio_json(), Production-shaped scheduler → Hermes → paper-trading worker runtime., Run one durable orchestration claim at a time without an HTTP mutation surface. (+10 more)
+Cohesion: 0.23
+Nodes (12): Decision, _iso(), _portfolio_json(), Production-shaped scheduler → Hermes → paper-trading worker runtime., Run one durable orchestration claim at a time without an HTTP mutation surface., _require_verified_research(), WorkerRuntime, object (+4 more)
 
 ### Community 18 - "Community 18"
-Cohesion: 0.14
-Nodes (23): collect_once(), CollectionResult, expected_reports(), main(), Continuous official Nasdaq delayed-report collector., report_timestamp(), reports_due(), ArchivedReport (+15 more)
+Cohesion: 0.22
+Nodes (12): ArchivedReport, FeedProtocolError, NasdaqPostTradeClient, Acquisition and immutable archival for Nasdaq's delayed post-trade CSV feed., Persist the immutable checksum set proving one collected session complete., The official feed returned data outside its pinned contract., Return a checksum-verified immutable archive entry, if present., client_for() (+4 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.20
-Nodes (9): AccessIdentity, SeriousAlertKind, ContestStateEvent, CriticalAlert, DailyReport, DeliveryAttempt, ContestOperationError, ContestOperations (+1 more)
+Cohesion: 0.12
+Nodes (17): AccessIdentity, DeliveryError, DeliveryReceipt, HermesDiscordDelivery, Discord delivery through the already-configured Hermes gateway credentials., SeriousAlertKind, ContestStateEvent, CriticalAlert (+9 more)
 
 ### Community 20 - "Community 20"
 Cohesion: 0.08
-Nodes (26): AgentDefinition, PostgresConfiguration, ResearchAttestationStore, TestData, Account, Contains(), ExecutionMath, PaperTradingEngine (+18 more)
+Nodes (28): AgentDefinition, IPaperTradingCommands, CollectorHealth, OperationsException, PostgresConfiguration, RuntimeConfigurationException, TestData, Account (+20 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.83
 Nodes (3): _create_sqlite_agent_run_triggers(), downgrade(), upgrade()
 
 ### Community 25 - "Community 25"
-Cohesion: 0.10
-Nodes (19): TradingSession, NasdaqTrade, NoEligibleTrade, parse_first_eligible_trade(), _time(), NasdaqCsvParser, NasdaqTradeSelection, TradeInstrumentMapper (+11 more)
+Cohesion: 0.25
+Nodes (6): NasdaqTrade, NasdaqCsvParser, NasdaqTradeSelection, TradeInstrumentMapper, IEnumerable, string
 
 ### Community 26 - "Community 26"
 Cohesion: 0.11
 Nodes (16): _normalize(), _PinnedHTTPSConnection, Pinned-IP, independently verified public research evidence., ResearchVerificationError, ResearchVerifier, _VisibleText, EvidenceSource, HTMLParser (+8 more)
 
 ### Community 28 - "Community 28"
-Cohesion: 0.20
-Nodes (24): AgentOrchestrator, Database-backed scheduler-to-runner-to-trading orchestration., Durably claim fixed-model windows and retain one immutable record per attempt., HermesRunner, ProcessCapture, Run a stateless Hermes/Copilot turn; this class never mutates a portfolio., build_run_windows(), Deterministic session-relative run windows for the four competitors. (+16 more)
+Cohesion: 0.19
+Nodes (7): ResearchDecisionAttestorTests, StubVerifier, DecisionAction, IEvidenceVerifier, EvidenceClaim, IReadOnlyCollection, VerifiedEvidence
 
 ### Community 29 - "Community 29"
-Cohesion: 0.08
-Nodes (23): AgentRunRequest, AgentRunResult, FakeDecisionPort, FakeDiscord, FakePausePort, FakeRunner, FakeRunStore, FakeSchedulePort (+15 more)
+Cohesion: 0.10
+Nodes (20): AgentRunRequest, AgentRunResult, FakeDecisionPort, FakeDiscord, FakePausePort, FakeRunner, FakeRunStore, DurableOrchestrator (+12 more)
 
 ### Community 30 - "Community 30"
 Cohesion: 0.16
@@ -334,8 +333,8 @@ Cohesion: 0.05
 Nodes (49): Microsoft.Extensions.Configuration, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.Configuration.FileExtensions, Microsoft.Extensions.Configuration.Json, Microsoft.Extensions.Diagnostics.Abstractions, Microsoft.Extensions.FileProviders.Abstractions, Microsoft.Extensions.FileProviders.Physical, Microsoft.Extensions.FileSystemGlobbing (+41 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.04
-Nodes (46): type, dependencies, net10.0, contentHash, resolved, type, contentHash, resolved (+38 more)
+Cohesion: 0.05
+Nodes (43): type, dependencies, net10.0, contentHash, resolved, type, contentHash, resolved (+35 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.05
@@ -358,76 +357,76 @@ Cohesion: 0.09
 Nodes (35): Microsoft.Extensions.Configuration.Binder, Microsoft.Extensions.Configuration.CommandLine, Microsoft.Extensions.Configuration.EnvironmentVariables, Microsoft.Extensions.Configuration.UserSecrets, Microsoft.Extensions.DependencyInjection, Microsoft.Extensions.DependencyInjection.Abstractions, Microsoft.Extensions.Diagnostics, Microsoft.Extensions.Hosting.Abstractions (+27 more)
 
 ### Community 38 - "Community 38"
-Cohesion: 0.06
-Nodes (6): OrchestrationTests, PersistenceContractTests, ExecutionAndRiskTests, FinalLiquidationTests, ValidationBoundaryTests, Fact
+Cohesion: 0.07
+Nodes (5): OrchestrationTests, PersistenceContractTests, ExecutionAndRiskTests, FinalLiquidationTests, Fact
 
 ### Community 39 - "Community 39"
-Cohesion: 0.14
-Nodes (16): PostgresCollectorPersistence, PostgresDashboardFacade, AuditRow, DividendRow, EvidenceRow, FailureRow, FeeRow, IReadOnlyList (+8 more)
+Cohesion: 0.09
+Nodes (18): ContestControlRejectedException, DashboardUnavailableException, FailClosedDashboardFacade, IDashboardFacade, PostgresDashboardFacade, AuditRow, ContestControlCommand, ContestControlResult (+10 more)
 
 ### Community 40 - "Community 40"
-Cohesion: 0.08
-Nodes (20): FakeBootstrapPort, FakeDeliveryStore, Acquired(), AlreadyCompleted(), AuditedDiscordDelivery, Busy(), Conflict(), ContestBootstrapper (+12 more)
+Cohesion: 0.09
+Nodes (18): FakeBootstrapPort, FakeDeliveryStore, Acquired(), AlreadyCompleted(), AuditedDiscordDelivery, Busy(), Conflict(), ContestBootstrapper (+10 more)
 
 ### Community 41 - "Community 41"
-Cohesion: 0.10
-Nodes (8): FakeReadinessPort, IReadinessPort, FixedClock, ProductionCompositionIntegrationTests, RecordingDiscord, RecordingOperationsPorts, RuntimeIntegrationTests, Task
+Cohesion: 0.13
+Nodes (8): NasdaqPostTradeClient, DisposableDatabase, FixedClock, ProductionCompositionIntegrationTests, RecordingDiscord, ExitedLeaderOpenPipesProcess, IResearchProcess, Task
 
 ### Community 42 - "Community 42"
-Cohesion: 0.13
-Nodes (12): DelayingTransport, FakeDns, FakeTransport, HostDns, EvidenceHttpResponse, EvidenceVerificationException, IEvidenceHttpTransport, IHostResolver (+4 more)
+Cohesion: 0.14
+Nodes (15): DelayingTransport, FakeDns, FakeTransport, HostDns, EvidenceHttpResponse, EvidenceVerificationException, HttpOwner, IEvidenceHttpTransport (+7 more)
 
 ### Community 43 - "Community 43"
-Cohesion: 0.16
-Nodes (6): PostgresCollectorReadiness, IOperationsPorts, OperationsApplication, PostgresOperationsPorts, ReadinessResult, TextWriter
+Cohesion: 0.10
+Nodes (9): PostgresCollectorReadiness, IOperationsPorts, OperationsApplication, PostgresOperationsPorts, DisposableDatabase, RecordingOperationsPorts, RuntimeIntegrationTests, ReadinessResult (+1 more)
 
 ### Community 44 - "Community 44"
-Cohesion: 0.16
-Nodes (5): DomainContractTests, EvidenceVerifierTests, EvidenceVerificationOptions, InlineData, Theory
+Cohesion: 0.17
+Nodes (4): EvidenceVerifierTests, EvidenceVerificationOptions, InlineData, Theory
 
 ### Community 45 - "Community 45"
-Cohesion: 0.21
-Nodes (7): DecisionAction, DecisionJsonLimits, StrictDecisionJsonParser, EvidenceClaim, IReadOnlyCollection, JsonElement, List
+Cohesion: 0.23
+Nodes (5): DecisionJsonLimits, DecisionValidationException, StrictDecisionJsonParser, JsonElement, List
 
 ### Community 46 - "Community 46"
-Cohesion: 0.17
-Nodes (8): AccessOptions, AuthenticationFailureException, BoundedJwksFetcher, CloudflareAccessValidator, IAccessAssertionValidator, IJwksFetcher, JsonDocument, SemaphoreSlim
+Cohesion: 0.06
+Nodes (28): ContestContract, DecimalMath, IClock, Money, FakeClock, PostgresImmediateAlertStore, SystemOperationsClock, AccessOptions (+20 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.32
-Nodes (7): DeliveryError, DeliveryReceipt, HermesDiscordDelivery, Discord delivery through the already-configured Hermes gateway credentials., test_fails_closed_on_bad_target_delivery_error_and_oversized_text(), test_serious_alerts_are_allowlisted_and_prefixed(), test_uses_exact_hermes_send_argv_without_shell_or_secret()
+Cohesion: 0.31
+Nodes (4): PostgresCollectorPersistence, Isin, NpgsqlTransaction, OrderBookId
 
 ### Community 49 - "Community 49"
 Cohesion: 0.10
 Nodes (21): Microsoft.Extensions.Primitives, contentHash, dependencies, resolved, type, contentHash, dependencies, resolved (+13 more)
 
 ### Community 50 - "Community 50"
-Cohesion: 0.26
-Nodes (13): AccessJWTValidator, AuthenticationError, An Access assertion could not be authenticated or locally authorized., config(), keys(), test_algorithm_kid_signature_size_and_duplicate_jwks_fail_closed(), test_claims_and_membership_fail_closed(), test_cloudflare_policy_may_authorize_all_verified_non_owner_viewers() (+5 more)
+Cohesion: 0.20
+Nodes (16): AccessJWTValidator, AuthenticationError, _normal_email(), An Access assertion could not be authenticated or locally authorized., _validated_emails(), _validated_origin(), config(), keys() (+8 more)
 
 ### Community 51 - "Community 51"
-Cohesion: 0.23
-Nodes (6): FirdsUniverseParser, ConfiguredMarketDataReadiness, MarketDataReadinessGate, Change, DateOnly, FirdsInstrument
+Cohesion: 0.33
+Nodes (11): collect_once(), CollectionResult, expected_reports(), main(), Continuous official Nasdaq delayed-report collector., report_timestamp(), reports_due(), NasdaqPostTradeClient (+3 more)
 
 ### Community 52 - "Community 52"
-Cohesion: 0.15
-Nodes (8): DashboardApplicationFactory, DashboardApplicationTests, HttpClient, HttpContext, IClassFixture, IWebHostBuilder, Program, WebApplicationFactory
+Cohesion: 0.14
+Nodes (9): DashboardApplicationFactory, DashboardApplicationTests, RecordingFacade, HttpClient, HttpContext, IClassFixture, IWebHostBuilder, Program (+1 more)
 
 ### Community 53 - "Community 53"
 Cohesion: 0.13
 Nodes (19): dependencies, type, dependencies, dependencies, type, dependencies, type, dependencies (+11 more)
 
 ### Community 54 - "Community 54"
-Cohesion: 0.23
-Nodes (5): ImmutableArchive, SessionManifestStore, CompleteSessionManifest, JsonSerializerOptions, VerifiedSessionManifest
+Cohesion: 0.24
+Nodes (6): TradingSession, ImmutableArchive, SessionManifestStore, CompleteSessionManifest, JsonSerializerOptions, VerifiedSessionManifest
 
 ### Community 55 - "Community 55"
-Cohesion: 0.12
-Nodes (20): dependencies, type, dependencies, type, dependencies, type, dependencies, dependencies (+12 more)
+Cohesion: 0.19
+Nodes (13): dependencies, type, dependencies, type, dependencies, type, AiStocks.MarketData, AiStocks.Research (+5 more)
 
 ### Community 56 - "Community 56"
-Cohesion: 0.24
-Nodes (5): PostgresIntegrationTests, NpgsqlDataSource, P1, P2, Sql
+Cohesion: 0.14
+Nodes (12): StubHandler, TemporaryDirectory, StubHandler, TemporaryDirectory, PostgresIntegrationTests, StubHandler, HttpMessageHandler, IDisposable (+4 more)
 
 ### Community 57 - "Community 57"
 Cohesion: 0.11
@@ -438,12 +437,12 @@ Cohesion: 0.11
 Nodes (18): dependencies, type, dependencies, type, dependencies, type, dependencies, type (+10 more)
 
 ### Community 59 - "Community 59"
-Cohesion: 0.18
+Cohesion: 0.19
 Nodes (5): EvidenceVerifier, HashSet, HttpStatusCode, IElement, INode
 
 ### Community 60 - "Community 60"
-Cohesion: 0.14
-Nodes (11): AtomicFile, NasdaqStatusMachine, PinnedStatusSeedVerifier, AsOf, byte, Dictionary, InstrumentTradingState, NasdaqRssArtifact (+3 more)
+Cohesion: 0.12
+Nodes (13): NasdaqCollector, AtomicFile, NasdaqStatusMachine, PinnedStatusSeedVerifier, AsOf, byte, CollectorDownloadPolicy, Dictionary (+5 more)
 
 ### Community 61 - "Community 61"
 Cohesion: 0.31
@@ -470,44 +469,44 @@ Cohesion: 0.13
 Nodes (15): ASPNETCORE_ENVIRONMENT, applicationUrl, commandName, dotnetRunMessages, environmentVariables, launchBrowser, applicationUrl, commandName (+7 more)
 
 ### Community 67 - "Community 67"
-Cohesion: 0.44
-Nodes (14): OrderRequest, evidence(), market(), session(), test_evidence_gated_idempotent_buy_creates_immutable_ledger(), test_fees_slippage_cash_holdings_concentration_and_liquidity(), test_official_quote_delay_outside_window_rejects(), test_out_of_hours_order_queues_then_fills_at_next_open_quote() (+6 more)
+Cohesion: 0.48
+Nodes (13): OrderRequest, evidence(), market(), test_evidence_gated_idempotent_buy_creates_immutable_ledger(), test_fees_slippage_cash_holdings_concentration_and_liquidity(), test_official_quote_delay_outside_window_rejects(), test_out_of_hours_order_queues_then_fills_at_next_open_quote(), test_post_cost_concentration_and_terminal_queue_replay() (+5 more)
 
 ### Community 68 - "Community 68"
-Cohesion: 0.23
-Nodes (15): contest_final_session(), next_full_session(), Pinned Nasdaq Stockholm equity calendar for the 2026 contest., session_for(), SessionKind, six_run_times(), verify_source_artifacts(), RunWindowState (+7 more)
+Cohesion: 0.27
+Nodes (4): ResearchAttestationStore, NpgsqlCommand, NpgsqlDbType, PersistableResearchAttestation
 
 ### Community 69 - "Community 69"
-Cohesion: 0.27
-Nodes (3): NasdaqReportName, GeneratedRegex, Regex
-
-### Community 70 - "Community 70"
-Cohesion: 0.19
-Nodes (8): ContestControlRejectedException, DashboardUnavailableException, FailClosedDashboardFacade, IDashboardFacade, RecordingFacade, ContestControlCommand, ContestControlResult, DashboardSnapshot
+Cohesion: 0.21
+Nodes (4): NasdaqReportName, HermesDiscordPort, GeneratedRegex, Regex
 
 ### Community 71 - "Community 71"
 Cohesion: 0.09
-Nodes (9): IPaperTradingCommands, MarketReferenceAcquirer, PostgresMigrationRunner, CancellationToken, FirdsPlan, HttpContent, HttpRequestMessage, HttpResponseMessage (+1 more)
+Nodes (10): FakeReadinessPort, MarketReferenceAcquirer, IReadinessPort, OperationsHealth, PostgresMigrationRunner, CancellationToken, FirdsPlan, HttpContent (+2 more)
 
 ### Community 72 - "Community 72"
 Cohesion: 0.14
 Nodes (13): type, dependencies, type, dependencies, AiStocks.Core, net10.0, aistocks.core, aistocks.marketdata (+5 more)
 
 ### Community 73 - "Community 73"
-Cohesion: 0.10
-Nodes (8): CollectorWorker, HermesAgentRunner, PostgresWorkerState, PostRunAcceptance, WorkerRuntimeService, WorkerScheduleRecovery, BackgroundService, RunAttemptOutcome
+Cohesion: 0.08
+Nodes (12): RunWindow, CollectorWorker, FakeSchedulePort, DurableScheduleRegistrar, IDurableRunSchedulePort, RunSchedule, PostgresWorkerState, PostRunAcceptance (+4 more)
 
 ### Community 74 - "Community 74"
-Cohesion: 0.11
-Nodes (17): type, type, type, dependencies, net10.0, contentHash, resolved, type (+9 more)
+Cohesion: 0.14
+Nodes (13): type, dependencies, net10.0, contentHash, resolved, type, aistocks.core, Microsoft.TestPlatform.ObjectModel (+5 more)
 
 ### Community 76 - "Community 76"
-Cohesion: 0.14
-Nodes (13): type, dependencies, type, dependencies, AiStocks.Core, net10.0, aistocks.core, aistocks.trading (+5 more)
+Cohesion: 0.20
+Nodes (9): type, dependencies, type, dependencies, AiStocks.Core, net10.0, aistocks.core, aistocks.trading (+1 more)
 
 ### Community 77 - "Community 77"
 Cohesion: 0.20
 Nodes (9): net10.0, Microsoft.NET.Sdk, net10.0, Microsoft.NET.Sdk.Web, net10.0, Npgsql (10.0.0), Microsoft.NET.Sdk, net10.0 (+1 more)
+
+### Community 78 - "Community 78"
+Cohesion: 0.28
+Nodes (4): ConfiguredMarketDataReadiness, DurableObservationStore, MarketDataReadinessGate, InstrumentSessionObservation
 
 ### Community 81 - "Community 81"
 Cohesion: 0.17
@@ -530,8 +529,8 @@ Cohesion: 0.17
 Nodes (12): xunit.extensibility.core, xunit.extensibility.execution, xunit.core, xunit.extensibility.execution, contentHash, dependencies, resolved, type (+4 more)
 
 ### Community 86 - "Community 86"
-Cohesion: 0.26
-Nodes (6): ScheduledAgentRun, _aware(), _utc(), _bounded_text(), Complete bounded audit material plus a validated decision, if any., RunnerResult
+Cohesion: 0.33
+Nodes (3): AverageDailyValue, SessionManifest, SessionTradedValue
 
 ### Community 87 - "Community 87"
 Cohesion: 0.17
@@ -542,8 +541,8 @@ Cohesion: 0.17
 Nodes (12): xunit.extensibility.core, xunit.extensibility.execution, xunit.core, xunit.extensibility.execution, contentHash, dependencies, resolved, type (+4 more)
 
 ### Community 89 - "Community 89"
-Cohesion: 0.19
-Nodes (29): bootstrap(), BootstrapError, _is_complete(), main(), One-time, idempotent initialization of the immutable contest state., Base, Quote, SessionWindow (+21 more)
+Cohesion: 0.16
+Nodes (34): bootstrap(), BootstrapError, _is_complete(), main(), One-time, idempotent initialization of the immutable contest state., Base, Agent, CorporateAction (+26 more)
 
 ### Community 91 - "Community 91"
 Cohesion: 0.18
@@ -570,12 +569,8 @@ Cohesion: 0.33
 Nodes (5): BackupRestoreCommands, BackupRequest, RestoreRequest, ValidatedBackupCommand, ValidatedRestoreCommand
 
 ### Community 97 - "Community 97"
-Cohesion: 0.07
-Nodes (19): CollectorHealth, Create(), DailyReportService, HermesDiscordPort, OperationsRuntimeService, PostgresContestOperations, PostgresDailyReportPublisher, RuntimeConfigurationException (+11 more)
-
-### Community 98 - "Community 98"
-Cohesion: 0.30
-Nodes (5): CloudflareAccessValidatorTests, FakeJwksFetcher, MutableTimeProvider, RSA, TimeProvider
+Cohesion: 0.13
+Nodes (11): Create(), DailyReportService, OperationsRuntimeService, PostgresContestOperations, PostgresDailyReportPublisher, PostgresImmediateAlertPublisher, DailyAgentSnapshot, ImmediateAlert (+3 more)
 
 ### Community 99 - "Community 99"
 Cohesion: 0.20
@@ -590,8 +585,8 @@ Cohesion: 0.18
 Nodes (10): contentHash, dependencies, resolved, type, contentHash, dependencies, resolved, type (+2 more)
 
 ### Community 102 - "Community 102"
-Cohesion: 0.19
-Nodes (6): ResearchDecisionAttestorTests, StubVerifier, ResearchDecisionAttestor, IEvidenceVerifier, InvocationProvenance, ResearchDecisionDraft
+Cohesion: 0.31
+Nodes (4): AttestedResearchDecision, ResearchDecisionAttestor, InvocationProvenance, ResearchDecisionDraft
 
 ### Community 103 - "Community 103"
 Cohesion: 0.23
@@ -602,7 +597,7 @@ Cohesion: 0.22
 Nodes (9): xunit.analyzers, xunit.assert, xunit.core, xunit, contentHash, dependencies, requested, resolved (+1 more)
 
 ### Community 105 - "Community 105"
-Cohesion: 0.33
+Cohesion: 0.29
 Nodes (3): Contains(), MarketDataException, StockholmCalendar
 
 ### Community 106 - "Community 106"
@@ -634,8 +629,8 @@ Cohesion: 0.25
 Nodes (8): Microsoft.CodeCoverage, Microsoft.TestPlatform.TestHost, contentHash, dependencies, requested, resolved, type, Microsoft.NET.Test.Sdk
 
 ### Community 113 - "Community 113"
-Cohesion: 0.29
-Nodes (7): dependencies, type, dependencies, type, AiStocks.Persistence, aistocks.operations, aistocks.web
+Cohesion: 0.12
+Nodes (18): dependencies, type, dependencies, type, dependencies, type, dependencies, type (+10 more)
 
 ### Community 114 - "Community 114"
 Cohesion: 0.50
@@ -678,8 +673,8 @@ Cohesion: 0.29
 Nodes (7): Microsoft.TestPlatform.ObjectModel, Newtonsoft.Json, contentHash, dependencies, resolved, type, Microsoft.TestPlatform.TestHost
 
 ### Community 124 - "Community 124"
-Cohesion: 0.48
-Nodes (3): DurableFirdsStore, FirdsSnapshot, Stream
+Cohesion: 0.25
+Nodes (8): DurableFirdsStore, FirdsUniverseParser, Change, DateOnly, FirdsInstrument, FirdsSnapshot, Stream, Uri
 
 ### Community 125 - "Community 125"
 Cohesion: 0.29
@@ -704,10 +699,6 @@ Nodes (7): Microsoft.TestPlatform.ObjectModel, Newtonsoft.Json, contentHash, dep
 ### Community 130 - "Community 130"
 Cohesion: 0.29
 Nodes (6): net10.0, coverlet.collector (6.0.4), Microsoft.NET.Test.Sdk (17.14.1), xunit (2.9.3), xunit.runner.visualstudio (3.1.4), Microsoft.NET.Sdk
-
-### Community 131 - "Community 131"
-Cohesion: 0.40
-Nodes (5): xunit.runner.visualstudio, contentHash, requested, resolved, type
 
 ### Community 132 - "Community 132"
 Cohesion: 0.29
@@ -822,8 +813,8 @@ Cohesion: 0.50
 Nodes (3): dependencies, net10.0, version
 
 ### Community 162 - "Community 162"
-Cohesion: 0.29
-Nodes (6): CapturingLauncher, IResearchProcess, IResearchProcessLauncher, ResearchExecutionException, SystemResearchProcessLauncher, ProcessStartInfo
+Cohesion: 0.31
+Nodes (5): CapturingLauncher, IResearchProcessLauncher, ResearchExecutionException, SystemResearchProcessLauncher, ProcessStartInfo
 
 ### Community 163 - "Community 163"
 Cohesion: 0.50
@@ -873,10 +864,6 @@ Nodes (4): contentHash, resolved, type, AngleSharp
 Cohesion: 0.50
 Nodes (4): contentHash, resolved, type, Microsoft.CodeCoverage
 
-### Community 176 - "Community 176"
-Cohesion: 0.20
-Nodes (5): ContestContract, DecimalMath, Money, TestAccessAssertionValidator, int
-
 ### Community 177 - "Community 177"
 Cohesion: 0.50
 Nodes (4): Newtonsoft.Json, contentHash, resolved, type
@@ -886,8 +873,8 @@ Cohesion: 0.50
 Nodes (4): xunit.analyzers, contentHash, resolved, type
 
 ### Community 179 - "Community 179"
-Cohesion: 0.24
-Nodes (5): DisposableDatabase, DisposableDatabase, HttpOwner, IAsyncDisposable, ValueTask
+Cohesion: 0.50
+Nodes (4): xunit.analyzers, contentHash, resolved, type
 
 ### Community 180 - "Community 180"
 Cohesion: 0.50
@@ -910,8 +897,8 @@ Cohesion: 0.50
 Nodes (4): xunit.abstractions, contentHash, resolved, type
 
 ### Community 185 - "Community 185"
-Cohesion: 0.22
-Nodes (5): ExitedLeaderOpenPipesProcess, FakeProcess, TrackingStream, bool, MemoryStream
+Cohesion: 0.19
+Nodes (5): FakeProcess, TrackingStream, bool, MemoryStream, ValueTask
 
 ### Community 186 - "Community 186"
 Cohesion: 0.50
@@ -930,8 +917,8 @@ Cohesion: 0.50
 Nodes (4): xunit.abstractions, contentHash, resolved, type
 
 ### Community 190 - "Community 190"
-Cohesion: 0.22
-Nodes (8): NasdaqCollector, NasdaqPostTradeClient, CloudflareAccessHandler, AuthenticateResult, AuthenticationHandler, AuthenticationSchemeOptions, CollectorDownloadPolicy, string
+Cohesion: 0.50
+Nodes (4): xunit.abstractions, contentHash, resolved, type
 
 ### Community 191 - "Community 191"
 Cohesion: 0.50
@@ -982,19 +969,15 @@ Cohesion: 0.50
 Nodes (4): Newtonsoft.Json, contentHash, resolved, type
 
 ### Community 207 - "Community 207"
-Cohesion: 0.29
-Nodes (5): IClock, FakeClock, SystemOperationsClock, Program, SystemClock
-
-### Community 208 - "Community 208"
-Cohesion: 0.22
-Nodes (6): StubHandler, TemporaryDirectory, StubHandler, TemporaryDirectory, HttpMessageHandler, IDisposable
+Cohesion: 0.50
+Nodes (4): xunit.analyzers, contentHash, resolved, type
 
 ### Community 209 - "Community 209"
 Cohesion: 0.20
 Nodes (6): DenyNetworkEventListener, NoBrokerOrderPathProbe, ConcurrentBag, EventListener, EventSource, EventWrittenEventArgs
 
 ### Community 210 - "Community 210"
-Cohesion: 0.22
+Cohesion: 0.20
 Nodes (3): NeverEndingStream, Memory, SeekOrigin
 
 ### Community 211 - "Community 211"
@@ -1012,22 +995,22 @@ Nodes (4): xunit.assert, contentHash, resolved, type
 ## Knowledge Gaps
 - **778 isolated node(s):** `ai-stocks`, `entrypoint.sh script`, `migrate.sh script`, `verify-release.sh script`, `LD_LIBRARY_PATH` (+773 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **19 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `TradingSession` connect `Community 25` to `Community 97`, `Community 68`, `Community 39`, `Community 105`, `Community 78`, `Community 18`, `Community 20`, `Community 54`, `Community 28`, `Community 29`?**
+- **Why does `TradingSession` connect `Community 54` to `Community 5`, `Community 73`, `Community 105`, `Community 78`, `Community 47`, `Community 18`, `Community 51`, `Community 20`, `Community 86`, `Community 25`?**
   _High betweenness centrality (0.039) - this node is a cross-community bridge._
-- **Why does `AgentContext` connect `Community 17` to `Community 5`, `Community 73`, `Community 86`, `Community 28`, `Community 29`?**
-  _High betweenness centrality (0.026) - this node is a cross-community bridge._
-- **Why does `AccessIdentity` connect `Community 19` to `Community 2`, `Community 3`, `Community 71`, `Community 46`, `Community 176`, `Community 50`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
+- **Why does `AccessIdentity` connect `Community 19` to `Community 2`, `Community 3`, `Community 71`, `Community 46`, `Community 50`?**
+  _High betweenness centrality (0.027) - this node is a cross-community bridge._
+- **Why does `AgentContext` connect `Community 5` to `Community 73`, `Community 17`, `Community 29`?**
+  _High betweenness centrality (0.024) - this node is a cross-community bridge._
 - **Are the 13 inferred relationships involving `TradingService` (e.g. with `MarketProvider` and `Quote`) actually correct?**
   _`TradingService` has 13 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `An Access assertion could not be authenticated or locally authorized.`, `One-time, idempotent initialization of the immutable contest state.`, `Pinned Nasdaq Stockholm equity calendar for the 2026 contest.` to the rest of the system?**
   _806 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.06960385042576823 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07006151742993848 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.11561561561561562 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.13306451612903225 - nodes in this community are weakly interconnected._
