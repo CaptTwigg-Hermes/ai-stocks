@@ -60,6 +60,13 @@ public sealed class ProductionCompositionIntegrationTests
             await ExecuteAsync(connection, """
                 INSERT INTO market_observations(id,instrument_id,raw_market_report_id,traded_at,retrieved_at,price,quantity,bid,ask,
                   average_daily_value_20,complete_history_sessions,session_id,is_official_pats,warning,suspended,verified,source_json,source_hash)
+                SELECT gen_random_uuid(),$1,id,'2026-06-21T09:59:30Z','2026-06-21T10:14:30Z',99.5,10,99.4,99.6,
+                  1000000,19,'compose-s20',false,false,false,true,'{"quote":"ineligible"}',canonical_jsonb_sha256('{"quote":"ineligible"}')
+                FROM raw_market_reports WHERE report_name='compose-report'
+                """, instrument);
+            await ExecuteAsync(connection, """
+                INSERT INTO market_observations(id,instrument_id,raw_market_report_id,traded_at,retrieved_at,price,quantity,bid,ask,
+                  average_daily_value_20,complete_history_sessions,session_id,is_official_pats,warning,suspended,verified,source_json,source_hash)
                 SELECT gen_random_uuid(),$1,id,'2026-06-21T10:00:00Z','2026-06-21T10:15:00Z',100,10,99.9,100.1,
                   1000000,20,'compose-s20',false,false,false,true,'{"quote":"fill"}',canonical_jsonb_sha256('{"quote":"fill"}')
                 FROM raw_market_reports WHERE report_name='compose-report'
@@ -78,6 +85,8 @@ public sealed class ProductionCompositionIntegrationTests
         await using (var connection = await source.OpenConnectionAsync())
         {
             Assert.Equal(1L, await ScalarLongAsync(connection, "SELECT count(*) FROM fills WHERE order_id=$1", order));
+            Assert.Equal("2026-06-21 10:00:00", await ScalarStringAsync(connection,
+                "SELECT (observation.traded_at AT TIME ZONE 'UTC')::text FROM fills fill JOIN market_observations observation ON observation.id=fill.market_observation_id WHERE fill.order_id=$1", order));
             Assert.Equal(1L, await ScalarLongAsync(connection, "SELECT quantity FROM positions WHERE agent_id='11111111-1111-1111-1111-111111111111' AND instrument_id=$1", instrument));
             await ExecuteAsync(connection, """
                 INSERT INTO corporate_actions VALUES($1,'compose-split',$2,'SPLIT','2026-06-22T08:00:00Z',
@@ -97,7 +106,10 @@ public sealed class ProductionCompositionIntegrationTests
             Assert.Equal(2L, await ScalarLongAsync(connection, "SELECT quantity FROM positions WHERE agent_id='11111111-1111-1111-1111-111111111111' AND instrument_id=$1", instrument));
             await ExecuteAsync(connection, """
                 INSERT INTO trading_sessions(session_id,session_day,opens_at,closes_at,is_final,calendar_sha256,trading_hours_sha256)
-                VALUES('XSTO-2026-12-30','2026-12-30','2026-12-30T08:00:00Z','2026-12-30T16:30:00Z',true,
+                VALUES('XSTO-2026-12-29','2026-12-29','2026-12-29T08:00:00Z','2026-12-29T16:30:00Z',false,
+                  '867f80011a2d8cf91f29dce6de8b6c77d4c4fda0954efa8f757f40b25c585395',
+                  'f16f58c7520eaaae3210ddab666e7bde2609d1935c69e9f5d706bbd0d14fe395'),
+                  ('XSTO-2026-12-30','2026-12-30','2026-12-30T08:00:00Z','2026-12-30T16:30:00Z',true,
                   '867f80011a2d8cf91f29dce6de8b6c77d4c4fda0954efa8f757f40b25c585395',
                   'f16f58c7520eaaae3210ddab666e7bde2609d1935c69e9f5d706bbd0d14fe395')
                 """);
@@ -114,22 +126,28 @@ public sealed class ProductionCompositionIntegrationTests
                 """, instrument);
         }
 
+        var discord = new RecordingDiscord();
+        var publisher = new PostgresDailyReportPublisher(source, new DailyReportService(),
+            new AuditedDiscordDelivery(new PostgresDeliveryAuditPort(source), discord, new FixedClock(new DateTimeOffset(2026, 12, 29, 17, 30, 0, TimeSpan.Zero))));
+        Assert.True(await publisher.PublishIfDueAsync(new DateTimeOffset(2026, 12, 29, 17, 30, 0, TimeSpan.Zero), default));
+
         await operations.FinalizeIfDueAsync(new DateTimeOffset(2026, 12, 30, 16, 50, 0, TimeSpan.Zero), default);
         await operations.FinalizeIfDueAsync(new DateTimeOffset(2026, 12, 30, 17, 0, 0, TimeSpan.Zero), default);
 
-        var discord = new RecordingDiscord();
-        var publisher = new PostgresDailyReportPublisher(source, new DailyReportService(),
+        publisher = new PostgresDailyReportPublisher(source, new DailyReportService(),
             new AuditedDiscordDelivery(new PostgresDeliveryAuditPort(source), discord, new FixedClock(new DateTimeOffset(2026, 12, 30, 17, 30, 0, TimeSpan.Zero))));
         var published = await publisher.PublishIfDueAsync(new DateTimeOffset(2026, 12, 30, 17, 30, 0, TimeSpan.Zero), default);
         Assert.True(published);
         Assert.False(await publisher.PublishIfDueAsync(new DateTimeOffset(2026, 12, 30, 17, 31, 0, TimeSpan.Zero), default));
-        Assert.Single(discord.Messages);
+        Assert.Equal(2, discord.Messages.Count);
+        Assert.DoesNotContain("daily 0.40%; total 0.40%", discord.Messages[1], StringComparison.Ordinal);
 
         await using var verify = await source.OpenConnectionAsync();
         Assert.Equal("FINISHED", await ScalarStringAsync(verify, "SELECT status::text FROM contest_state WHERE singleton"));
         Assert.Equal(4L, await ScalarLongAsync(verify, "SELECT count(*) FROM final_rankings"));
-        Assert.Equal(1L, await ScalarLongAsync(verify, "SELECT count(*) FROM daily_reports WHERE report_key='daily:2026-12-30'"));
-        Assert.Equal(1L, await ScalarLongAsync(verify, "SELECT count(*) FROM delivery_audits WHERE delivery_key='daily:2026-12-30' AND status='SUCCEEDED'"));
+        Assert.Equal(2L, await ScalarLongAsync(verify, "SELECT count(*) FROM daily_reports"));
+        Assert.Equal(8L, await ScalarLongAsync(verify, "SELECT count(*) FROM daily_report_values"));
+        Assert.Equal(2L, await ScalarLongAsync(verify, "SELECT count(*) FROM delivery_audits WHERE status='SUCCEEDED'"));
         Assert.True(await ScalarBoolAsync(verify, "SELECT has_function_privilege('ai_stocks_worker_runtime','execute_queued_order(uuid,timestamptz)','EXECUTE')"));
         Assert.False(await ScalarBoolAsync(verify, "SELECT has_function_privilege('ai_stocks_worker_runtime','finalize_contest(text,uuid,text,jsonb,sha256_hex,timestamptz)','EXECUTE')"));
         Assert.False(await ScalarBoolAsync(verify, "SELECT has_function_privilege('ai_stocks_worker_runtime','apply_corporate_action(uuid,uuid,uuid,uuid,timestamptz)','EXECUTE')"));
@@ -168,9 +186,10 @@ public sealed class ProductionCompositionIntegrationTests
         return Convert.ToInt64(await command.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private static async Task<string> ScalarStringAsync(NpgsqlConnection connection, string sql)
+    private static async Task<string> ScalarStringAsync(NpgsqlConnection connection, string sql, params object[] values)
     {
         await using var command = new NpgsqlCommand(sql, connection);
+        for (var index = 0; index < values.Length; index++) command.Parameters.AddWithValue(values[index]);
         return (string)(await command.ExecuteScalarAsync() ?? throw new InvalidOperationException());
     }
 

@@ -82,6 +82,7 @@ public sealed class PostgresDailyReportPublisher(
             if (await eligible.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not true) return false;
         }
 
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         var snapshots = await LoadSnapshotsAsync(connection, day, generatedAt, cancellationToken).ConfigureAwait(false);
         var report = reports.Generate(day, generatedAt, snapshots);
         await using (var persist = new NpgsqlCommand("SELECT persist_daily_report($1,$2,$3,$4,$5::sha256_hex)", connection))
@@ -93,6 +94,16 @@ public sealed class PostgresDailyReportPublisher(
             persist.Parameters.AddWithValue(report.ContentHash);
             await persist.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
+        foreach (var snapshot in snapshots)
+        {
+            await using var persistValue = new NpgsqlCommand(
+                "SELECT persist_daily_report_value($1,$2,$3)", connection);
+            persistValue.Parameters.AddWithValue(report.Key);
+            persistValue.Parameters.AddWithValue(snapshot.AgentId);
+            persistValue.Parameters.AddWithValue(snapshot.NetValue);
+            await persistValue.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         await delivery.DeliverAsync(report.Key, report.ContentHash, report.Message, cancellationToken).ConfigureAwait(false);
         return true;
     }
@@ -120,18 +131,27 @@ public sealed class PostgresDailyReportPublisher(
               (SELECT count(*) FROM scheduled_agent_runs r WHERE r.agent_id=a.id AND r.status='MISSED'
                 AND r.scheduled_at>=$1 AND r.scheduled_at<=$2) AS missed,
               COALESCE((SELECT NULLIF(o.request_json->>'reason','') FROM orders o WHERE o.agent_id=a.id
-                AND o.decision_at<=$2 ORDER BY o.decision_at DESC,o.id DESC LIMIT 1),'no trade rationale') AS rationale
-            FROM agents a JOIN account_balances b ON b.agent_id=a.id ORDER BY a.id
+                AND o.decision_at<=$2 ORDER BY o.decision_at DESC,o.id DESC LIMIT 1),'no trade rationale') AS rationale,
+              previous.net_value
+            FROM agents a JOIN account_balances b ON b.agent_id=a.id
+            LEFT JOIN LATERAL (SELECT value.net_value FROM daily_report_values value
+              JOIN daily_reports report ON report.report_key=value.report_key
+              WHERE value.agent_id=a.id AND report.trading_day<$3
+              ORDER BY report.trading_day DESC LIMIT 1) previous ON true
+            ORDER BY a.id
             """, connection);
         command.Parameters.AddWithValue(start.ToUniversalTime());
         command.Parameters.AddWithValue(generatedAt.ToUniversalTime());
+        command.Parameters.AddWithValue(day);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var rows = new List<DailyAgentSnapshot>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             var net = reader.GetDecimal(3);
             var total = decimal.Round((net / ContestContract.InitialCash - 1m) * 100m, 2, MidpointRounding.AwayFromZero);
-            rows.Add(new DailyAgentSnapshot(reader.GetGuid(0), reader.GetString(1), net, total, total,
+            var prior = reader.IsDBNull(9) ? ContestContract.InitialCash : reader.GetDecimal(9);
+            var daily = decimal.Round((net / prior - 1m) * 100m, 2, MidpointRounding.AwayFromZero);
+            rows.Add(new DailyAgentSnapshot(reader.GetGuid(0), reader.GetString(1), net, daily, total,
                 reader.GetDecimal(2), reader.GetString(4), reader.GetString(5), reader.GetDecimal(6),
                 checked((int)reader.GetInt64(7)), reader.GetString(8)));
         }

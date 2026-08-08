@@ -12,6 +12,17 @@ FOR EACH ROW EXECUTE FUNCTION reject_audit_mutation();
 CREATE TRIGGER daily_reports_no_truncate BEFORE TRUNCATE ON daily_reports
 FOR EACH STATEMENT EXECUTE FUNCTION reject_audit_mutation();
 
+CREATE TABLE daily_report_values (
+    report_key text NOT NULL REFERENCES daily_reports(report_key) ON DELETE RESTRICT,
+    agent_id uuid NOT NULL REFERENCES agents(id) ON DELETE RESTRICT,
+    net_value nonnegative_money NOT NULL,
+    PRIMARY KEY (report_key,agent_id)
+);
+CREATE TRIGGER daily_report_values_no_update_delete BEFORE UPDATE OR DELETE ON daily_report_values
+FOR EACH ROW EXECUTE FUNCTION reject_audit_mutation();
+CREATE TRIGGER daily_report_values_no_truncate BEFORE TRUNCATE ON daily_report_values
+FOR EACH STATEMENT EXECUTE FUNCTION reject_audit_mutation();
+
 CREATE FUNCTION persist_daily_report(
  p_key text,p_day date,p_generated_at timestamptz,p_content text,p_hash sha256_hex)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
@@ -31,6 +42,22 @@ BEGIN
   VALUES(p_key,p_day,p_generated_at,p_content,p_hash);
 END $$;
 
+CREATE FUNCTION persist_daily_report_value(p_key text,p_agent_id uuid,p_net_value numeric)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE prior numeric;
+BEGIN
+  IF p_net_value<0 OR NOT EXISTS (SELECT FROM daily_reports WHERE report_key=p_key) THEN
+    RAISE EXCEPTION 'daily report value identity is invalid';
+  END IF;
+  SELECT net_value INTO prior FROM daily_report_values
+    WHERE report_key=p_key AND agent_id=p_agent_id FOR KEY SHARE;
+  IF FOUND THEN
+    IF prior=p_net_value THEN RETURN; END IF;
+    RAISE EXCEPTION 'daily report value idempotency conflict';
+  END IF;
+  INSERT INTO daily_report_values VALUES(p_key,p_agent_id,p_net_value);
+END $$;
+
 CREATE FUNCTION execute_queued_order(p_order_id uuid,p_now timestamptz)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE
@@ -44,26 +71,30 @@ BEGIN
   IF EXISTS (SELECT FROM positions WHERE agent_id=o.agent_id AND instrument_id=o.instrument_id AND frozen) THEN
     RAISE EXCEPTION 'frozen positions are ineligible for execution';
   END IF;
-  SELECT mo.* INTO obs FROM market_observations mo
-  JOIN trading_sessions ts ON ts.session_id=mo.session_id
-  WHERE mo.instrument_id=o.instrument_id AND mo.verified AND NOT mo.warning AND NOT mo.suspended
-    AND mo.traded_at>=o.decision_at AND mo.traded_at BETWEEN ts.opens_at AND ts.closes_at
-    AND mo.retrieved_at-mo.traded_at BETWEEN interval '15 minutes' AND interval '20 minutes'
-    AND mo.retrieved_at<=p_now
-    AND NOT EXISTS (SELECT 1 FROM contest_state_events pause_event
-      WHERE pause_event.to_status='PAUSED' AND mo.traded_at>=pause_event.occurred_at
-        AND mo.traded_at<COALESCE((SELECT min(resume_event.occurred_at) FROM contest_state_events resume_event
-          WHERE resume_event.from_status='PAUSED' AND resume_event.to_status='RUNNING'
-            AND resume_event.occurred_at>pause_event.occurred_at),'infinity'::timestamptz))
-  ORDER BY mo.traded_at,mo.id LIMIT 1;
+  obs.id:=NULL;
+  FOR obs IN SELECT mo.* FROM market_observations mo
+    JOIN trading_sessions ts ON ts.session_id=mo.session_id
+    WHERE mo.instrument_id=o.instrument_id AND mo.verified AND NOT mo.warning AND NOT mo.suspended
+      AND mo.traded_at>=o.decision_at AND mo.traded_at BETWEEN ts.opens_at AND ts.closes_at
+      AND mo.retrieved_at-mo.traded_at BETWEEN interval '15 minutes' AND interval '20 minutes'
+      AND mo.retrieved_at<=p_now
+      AND NOT EXISTS (SELECT 1 FROM contest_state_events pause_event
+        WHERE pause_event.to_status='PAUSED' AND mo.traded_at>=pause_event.occurred_at
+          AND mo.traded_at<COALESCE((SELECT min(resume_event.occurred_at) FROM contest_state_events resume_event
+            WHERE resume_event.from_status='PAUSED' AND resume_event.to_status='RUNNING'
+              AND resume_event.occurred_at>pause_event.occurred_at),'infinity'::timestamptz))
+    ORDER BY mo.traded_at,mo.id
+  LOOP
+    SELECT * INTO STRICT s FROM trading_sessions WHERE session_id=obs.session_id;
+    SELECT count(*),avg(stats.traded_value) INTO history_count,derived_adv
+    FROM (SELECT session_id FROM trading_sessions WHERE session_day<s.session_day ORDER BY session_day DESC LIMIT 20) required
+    JOIN instrument_session_stats stats ON stats.session_id=required.session_id
+      AND stats.instrument_id=o.instrument_id AND stats.complete;
+    EXIT WHEN o.side='SELL' OR (history_count=20 AND obs.complete_history_sessions>=20
+      AND obs.average_daily_value_20=round(derived_adv,2) AND obs.price*o.quantity<=derived_adv*0.01);
+    obs.id:=NULL;
+  END LOOP;
   IF obs.id IS NULL THEN RETURN NULL; END IF;
-  SELECT * INTO STRICT s FROM trading_sessions WHERE session_id=obs.session_id;
-  SELECT count(*),avg(stats.traded_value) INTO history_count,derived_adv
-  FROM (SELECT session_id FROM trading_sessions WHERE session_day<s.session_day ORDER BY session_day DESC LIMIT 20) required
-  JOIN instrument_session_stats stats ON stats.session_id=required.session_id
-    AND stats.instrument_id=o.instrument_id AND stats.complete;
-  IF o.side='BUY' AND (history_count<>20 OR obs.complete_history_sessions<20
-      OR obs.average_daily_value_20<>round(derived_adv,2) OR obs.price*o.quantity>derived_adv*0.01) THEN RETURN NULL; END IF;
 
   SELECT b.cash+COALESCE(sum(p.quantity*mark.price),0),b.fee_tier,b.stock_trade_count
     INTO marked_capital,active_tier,trade_count
@@ -100,8 +131,9 @@ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_stocks_web_runtime') THEN CREATE ROLE ai_stocks_web_runtime NOLOGIN; END IF;
 END $roles$;
 
-REVOKE ALL ON daily_reports FROM PUBLIC;
+REVOKE ALL ON daily_reports,daily_report_values FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION persist_daily_report(text,date,timestamptz,text,sha256_hex) FROM PUBLIC,ai_stocks_runtime;
+REVOKE EXECUTE ON FUNCTION persist_daily_report_value(text,uuid,numeric) FROM PUBLIC,ai_stocks_runtime;
 REVOKE EXECUTE ON FUNCTION execute_queued_order(uuid,timestamptz) FROM PUBLIC,ai_stocks_runtime;
 REVOKE EXECUTE ON FUNCTION apply_corporate_action(uuid,uuid,uuid,uuid,timestamptz) FROM ai_stocks_runtime;
 REVOKE EXECUTE ON FUNCTION finalize_contest(text,uuid,text,jsonb,sha256_hex,timestamptz) FROM ai_stocks_runtime;
@@ -121,15 +153,16 @@ GRANT EXECUTE ON FUNCTION submit_order(uuid,uuid,text,text,order_side,uuid,integ
 
 GRANT SELECT ON agents,contest_state,instruments,trading_sessions,market_observations,scheduled_agent_runs,agent_runs,
  orders,order_outcomes,ledger_events,fills,corporate_actions,corporate_action_applications,account_balances,positions,
- portfolio_snapshots,final_rankings,daily_reports,delivery_reservations,delivery_audits TO ai_stocks_operations_runtime;
+ portfolio_snapshots,final_rankings,daily_reports,daily_report_values,delivery_reservations,delivery_audits TO ai_stocks_operations_runtime;
 GRANT EXECUTE ON FUNCTION apply_corporate_action(uuid,uuid,uuid,uuid,timestamptz),
  finalize_contest(text,uuid,text,jsonb,sha256_hex,timestamptz),persist_daily_report(text,date,timestamptz,text,sha256_hex),
+ persist_daily_report_value(text,uuid,numeric),
  reserve_delivery(text,sha256_hex,timestamptz,interval),begin_delivery_send(text,sha256_hex,uuid,timestamptz),
  record_delivery(uuid,text,sha256_hex,delivery_status,text,text,timestamptz,uuid) TO ai_stocks_operations_runtime;
 
 GRANT SELECT ON agents,contest_state,instruments,trading_sessions,orders,order_outcomes,ledger_events,fills,
  corporate_actions,corporate_action_applications,account_balances,positions,portfolio_snapshots,final_rankings,
- contest_state_events,daily_reports TO ai_stocks_web_runtime;
+ contest_state_events,daily_reports,daily_report_values TO ai_stocks_web_runtime;
 GRANT EXECUTE ON FUNCTION transition_contest(uuid,contest_status,contest_status,text,text,text,jsonb,sha256_hex,timestamptz),
  prestart_reset(uuid,text,text,jsonb,sha256_hex,timestamptz) TO ai_stocks_web_runtime;
 

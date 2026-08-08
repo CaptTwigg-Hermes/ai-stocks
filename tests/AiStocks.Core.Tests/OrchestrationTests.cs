@@ -162,6 +162,21 @@ public sealed class OrchestrationTests
     }
 
     [Fact]
+    public async Task FailingQueuedOrderDoesNotPoisonLaterOrders()
+    {
+        var port = new FakeQueuedOrderPort(
+            [new QueuedExecution("a", Open, ContestContract.Agents[0].Id),
+             new QueuedExecution("b", Open.AddMinutes(1), ContestContract.Agents[1].Id)],
+            "a");
+
+        var failure = await Assert.ThrowsAsync<AggregateException>(
+            () => new QueuedExecutionCoordinator(port).ExecuteAllAsync(default));
+
+        Assert.Single(failure.InnerExceptions);
+        Assert.Equal(new[] { "a", "b" }, port.Executed);
+    }
+
+    [Fact]
     public void DailyReportRequiresStockholm1830AllFourAgentsAndEveryRequiredField()
     {
         var service = new DailyReportService();
@@ -302,12 +317,22 @@ public sealed class OrchestrationTests
         public Task<bool> IsPausedAsync(CancellationToken cancellationToken) => Task.FromResult(states.Count > 1 ? states.Dequeue() : states.Peek());
     }
 
-    private sealed class FakeQueuedOrderPort(params QueuedExecution[] orders) : IQueuedExecutionPort
+    private sealed class FakeQueuedOrderPort : IQueuedExecutionPort
     {
-        private readonly List<QueuedExecution> orders = [.. orders];
+        private readonly List<QueuedExecution> orders;
+        private readonly HashSet<string> failures;
+        public FakeQueuedOrderPort(params QueuedExecution[] orders) : this(orders, []) { }
+        public FakeQueuedOrderPort(IEnumerable<QueuedExecution> orders, params string[] failures) =>
+            (this.orders, this.failures) = ([.. orders], [.. failures]);
         public List<string> Executed { get; } = [];
         public Task<IReadOnlyList<QueuedExecution>> LoadReadyAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<QueuedExecution>>(orders);
-        public Task ExecuteAsync(QueuedExecution order, CancellationToken cancellationToken) { Executed.Add(order.OrderId); return Task.CompletedTask; }
+        public Task ExecuteAsync(QueuedExecution order, CancellationToken cancellationToken)
+        {
+            Executed.Add(order.OrderId);
+            return failures.Contains(order.OrderId)
+                ? Task.FromException(new InvalidOperationException("synthetic order failure"))
+                : Task.CompletedTask;
+        }
     }
 
     private sealed class FakeDeliveryStore : IDeliveryAuditPort

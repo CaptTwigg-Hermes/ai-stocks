@@ -251,7 +251,13 @@ public sealed class QueuedExecutionCoordinator(IQueuedExecutionPort port)
     public async Task ExecuteAllAsync(CancellationToken cancellationToken)
     {
         var orders = await port.LoadReadyAsync(cancellationToken).ConfigureAwait(false);
+        var failures = new List<Exception>();
         foreach (var order in orders.OrderBy(x => x.DecisionAt).ThenBy(x => x.OrderId, StringComparer.Ordinal))
-            await port.ExecuteAsync(order, cancellationToken).ConfigureAwait(false);
+        {
+            try { await port.ExecuteAsync(order, cancellationToken).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception exception) { failures.Add(new InvalidOperationException($"Queued order {order.OrderId} failed.", exception)); }
+        }
+        if (failures.Count != 0) throw new AggregateException("One or more queued orders failed closed.", failures);
     }
 }
