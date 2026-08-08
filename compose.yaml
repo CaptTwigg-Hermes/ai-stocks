@@ -48,7 +48,9 @@ services:
       target: collector
     environment:
       APP_ENV: production
+      COLLECTOR_DATABASE_URL: ${COLLECTOR_DATABASE_URL:?set the least-privilege collector PostgreSQL URL}
       ARCHIVE_PATH: /data/nasdaq
+      STATUS_PINNED_KEY_ID: ${STATUS_PINNED_KEY_ID:?set the reviewed status seed signer key ID}
       COLLECTOR_POLL_SECONDS: ${COLLECTOR_POLL_SECONDS:-15}
       TZ: Europe/Stockholm
     volumes:
@@ -56,7 +58,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/healthz"]
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/readyz"]
       interval: 30s
       timeout: 5s
       retries: 4

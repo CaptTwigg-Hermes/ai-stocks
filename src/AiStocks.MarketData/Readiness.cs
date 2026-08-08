@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace AiStocks.MarketData;
 
 public sealed record InstrumentSessionObservation(string Isin, string OrderBookId, DateOnly Session, decimal TradedValue,
-    int UsableTradeCount, string ManifestSha256, string? RawReport, string? RawSha256);
+    int UsableTradeCount, string ManifestSha256, string? RawReport, string? RawSha256, decimal? OfficialPatsPrice = null);
 
 public sealed class DurableObservationStore
 {
@@ -16,7 +16,7 @@ public sealed class DurableObservationStore
     public DurableObservationStore(string path, ImmutableArchive archive, SessionManifestStore manifests)
     { _path = Path.GetFullPath(path); _archive = archive; _manifests = manifests; }
 
-    public void Record(InstrumentSessionObservation observation)
+    private void Record(InstrumentSessionObservation observation)
     {
         if (observation.TradedValue < 0 || observation.UsableTradeCount < 0 || string.IsNullOrWhiteSpace(observation.Isin) || string.IsNullOrWhiteSpace(observation.OrderBookId))
             throw new MarketDataException("Observation aggregate is invalid");
@@ -40,6 +40,35 @@ public sealed class DurableObservationStore
         var values = LoadInternal().Where(x => (x.Isin, x.OrderBookId, x.Session) != (observation.Isin, observation.OrderBookId, observation.Session)).Append(observation)
             .OrderBy(x => x.Isin, StringComparer.Ordinal).ThenBy(x => x.OrderBookId, StringComparer.Ordinal).ThenBy(x => x.Session).ToArray();
         Persist(values);
+    }
+
+    public IReadOnlyList<InstrumentSessionObservation> DeriveSession(TradingSession session, IReadOnlyList<FirdsInstrument> instruments)
+    {
+        var manifest = _manifests.Verify(session);
+        var parsed = new List<(ArchivedReport Report, NasdaqTrade Trade)>();
+        foreach (var entry in manifest.Manifest.Reports)
+        {
+            var report = _archive.Verify(entry.Report);
+            if (report.Sha256 != entry.Sha256) throw new MarketDataException("Observation report is not manifest-bound");
+            parsed.AddRange(NasdaqCsvParser.Parse(File.ReadAllBytes(report.CsvPath), report.FetchedAt).Select(trade => (report, trade)));
+        }
+        var result = new List<InstrumentSessionObservation>();
+        foreach (var instrument in instruments)
+        {
+            var rows = parsed.Where(x => x.Trade.Isin == instrument.Isin && x.Trade.Venue == "XSTO" &&
+                x.Trade.Currency == "SEK" && x.Trade.PriceNotation == "MONE" && session.Contains(x.Trade.ExecutedAt)).ToArray();
+            var pats = rows.Where(x => x.Trade.Flags.Split(',', ' ', ';').Contains("PATS", StringComparer.Ordinal))
+                .Select(x => x.Trade.Price).Distinct().ToArray();
+            if (pats.Length > 1) throw new MarketDataException("Closing auction PATS price is ambiguous");
+            var first = rows.FirstOrDefault();
+            var observation = new InstrumentSessionObservation(instrument.Isin, instrument.OrderBookId, session.Day,
+                rows.Sum(x => x.Trade.Price * x.Trade.Quantity), rows.Length, manifest.Sha256,
+                rows.Length == 0 ? null : first.Report.Report, rows.Length == 0 ? null : first.Report.Sha256,
+                pats.Length == 1 ? pats[0] : null);
+            Record(observation);
+            result.Add(observation);
+        }
+        return result;
     }
 
     public IReadOnlyList<InstrumentSessionObservation> LoadVerified() => LoadInternal();
@@ -82,6 +111,8 @@ public sealed class MarketDataReadinessGate(DurableFirdsStore firds, NasdaqStatu
         try { values = observations.LoadVerified(); }
         catch (MarketDataException exception) { return new(false, [exception.Message]); }
         if (snapshot.Instruments.Count == 0) failures.Add("FIRDS eligible universe is empty");
+        var readinessAt = new DateTimeOffset(asOf.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
+        if (!statuses.IsFreshAt(readinessAt, TimeSpan.FromHours(48))) failures.Add("Signed status state is stale at readiness asOf");
         var expected = ExpectedSessions(asOf);
         var verifiedManifests = new Dictionary<DateOnly, VerifiedSessionManifest>();
         foreach (var day in expected)

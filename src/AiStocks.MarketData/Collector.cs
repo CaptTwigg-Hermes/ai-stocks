@@ -30,7 +30,6 @@ public sealed class NasdaqPostTradeClient(HttpClient http, ImmutableArchive arch
     public async Task<ArchivedReport> DownloadAsync(string report, DateTimeOffset fetchedAt, CancellationToken cancellationToken)
     {
         NasdaqReportName.Validate(report);
-        if (archive.TryVerify(report) is { } existing) return existing;
         var path = $"/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName={Uri.EscapeDataString(report)}";
         using var response = await http.GetAsync(path, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -41,7 +40,10 @@ public sealed class NasdaqPostTradeClient(HttpClient http, ImmutableArchive arch
     }
 }
 
-public sealed record CollectionResult(IReadOnlyList<string> Downloaded, string? FinalizedManifest, IReadOnlyList<string> Missing);
+public sealed record CollectionResult(IReadOnlyList<string> Downloaded, IReadOnlyList<string> FinalizedManifests, IReadOnlyList<string> Missing)
+{
+    public string? FinalizedManifest => FinalizedManifests.LastOrDefault();
+}
 
 public sealed class NasdaqCollector(NasdaqPostTradeClient client, ImmutableArchive archive, SessionManifestStore manifests)
 {
@@ -51,7 +53,7 @@ public sealed class NasdaqCollector(NasdaqPostTradeClient client, ImmutableArchi
         var listed = listing.ToHashSet(StringComparer.Ordinal);
         var downloaded = new List<string>();
         var missing = new List<string>();
-        string? finalized = null;
+        var finalized = new List<string>();
         var days = listing.Select(NasdaqReportName.ParseTimestamp).Select(x => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(x, StockholmCalendar.Zone).DateTime))
             .Append(DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, StockholmCalendar.Zone).DateTime)).Distinct().Order().ToArray();
         foreach (var day in days)
@@ -79,9 +81,8 @@ public sealed class NasdaqCollector(NasdaqPostTradeClient client, ImmutableArchi
             var expected = SessionManifest.ExpectedReports(session);
             var absent = expected.Where(x => !listed.Contains(x)).ToArray();
             if (absent.Length > 0) { missing.AddRange(absent); continue; }
-            if (now > session.Close.AddMinutes(20)) continue;
             var archived = expected.Select(archive.Verify).ToArray();
-            finalized = manifests.Save(session, archived, now);
+            finalized.Add(manifests.Save(session, archived, now));
         }
         return new(downloaded, finalized, missing.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray());
     }

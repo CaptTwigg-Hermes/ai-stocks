@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 
 namespace AiStocks.MarketData;
@@ -110,12 +109,19 @@ public sealed record VerifiedSessionManifest(string Path, string Sha256, Complet
 public sealed class SessionManifestStore(string archiveRoot)
 {
     private readonly string _directory = Path.Combine(Path.GetFullPath(archiveRoot), "sessions");
+    private readonly ImmutableArchive _archive = new(archiveRoot);
 
     public string Save(TradingSession session, IEnumerable<ArchivedReport> reports, DateTimeOffset finalizedAt)
     {
         var delay = finalizedAt - session.Close;
-        if (delay < TimeSpan.FromMinutes(15) || delay > TimeSpan.FromMinutes(20)) throw new MarketDataException("Session finalization is outside feed delay");
+        if (delay < TimeSpan.FromMinutes(15)) throw new MarketDataException("Session finalization precedes the feed delay");
         var rows = reports.OrderBy(x => x.Report, StringComparer.Ordinal).ToArray();
+        foreach (var row in rows)
+        {
+            var verified = _archive.Verify(row.Report);
+            if (verified.Sha256 != row.Sha256) throw new MarketDataException("Session report archive binding is invalid");
+            _ = NasdaqCsvParser.Parse(File.ReadAllBytes(verified.CsvPath), verified.FetchedAt);
+        }
         var map = rows.ToDictionary(x => x.Report, x => x.Sha256, StringComparer.Ordinal);
         SessionManifest.ValidateComplete(session, map);
         var manifest = new CompleteSessionManifest(1, true, $"XSTO-{session.Day:yyyy-MM-dd}", session.Open, session.Close, finalizedAt,
@@ -124,9 +130,9 @@ public sealed class SessionManifestStore(string archiveRoot)
         Directory.CreateDirectory(_directory);
         var path = Path.Combine(_directory, manifest.SessionId + ".json");
         var bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);
-        if (File.Exists(path)) { ValidateExisting(path, manifest, session, JsonOptions); return path; }
-        AtomicFile.Write(path + ".sha256", Encoding.UTF8.GetBytes(Convert.ToHexStringLower(SHA256.HashData(bytes)) + "\n"));
-        AtomicFile.Write(path, bytes);
+        if (File.Exists(path)) { ValidateExisting(manifest, session); return path; }
+        AtomicFile.Write(path, JsonSerializer.SerializeToUtf8Bytes(
+            new ManifestEnvelope(Convert.ToHexStringLower(SHA256.HashData(bytes)), manifest), JsonOptions));
         _ = Verify(session);
         return path;
     }
@@ -138,14 +144,24 @@ public sealed class SessionManifestStore(string archiveRoot)
         var path = PathFor(session);
         try
         {
-            var bytes = File.ReadAllBytes(path);
-            var expected = File.ReadAllText(path + ".sha256").Trim();
+            var envelopeBytes = File.ReadAllBytes(path);
+            var envelope = JsonSerializer.Deserialize<ManifestEnvelope>(envelopeBytes, JsonOptions) ?? throw new JsonException();
+            if (!envelopeBytes.AsSpan().SequenceEqual(JsonSerializer.SerializeToUtf8Bytes(envelope, JsonOptions)))
+                throw new MarketDataException("Session manifest envelope is not canonical");
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(envelope.Manifest, JsonOptions);
+            var expected = envelope.Sha256;
             var actual = Convert.ToHexStringLower(SHA256.HashData(bytes));
             if (expected.Length != 64 || !expected.All(Uri.IsHexDigit) || !CryptographicOperations.FixedTimeEquals(Convert.FromHexString(expected), Convert.FromHexString(actual)))
                 throw new MarketDataException("Session manifest checksum mismatch");
-            var manifest = JsonSerializer.Deserialize<CompleteSessionManifest>(bytes, JsonOptions) ?? throw new JsonException();
+            var manifest = envelope.Manifest;
             ValidateManifestIdentity(manifest, session);
             SessionManifest.ValidateComplete(session, manifest.Reports.ToDictionary(x => x.Report, x => x.Sha256, StringComparer.Ordinal));
+            foreach (var report in manifest.Reports)
+            {
+                var archived = _archive.Verify(report.Report);
+                if (archived.Sha256 != report.Sha256) throw new MarketDataException("Session manifest archive provenance mismatch");
+                _ = NasdaqCsvParser.Parse(File.ReadAllBytes(archived.CsvPath), archived.FetchedAt);
+            }
             return new(path, actual, manifest);
         }
         catch (MarketDataException) { throw; }
@@ -153,20 +169,16 @@ public sealed class SessionManifestStore(string archiveRoot)
         { throw new MarketDataException("Session manifest is missing or malformed", exception); }
     }
 
-    private static void ValidateExisting(string path, CompleteSessionManifest candidate, TradingSession session, JsonSerializerOptions options)
+    private void ValidateExisting(CompleteSessionManifest candidate, TradingSession session)
     {
-        CompleteSessionManifest existing;
-        try { existing = JsonSerializer.Deserialize<CompleteSessionManifest>(File.ReadAllBytes(path), options) ?? throw new JsonException(); }
-        catch (Exception exception) when (exception is IOException or JsonException)
-        { throw new MarketDataException("Existing session manifest is malformed", exception); }
+        var existing = Verify(session).Manifest;
         var delay = existing.FinalizedAt - session.Close;
-        if (delay < TimeSpan.FromMinutes(15) || delay > TimeSpan.FromMinutes(20) ||
+        if (delay < TimeSpan.FromMinutes(15) ||
             existing.SchemaVersion != candidate.SchemaVersion || existing.Complete != candidate.Complete ||
             existing.SessionId != candidate.SessionId || existing.SessionOpen != candidate.SessionOpen || existing.SessionClose != candidate.SessionClose ||
             existing.SourceListingUrl != candidate.SourceListingUrl || !existing.Reports.SequenceEqual(candidate.Reports))
             throw new MarketDataException("Conflicting immutable session manifest");
-        var checksumPath = path + ".sha256";
-        if (!File.Exists(checksumPath)) throw new MarketDataException("Existing session manifest checksum is missing");
+
     }
 
     private string PathFor(TradingSession session) => Path.Combine(_directory, $"XSTO-{session.Day:yyyy-MM-dd}.json");
@@ -174,9 +186,10 @@ public sealed class SessionManifestStore(string archiveRoot)
     {
         var delay = manifest.FinalizedAt - session.Close;
         if (!manifest.Complete || manifest.SchemaVersion != 1 || manifest.SessionId != $"XSTO-{session.Day:yyyy-MM-dd}" ||
-            manifest.SessionOpen != session.Open || manifest.SessionClose != session.Close || delay < TimeSpan.FromMinutes(15) || delay > TimeSpan.FromMinutes(20) ||
+            manifest.SessionOpen != session.Open || manifest.SessionClose != session.Close || delay < TimeSpan.FromMinutes(15) ||
             manifest.SourceListingUrl != "https://tradereports.nasdaq.com/api/regulatory/trade-reports?type=POST_TRADE&assetClass=EQUITY")
             throw new MarketDataException("Session manifest identity is invalid");
     }
+    private sealed record ManifestEnvelope(string Sha256, CompleteSessionManifest Manifest);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 }

@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\AiStocks.Operations\AiStocks.Operations.csproj" />
     <ProjectReference Include="..\..\src\AiStocks.Web\AiStocks.Web.csproj" />
     <ProjectReference Include="..\..\src\AiStocks.Worker\AiStocks.Worker.csproj" />
+    <ProjectReference Include="..\..\src\AiStocks.Collector\AiStocks.Collector.csproj" />
   </ItemGroup>
 
 </Project>

@@ -134,6 +134,13 @@
           "xunit.extensibility.core": "[2.9.3]"
         }
       },
+      "aistocks.collector": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.MarketData": "[1.0.0, )",
+          "Npgsql": "[10.0.0, )"
+        }
+      },
       "aistocks.core": {
         "type": "Project"
       },

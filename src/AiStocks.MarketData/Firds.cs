@@ -7,7 +7,7 @@ namespace AiStocks.MarketData;
 
 public sealed record FirdsInstrument(string Isin, string OrderBookId, string IssuerId, string Name, string Cfi,
     string Currency, string Venue, DateOnly? FirstTradeDate, DateOnly? TerminationDate);
-public sealed record FirdsSourceVersion(string Version, long Cursor, Uri SourceUrl, string Sha256, DateTimeOffset AppliedAt, bool IsFull);
+public sealed record FirdsSourceVersion(string Version, long Cursor, Uri SourceUrl, string Sha256, DateTimeOffset AppliedAt, bool IsFull, string RawPath);
 public sealed record FirdsSnapshot(long Cursor, IReadOnlyList<FirdsInstrument> Instruments, IReadOnlyList<FirdsSourceVersion> Versions);
 
 public sealed class FirdsUniverseParser
@@ -84,7 +84,11 @@ public sealed class DurableFirdsStore
     {
         var bytes = ReadAndVerify(xml, sourceUrl, sha256, version, cursor);
         var instruments = _parser.ParseFull(new MemoryStream(bytes), effectiveAt);
-        Persist(new(cursor, instruments, [new(version, cursor, sourceUrl, sha256, DateTimeOffset.UtcNow, true)]));
+        var current = File.Exists(_path) ? LoadVerified() : null;
+        if (current is not null && (cursor <= current.Cursor || current.Versions.Any(x => x.Version == version)))
+            throw new MarketDataException("FIRDS full cursor/version is not monotonic");
+        var versionRow = new FirdsSourceVersion(version, cursor, sourceUrl, sha256, DateTimeOffset.UtcNow, true, ArchiveRaw(bytes, sha256));
+        Persist(new(cursor, instruments, current is null ? [versionRow] : current.Versions.Append(versionRow).ToArray()));
     }
 
     public void ApplyDelta(Stream xml, DateOnly effectiveAt, Uri sourceUrl, string sha256, string version, long cursor)
@@ -93,7 +97,7 @@ public sealed class DurableFirdsStore
         if (cursor != current.Cursor + 1 || current.Versions.Any(x => x.Version == version)) throw new MarketDataException("FIRDS delta cursor/version replay or gap");
         var bytes = ReadAndVerify(xml, sourceUrl, sha256, version, cursor);
         var instruments = _parser.ApplyDelta(current.Instruments, new MemoryStream(bytes), effectiveAt);
-        Persist(new(cursor, instruments, current.Versions.Append(new(version, cursor, sourceUrl, sha256, DateTimeOffset.UtcNow, false)).ToArray()));
+        Persist(new(cursor, instruments, current.Versions.Append(new(version, cursor, sourceUrl, sha256, DateTimeOffset.UtcNow, false, ArchiveRaw(bytes, sha256))).ToArray()));
     }
 
     public FirdsSnapshot LoadVerified()
@@ -105,6 +109,9 @@ public sealed class DurableFirdsStore
             var actual = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(envelope.State, JsonOptions)));
             if (actual != envelope.Sha256 || envelope.State.Cursor <= 0 || envelope.State.Versions.Count == 0 ||
                 envelope.State.Versions[^1].Cursor != envelope.State.Cursor) throw new MarketDataException("Durable FIRDS state checksum/cursor is invalid");
+            foreach (var version in envelope.State.Versions)
+                if (Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(version.RawPath))) != version.Sha256)
+                    throw new MarketDataException("Durable FIRDS raw version checksum is invalid");
             return envelope.State;
         }
         catch (MarketDataException) { throw; }
@@ -126,6 +133,18 @@ public sealed class DurableFirdsStore
     {
         var checksum = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(state, JsonOptions)));
         AtomicFile.Write(_path, JsonSerializer.SerializeToUtf8Bytes(new Envelope(checksum, state), JsonOptions));
+    }
+    private string ArchiveRaw(byte[] bytes, string sha256)
+    {
+        var path = Path.Combine(_path + ".raw", sha256 + ".xml");
+        if (File.Exists(path))
+        {
+            if (Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path))) != sha256)
+                throw new MarketDataException("Conflicting FIRDS raw archive");
+            return path;
+        }
+        AtomicFile.Write(path, bytes);
+        return path;
     }
     private sealed record Envelope(string Sha256, FirdsSnapshot State);
 }

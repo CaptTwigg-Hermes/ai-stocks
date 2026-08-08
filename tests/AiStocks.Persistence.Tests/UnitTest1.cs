@@ -76,7 +76,7 @@ public sealed class PersistenceContractTests
     [Fact]
     public void MigrationChecksumIsStableAndSha256()
     {
-        Assert.Equal(3, MigrationCatalog.All.Count);
+        Assert.Equal(4, MigrationCatalog.All.Count);
         foreach (var migration in MigrationCatalog.All)
         {
             Assert.Matches("^[0-9a-f]{64}$", migration.Sha256);
@@ -93,5 +93,19 @@ public sealed class PersistenceContractTests
         Assert.Contains("requested_model_id = actual_model_id", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("reject_audit_mutation", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("persist_research_attestation", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MarketRuntimeMigrationUsesDistinctLeastPrivilegeCollectorAuthority()
+    {
+        var sql = MigrationCatalog.All.Single(migration => migration.Id == "004_market_runtime").Sql;
+        Assert.Contains("ai_stocks_collector", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("market_session_manifests", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("market_manifest_reports", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("market_instrument_versions", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("market_status_events", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("collector_runtime_state", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("REVOKE INSERT ON instruments,trading_sessions,instrument_session_stats,raw_market_reports,market_observations FROM ai_stocks_runtime", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("GRANT UPDATE ON market_session_manifests", sql, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -1,4 +1,8 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
+using AiStocks.Collector;
+using AiStocks.MarketData;
 using AiStocks.Persistence;
 using Npgsql;
 
@@ -329,6 +333,52 @@ public sealed class PostgresIntegrationTests
         {
             await ResetDatabase(dataSource);
         }
+    }
+
+    [Fact]
+    public async Task RealPostgresCollectorPersistsStrictManifestBoundAuthorityAndFailsReadinessClosed()
+    {
+        if (ConnectionString is not { } connectionString) return;
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ResetDatabase(dataSource);
+        await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
+        var root = Path.Combine(Path.GetTempPath(), $"aistocks-collector-pg-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var fixtures = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../tests/AiStocks.MarketData.Tests/Fixtures"));
+            var archive = new ImmutableArchive(root);
+            var manifests = new SessionManifestStore(root);
+            var firdsPath = Path.Combine(root, "firds.json");
+            var firds = new DurableFirdsStore(firdsPath);
+            var full = await File.ReadAllBytesAsync(Path.Combine(fixtures, "firds-full.xml"));
+            firds.ApplyFull(new MemoryStream(full), new DateOnly(2026, 8, 6), new Uri("https://registers.esma.europa.eu/firds/full.xml"),
+                Convert.ToHexStringLower(SHA256.HashData(full)), "full-20260806", 1);
+            using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            var payload = "{\"asOf\":\"2026-08-06T07:00:00Z\",\"states\":{\"SE0000108656\":\"Clear\"}}";
+            var payloadPath = Path.Combine(root, "seed.json"); var signaturePath = Path.Combine(root, "seed.sig");
+            await File.WriteAllTextAsync(payloadPath, payload);
+            await File.WriteAllBytesAsync(signaturePath, key.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256));
+            var statuses = new PinnedStatusSeedVerifier("test-key", key.ExportSubjectPublicKeyInfo())
+                .Load(payload, await File.ReadAllBytesAsync(signaturePath), Path.Combine(root, "status.json"));
+            var session = StockholmCalendar.GetSession(new DateOnly(2026, 8, 6))!;
+            var csv = await File.ReadAllBytesAsync(Path.Combine(fixtures, "nasdaq-posttrade.csv"));
+            var reports = SessionManifest.ExpectedReports(session).Select(name => archive.Archive(name, csv,
+                new Uri($"https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName={name}"), session.Close.AddMinutes(15))).ToArray();
+            var manifestPath = manifests.Save(session, reports, session.Close.AddHours(1));
+            var persistence = new PostgresCollectorPersistence(connectionString, archive, manifests, firds, statuses, payloadPath, signaturePath);
+            await persistence.PollStartedAsync(session.Close.AddHours(1), CancellationToken.None);
+            await persistence.PersistAsync(new CollectionResult([], [manifestPath], []), session.Close.AddHours(1), CancellationToken.None);
+            await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
+            Assert.Equal(511L, await ScalarLong(connection, "SELECT count(*) FROM raw_market_reports"));
+            Assert.Equal(1L, await ScalarLong(connection, "SELECT count(*) FROM market_session_manifests"));
+            Assert.True(await ScalarLong(connection, "SELECT count(*) FROM market_strict_trade_rows") > 0);
+            Assert.Equal(1L, await ScalarLong(connection, "SELECT count(*) FROM instrument_session_stats WHERE complete"));
+            var readiness = await new PostgresCollectorReadiness(connectionString).EvaluateAsync(session.Close.AddHours(1), CancellationToken.None);
+            Assert.False(readiness.Ready);
+            Assert.Contains(readiness.Failures, failure => failure.Contains("20 complete", StringComparison.Ordinal));
+        }
+        finally { Directory.Delete(root, true); }
     }
 
     private static async Task ResetDatabase(NpgsqlDataSource source)

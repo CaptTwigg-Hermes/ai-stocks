@@ -62,6 +62,9 @@ public sealed partial class NasdaqStatusMachine
     public string SignerKeySha256 { get; }
     public InstrumentTradingState StateOf(string isin) => _states.GetValueOrDefault(isin, InstrumentTradingState.Unknown);
     public bool IsEligible(string isin) => StateOf(isin) == InstrumentTradingState.Clear;
+    public DateTimeOffset LatestPublishedAt => _latestPublishedAt;
+    public bool IsFreshAt(DateTimeOffset asOf, TimeSpan maximumAge) =>
+        asOf >= _latestPublishedAt && asOf - _latestPublishedAt <= maximumAge;
 
     internal static NasdaqStatusMachine LoadVerifiedSeed(string payload, string keyId, string keySha256, string durableStatePath)
     {
