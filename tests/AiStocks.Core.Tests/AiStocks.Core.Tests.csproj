@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AiStocks.Core\AiStocks.Core.csproj" />
+    <ProjectReference Include="..\..\src\AiStocks.Worker\AiStocks.Worker.csproj" />
+    <ProjectReference Include="..\..\src\AiStocks.Operations\AiStocks.Operations.csproj" />
   </ItemGroup>
 
 </Project>
