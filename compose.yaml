@@ -102,7 +102,7 @@ services:
     environment:
       APP_ENV: production
       MIGRATOR_DATABASE_URL: ${MIGRATOR_DATABASE_URL:?set the privileged migrator PostgreSQL URL}
-      RUNTIME_DATABASE_URL: ${DATABASE_URL:?set the restricted runtime PostgreSQL URL}
+      DATABASE_URL: ${DATABASE_URL:?set the restricted runtime PostgreSQL URL}
       ACCESS_TEAM_DOMAIN: ${ACCESS_TEAM_DOMAIN:?set the exact Cloudflare Access team domain}
       ACCESS_AUD: ${ACCESS_AUD:?set the exact Access application AUD}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set the exact public HTTPS origin}

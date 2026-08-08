@@ -1,0 +1,136 @@
+using AiStocks.Core;
+using AiStocks.Operations;
+using AiStocks.Persistence;
+using AiStocks.Web;
+using AiStocks.Worker;
+using AiStocks.Worker.Orchestration;
+using Npgsql;
+
+namespace AiStocks.Persistence.Tests;
+
+public sealed class RuntimeIntegrationTests
+{
+    [Fact]
+    public void StrictDatabaseConfigurationRejectsMissingAndMalformedValuesWithoutEchoingSecrets()
+    {
+        Assert.Throws<RuntimeConfigurationException>(() =>
+            PostgresConfiguration.Require(new Dictionary<string, string?>(), "DATABASE_URL"));
+        var exception = Assert.Throws<RuntimeConfigurationException>(() =>
+            PostgresConfiguration.Require(new Dictionary<string, string?> { ["DATABASE_URL"] = "secret-value" }, "DATABASE_URL"));
+        Assert.DoesNotContain("secret-value", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OperationsCommandsExecuteDistinctPortsAndReturnSafeErrors()
+    {
+        var ports = new RecordingOperationsPorts();
+        Assert.Equal(0, await OperationsApplication.RunAsync(["migrate"], ports, TextWriter.Null, default));
+        Assert.Equal(0, await OperationsApplication.RunAsync(["bootstrap"], ports, TextWriter.Null, default));
+        Assert.Equal(0, await OperationsApplication.RunAsync(["preflight"], ports, TextWriter.Null, default));
+        Assert.Equal(["migrate", "bootstrap", "preflight"], ports.Calls);
+        var output = new StringWriter();
+        Assert.Equal(2, await OperationsApplication.RunAsync(["unknown"], ports, output, default));
+        Assert.DoesNotContain("secret", output.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task DisposablePostgresExercisesRunDeliveryDashboardAndOwnerControlTransactions()
+    {
+        var configured = Environment.GetEnvironmentVariable("AISTOCKS_TEST_DATABASE_URL");
+        if (string.IsNullOrWhiteSpace(configured)) return;
+        await using var database = await DisposableDatabase.CreateAsync(configured);
+        await using var source = NpgsqlDataSource.Create(database.ConnectionString);
+        await new PostgresMigrationRunner(source).ApplyAsync();
+
+        var operations = new PostgresOperationsPorts(source, source);
+        await operations.BootstrapAsync(default);
+        var health = await operations.PreflightAsync(default);
+        Assert.False(health.Ready); // no twenty-session market-data warm-up in a fresh database
+
+        var session = new TradingSession(new(2026, 8, 10), new DateTimeOffset(2026, 8, 10, 7, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 8, 10, 15, 30, 0, TimeSpan.Zero));
+        var worker = new PostgresWorkerState(source);
+        Assert.Equal(24, await worker.EnsureAtomicallyAsync(RunSchedule.Create(session), default));
+        var claimed = Assert.IsType<ClaimedRun>(await worker.ClaimNextAsync(session.OpenAt.AddHours(-1), default));
+        await worker.CompleteAsync(new RunCompletion(claimed.Run, claimed.ClaimToken, RunAttemptOutcome.Succeeded,
+            session.OpenAt.AddHours(-1).AddMinutes(1), null, null, AgentRunResult.Success("{\"action\":\"hold\"}")), default);
+
+        var delivery = new PostgresDeliveryAuditPort(source);
+        Assert.Equal(ReservationState.Acquired, (await delivery.ReserveAsync("daily:2026-08-10", new string('a', 64), default)).State);
+        await delivery.RecordAsync(new DeliveryAudit("daily:2026-08-10", new string('a', 64), DeliveryStatus.Succeeded,
+            "receipt", null, DateTimeOffset.UtcNow), default);
+        Assert.Equal(ReservationState.AlreadyCompleted, (await delivery.ReserveAsync("daily:2026-08-10", new string('a', 64), default)).State);
+
+        var dashboard = new PostgresDashboardFacade(source, TimeProvider.System);
+        var draft = await dashboard.QueryAsync(default);
+        Assert.Equal("draft", draft.Status);
+        var started = await dashboard.ControlAsync(new(ContestControlAction.Start, "owner@example.com", "start-1"), default);
+        Assert.False(started.Paused);
+        await using (var setup = await source.OpenConnectionAsync())
+        await using (var instrument = new NpgsqlCommand("""
+            INSERT INTO instruments(id,isin,order_book_id,mic,symbol,cfi,active_from,source_json,source_hash)
+            VALUES(gen_random_uuid(),'SE0000000001','book-runtime','XSTO','RUNTIME','ESVUFR','2026-01-01',
+                   '{"source":"runtime-test"}',canonical_jsonb_sha256('{"source":"runtime-test"}'))
+            """, setup))
+            await instrument.ExecuteNonQueryAsync();
+        var decision = $$"""
+            {"decisionId":"runtime-buy","agentId":"{{claimed.Run.AgentId:D}}","modelId":"{{claimed.Run.ModelId}}",
+             "action":"buy","instrument":{"isin":"SE0000000001","orderBookId":"book-runtime","mic":"XSTO"},
+             "quantity":1,"decisionAt":"{{claimed.Run.ScheduledAt:O}}","observedPrice":100,"reason":"verified test decision",
+             "catalyst":"public catalyst","risks":["loss"],"confidence":0.5,
+             "evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-09T10:00:00+00:00","exactExcerpt":"news"}],
+             "canonicalRequestSha256":"{{new string('a', 64)}}"}
+            """;
+        Assert.True(await worker.TryAcceptWhileRunningAsync(claimed.Run, AgentRunResult.Success(decision), default));
+        var paused = await dashboard.ControlAsync(new(ContestControlAction.Pause, "owner@example.com", "pause-1"), default);
+        Assert.True(paused.Paused);
+
+        await using var connection = await source.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand("SELECT (SELECT count(*) FROM scheduled_agent_runs WHERE status='SUCCEEDED'), (SELECT count(*) FROM agent_runs), (SELECT count(*) FROM delivery_audits WHERE status='SUCCEEDED'), (SELECT count(*) FROM orders)", connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(1, reader.GetInt64(0));
+        Assert.Equal(1, reader.GetInt64(1));
+        Assert.Equal(1, reader.GetInt64(2));
+        Assert.Equal(1, reader.GetInt64(3));
+    }
+
+    private sealed class RecordingOperationsPorts : IOperationsPorts
+    {
+        public List<string> Calls { get; } = [];
+        public Task MigrateAsync(CancellationToken cancellationToken) { Calls.Add("migrate"); return Task.CompletedTask; }
+        public Task BootstrapAsync(CancellationToken cancellationToken) { Calls.Add("bootstrap"); return Task.CompletedTask; }
+        public Task<ReadinessResult> PreflightAsync(CancellationToken cancellationToken) { Calls.Add("preflight"); return Task.FromResult(new ReadinessResult(true, [])); }
+    }
+
+    private sealed class DisposableDatabase : IAsyncDisposable
+    {
+        private readonly string adminConnectionString;
+        private readonly string name;
+        private DisposableDatabase(string adminConnectionString, string name, string connectionString) =>
+            (this.adminConnectionString, this.name, ConnectionString) = (adminConnectionString, name, connectionString);
+        public string ConnectionString { get; }
+
+        public static async Task<DisposableDatabase> CreateAsync(string configured)
+        {
+            var configuredBuilder = new NpgsqlConnectionStringBuilder(configured);
+            if (!(configuredBuilder.Database ?? "").Contains("test", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("AISTOCKS_TEST_DATABASE_URL database name must contain test.");
+            var admin = new NpgsqlConnectionStringBuilder(configuredBuilder.ConnectionString) { Database = "postgres" };
+            var name = $"ai_stocks_runtime_test_{Guid.NewGuid():N}";
+            await using var connection = new NpgsqlConnection(admin.ConnectionString);
+            await connection.OpenAsync();
+            await using var create = new NpgsqlCommand($"CREATE DATABASE \"{name}\" TEMPLATE template0", connection);
+            await create.ExecuteNonQueryAsync();
+            var target = new NpgsqlConnectionStringBuilder(admin.ConnectionString) { Database = name, IncludeErrorDetail = true };
+            return new DisposableDatabase(admin.ConnectionString, name, target.ConnectionString);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await using var connection = new NpgsqlConnection(adminConnectionString);
+            await connection.OpenAsync();
+            await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{name}\" WITH (FORCE)", connection);
+            await drop.ExecuteNonQueryAsync();
+        }
+    }
+}

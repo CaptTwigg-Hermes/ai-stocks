@@ -1,18 +1,37 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using AiStocks.Persistence;
 using AiStocks.Web;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.Configure<AccessOptions>(builder.Configuration.GetSection(AccessOptions.Section));
+if (builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.Configure<AccessOptions>(builder.Configuration.GetSection(AccessOptions.Section));
+    builder.Services.AddSingleton<IDashboardFacade, FailClosedDashboardFacade>();
+}
+else
+{
+    builder.Services.Configure<AccessOptions>(options =>
+    {
+        options.TeamDomain = Required("ACCESS_TEAM_DOMAIN");
+        options.Audience = Required("ACCESS_AUD");
+        options.PublicOrigin = Required("PUBLIC_ORIGIN");
+        options.OwnerEmails = Emails("ACCESS_OWNER_EMAILS");
+        options.ViewerEmails = Emails("ACCESS_VIEWER_EMAILS");
+    });
+    var dataSource = NpgsqlDataSource.Create(PostgresConfiguration.Require(PostgresConfiguration.Environment(), "DATABASE_URL"));
+    builder.Services.AddSingleton(dataSource);
+    builder.Services.AddSingleton<IDashboardFacade, PostgresDashboardFacade>();
+}
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient<IJwksFetcher, BoundedJwksFetcher>(client => client.Timeout = TimeSpan.FromSeconds(5))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, AutomaticDecompression = System.Net.DecompressionMethods.None });
 builder.Services.AddSingleton<IAccessAssertionValidator, CloudflareAccessValidator>();
-builder.Services.AddSingleton<IDashboardFacade, FailClosedDashboardFacade>();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = CloudflareAccessHandler.SchemeName;
@@ -53,7 +72,18 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 
-app.MapGet("/healthz", () => Results.Ok(new { ok = true }));
+app.MapGet("/healthz", async (IDashboardFacade facade, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        _ = await facade.QueryAsync(cancellationToken);
+        return Results.Ok(new { status = "ready" });
+    }
+    catch (DashboardUnavailableException)
+    {
+        return Results.Json(new { status = "not-ready" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
 
 app.MapGet("/", async (HttpContext context, IDashboardFacade facade, IAntiforgery antiforgery, CancellationToken cancellationToken) =>
 {
@@ -90,6 +120,15 @@ static Delegate Query(Func<DashboardSnapshot, object> select) => async (IDashboa
     try { return Results.Ok(select(await facade.QueryAsync(cancellationToken))); }
     catch (DashboardUnavailableException) { return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Dashboard unavailable"); }
 };
+
+string Required(string name)
+{
+    var value = builder.Configuration[name];
+    if (string.IsNullOrWhiteSpace(value)) throw new InvalidOperationException($"{name} is required.");
+    return value;
+}
+
+string[] Emails(string name) => Required(name).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
 static void MapControl(RouteGroupBuilder group, string pattern, ContestControlAction action)
 {

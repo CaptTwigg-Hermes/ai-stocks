@@ -23,14 +23,15 @@ public sealed class PostgresIntegrationTests
     public async Task RealPostgresEnforcesMigrationReplayAuditAndIdempotency()
     {
         if (ConnectionString is not { } connectionString) return;
-        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await using var database = await DisposableDatabase.CreateAsync(connectionString);
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
 
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
         Assert.Equal(4L, await ScalarLong(connection, "SELECT count(*) FROM agents"));
         Assert.Equal(120000m, await ScalarDecimal(connection, "SELECT sum(cash) FROM account_balances"));
-        Assert.Equal(1L, await ScalarLong(connection, "SELECT count(*) FROM schema_migrations WHERE length(sha256)=64"));
+        Assert.Equal(MigrationCatalog.All.Count, await ScalarLong(connection, "SELECT count(*) FROM schema_migrations WHERE length(sha256)=64"));
 
         var immutable = await Assert.ThrowsAsync<PostgresException>(() => Execute(connection,
             "UPDATE ledger_events SET occurred_at=clock_timestamp() WHERE event_type='INITIAL_FUNDING'"));
@@ -76,7 +77,8 @@ public sealed class PostgresIntegrationTests
     public async Task RealPostgresSerializesConcurrentOverspendAndOversell()
     {
         if (ConnectionString is not { } connectionString) return;
-        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await using var database = await DisposableDatabase.CreateAsync(connectionString);
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
         var instrument = Guid.NewGuid();
         await using (var setup = await dataSource.OpenConnectionAsync(CancellationToken.None))
@@ -166,5 +168,35 @@ public sealed class PostgresIntegrationTests
         await using var command = new NpgsqlCommand(sql, connection);
         for (var i = 0; i < values.Length; i++) command.Parameters.AddWithValue(values[i]);
         return await command.ExecuteScalarAsync(CancellationToken.None);
+    }
+
+    private sealed class DisposableDatabase : IAsyncDisposable
+    {
+        private readonly string adminConnectionString;
+        private readonly string name;
+        private DisposableDatabase(string adminConnectionString, string name, string connectionString) =>
+            (this.adminConnectionString, this.name, ConnectionString) = (adminConnectionString, name, connectionString);
+        public string ConnectionString { get; }
+
+        public static async Task<DisposableDatabase> CreateAsync(string configured)
+        {
+            var configuredBuilder = new NpgsqlConnectionStringBuilder(configured);
+            var admin = new NpgsqlConnectionStringBuilder(configuredBuilder.ConnectionString) { Database = "postgres" };
+            var name = $"ai_stocks_persistence_test_{Guid.NewGuid():N}";
+            await using var connection = new NpgsqlConnection(admin.ConnectionString);
+            await connection.OpenAsync();
+            await using var create = new NpgsqlCommand($"CREATE DATABASE \"{name}\" TEMPLATE template0", connection);
+            await create.ExecuteNonQueryAsync();
+            var target = new NpgsqlConnectionStringBuilder(admin.ConnectionString) { Database = name };
+            return new DisposableDatabase(admin.ConnectionString, name, target.ConnectionString);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await using var connection = new NpgsqlConnection(adminConnectionString);
+            await connection.OpenAsync();
+            await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{name}\" WITH (FORCE)", connection);
+            await drop.ExecuteNonQueryAsync();
+        }
     }
 }

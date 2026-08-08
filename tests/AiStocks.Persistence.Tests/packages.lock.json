@@ -130,6 +130,13 @@
           "AiStocks.Core": "[1.0.0, )"
         }
       },
+      "aistocks.operations": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )",
+          "AiStocks.Persistence": "[1.0.0, )"
+        }
+      },
       "aistocks.persistence": {
         "type": "Project",
         "dependencies": {
@@ -150,6 +157,23 @@
         "type": "Project",
         "dependencies": {
           "AiStocks.Core": "[1.0.0, )"
+        }
+      },
+      "aistocks.web": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )",
+          "AiStocks.Persistence": "[1.0.0, )"
+        }
+      },
+      "aistocks.worker": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )",
+          "AiStocks.MarketData": "[1.0.0, )",
+          "AiStocks.Persistence": "[1.0.0, )",
+          "AiStocks.Research": "[1.0.0, )",
+          "AiStocks.Trading": "[1.0.0, )"
         }
       }
     }

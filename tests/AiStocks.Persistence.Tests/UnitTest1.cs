@@ -5,7 +5,7 @@ namespace AiStocks.Persistence.Tests;
 
 public sealed class PersistenceContractTests
 {
-    private static readonly string Sql = MigrationCatalog.All.Single().Sql;
+    private static readonly string Sql = string.Join('\n', MigrationCatalog.All.Select(migration => migration.Sql));
 
     [Fact]
     public void InitialMigrationDefinesRolesAndCompletePersistenceSurface()
@@ -72,8 +72,11 @@ public sealed class PersistenceContractTests
     [Fact]
     public void MigrationChecksumIsStableAndSha256()
     {
-        var migration = MigrationCatalog.All.Single();
-        Assert.Matches("^[0-9a-f]{64}$", migration.Sha256);
-        Assert.Equal(migration.Sha256, MigrationCatalog.ComputeSha256(migration.Sql));
+        Assert.Equal(2, MigrationCatalog.All.Count);
+        foreach (var migration in MigrationCatalog.All)
+        {
+            Assert.Matches("^[0-9a-f]{64}$", migration.Sha256);
+            Assert.Equal(migration.Sha256, MigrationCatalog.ComputeSha256(migration.Sql));
+        }
     }
 }
