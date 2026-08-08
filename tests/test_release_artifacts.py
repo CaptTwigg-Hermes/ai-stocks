@@ -24,8 +24,10 @@ def test_dockge_compose_separates_and_hardens_services():
     assert services["collector"]["volumes"] == [
         "${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq",
         "${MARKET_BOOTSTRAP_DIR:?set the reviewed signed seed and FIRDS plan directory}:/run/market-bootstrap:ro",
+        "${CORPORATE_ACTION_INPUT_DIR:?set the reviewed corporate-action input directory}:/run/corporate-actions:ro",
     ]
     collector_environment = services["collector"]["environment"]
+    assert collector_environment["CORPORATE_ACTION_INPUT_PATH"] == "/run/corporate-actions"
     assert collector_environment["FIRDS_ACQUISITION_PLAN_PATH"] == "/run/market-bootstrap/firds-plan.json"
     assert collector_environment["STATUS_SEED_PAYLOAD_PATH"] == "/run/market-bootstrap/status-seed.json"
     assert collector_environment["STATUS_SEED_SIGNATURE_PATH"] == "/run/market-bootstrap/status-seed.sig"
