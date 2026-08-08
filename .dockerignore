@@ -1,10 +1,12 @@
 .git
 .venv
 .pytest_cache
+**/bin
+**/obj
+TestResults
 __pycache__
 *.py[cod]
 .env
 backups
 secrets
-.gitignore
-README.md
+graphify-out

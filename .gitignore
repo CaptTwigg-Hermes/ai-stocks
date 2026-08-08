@@ -9,3 +9,6 @@ __pycache__/
 htmlcov/
 *.db
 graphify-out/cache/
+**/bin/
+**/obj/
+TestResults/

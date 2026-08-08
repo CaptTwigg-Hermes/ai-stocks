@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "aistocks.core": {
+        "type": "Project"
+      },
+      "aistocks.marketdata": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )"
+        }
+      },
+      "aistocks.persistence": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )",
+          "AiStocks.MarketData": "[1.0.0, )",
+          "AiStocks.Research": "[1.0.0, )",
+          "AiStocks.Trading": "[1.0.0, )"
+        }
+      },
+      "aistocks.research": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )"
+        }
+      },
+      "aistocks.trading": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )"
+        }
+      }
+    }
+  }
+}
