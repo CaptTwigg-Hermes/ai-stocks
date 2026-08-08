@@ -43,6 +43,7 @@ public sealed class PinnedStatusSeedVerifier
 public sealed partial class NasdaqStatusMachine
 {
     private readonly Dictionary<string, InstrumentTradingState> _states;
+    private readonly Dictionary<string, InstrumentTradingState> _seedStates;
     private readonly HashSet<string> _eventIds;
     private readonly List<NasdaqStatusEvent> _events;
     private readonly string _durableStatePath;
@@ -50,10 +51,11 @@ public sealed partial class NasdaqStatusMachine
     private DateTimeOffset _latestPublishedAt;
 
     private NasdaqStatusMachine(Dictionary<string, InstrumentTradingState> states, DateTimeOffset seedAsOf,
-        string signerKeyId, string signerKeySha256, string durableStatePath, IEnumerable<NasdaqStatusEvent>? events = null,
-        IEnumerable<NasdaqRssArtifact>? rssArtifacts = null)
+        string signerKeyId, string signerKeySha256, string durableStatePath, Dictionary<string, InstrumentTradingState> seedStates,
+        IEnumerable<NasdaqStatusEvent>? events = null, IEnumerable<NasdaqRssArtifact>? rssArtifacts = null)
     {
-        _states = states; SeedAsOf = seedAsOf; SignerKeyId = signerKeyId; SignerKeySha256 = signerKeySha256;
+        _states = states; _seedStates = seedStates.ToDictionary(); SeedAsOf = seedAsOf;
+        SignerKeyId = signerKeyId; SignerKeySha256 = signerKeySha256;
         _durableStatePath = Path.GetFullPath(durableStatePath);
         _events = events?.ToList() ?? [];
         _rssArtifacts = rssArtifacts?.ToList() ?? [];
@@ -67,6 +69,15 @@ public sealed partial class NasdaqStatusMachine
     public string SignerKeyId { get; }
     public string SignerKeySha256 { get; }
     public InstrumentTradingState StateOf(string isin) => _states.GetValueOrDefault(isin, InstrumentTradingState.Unknown);
+    public InstrumentTradingState StateAt(string isin, DateTimeOffset at)
+    {
+        if (at < SeedAsOf) return InstrumentTradingState.Unknown;
+        var state = _seedStates.GetValueOrDefault(isin, InstrumentTradingState.Unknown);
+        foreach (var statusEvent in _events.Where(x => x.Isin == isin && x.PublishedAt <= at)
+                     .OrderBy(x => x.PublishedAt).ThenBy(x => x.Id, StringComparer.Ordinal))
+            state = statusEvent.State;
+        return state;
+    }
     public bool IsEligible(string isin) => StateOf(isin) == InstrumentTradingState.Clear;
     public DateTimeOffset LatestPublishedAt => _latestPublishedAt;
     public bool IsFreshAt(DateTimeOffset asOf, TimeSpan maximumAge) =>
@@ -78,7 +89,7 @@ public sealed partial class NasdaqStatusMachine
         var path = Path.GetFullPath(durableStatePath);
         if (!File.Exists(path))
         {
-            var created = new NasdaqStatusMachine(seedStates, asOf, keyId, keySha256, path);
+            var created = new NasdaqStatusMachine(seedStates, asOf, keyId, keySha256, path, seedStates);
             created.Persist();
             return created;
         }
@@ -90,7 +101,7 @@ public sealed partial class NasdaqStatusMachine
             if (envelope.Sha256 != actual || envelope.State.SeedAsOf != asOf || envelope.State.SignerKeyId != keyId ||
                 envelope.State.SignerKeySha256 != keySha256) throw new MarketDataException("Durable status state identity or checksum mismatch");
             var states = envelope.State.States.ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal);
-            return new(states, asOf, keyId, keySha256, path, envelope.State.Events, envelope.State.RssArtifacts);
+            return new(states, asOf, keyId, keySha256, path, seedStates, envelope.State.Events, envelope.State.RssArtifacts);
         }
         catch (MarketDataException) { throw; }
         catch (Exception exception) when (exception is IOException or JsonException)

@@ -100,6 +100,16 @@ public sealed class MarketDataTests
     }
 
     [Fact]
+    public void FirdsCfiEligibilityAdmitsOnlyDefinedCommonOrdinaryShareSubtypes()
+    {
+        var instruments = new FirdsUniverseParser().ParseFull(
+            File.OpenRead(Fixture("firds-cfi-subtypes.xml")), FullDay);
+
+        Assert.Equal(new[] { "ESNUFR", "ESVUFR" }, instruments.Select(x => x.Cfi).Order());
+        Assert.DoesNotContain(instruments, x => x.OrderBookId is "PREF" or "SDB" or "OTHER-X" or "OTHER-C");
+    }
+
+    [Fact]
     public void OfficialNoticeStateStartsUnknownUsesSignedSeedAndRejectsReplay()
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);

@@ -67,9 +67,16 @@ public sealed class FirdsUniverseParser
     }
 
     private static bool IsEligible(FirdsInstrument item, DateOnly at) =>
-        item.Venue == "XSTO" && item.Currency == "SEK" && item.Cfi.StartsWith("ES", StringComparison.Ordinal) &&
+        item.Venue == "XSTO" && item.Currency == "SEK" && IsCommonOrdinaryShare(item.Cfi) &&
         (item.FirstTradeDate is null || item.FirstTradeDate <= at) &&
         (item.TerminationDate is null || item.TerminationDate > at);
+
+    private static bool IsCommonOrdinaryShare(string cfi) =>
+        cfi.Length == 6 && cfi[0] == 'E' && cfi[1] == 'S' &&
+        "VNRE".Contains(cfi[2], StringComparison.Ordinal) &&
+        "TU".Contains(cfi[3], StringComparison.Ordinal) &&
+        "FOP".Contains(cfi[4], StringComparison.Ordinal) &&
+        "BRNM".Contains(cfi[5], StringComparison.Ordinal);
     private enum Operation { Upsert, Delete }
     private sealed record Change(Operation Operation, FirdsInstrument Instrument);
 }

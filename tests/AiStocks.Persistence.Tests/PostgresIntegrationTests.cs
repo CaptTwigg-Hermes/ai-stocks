@@ -339,6 +339,7 @@ public sealed class PostgresIntegrationTests
     public async Task RealPostgresCollectorPersistsStrictManifestBoundAuthorityAndFailsReadinessClosed()
     {
         if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ResetDatabase(dataSource);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
@@ -361,20 +362,39 @@ public sealed class PostgresIntegrationTests
             await File.WriteAllBytesAsync(signaturePath, key.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256));
             var statuses = new PinnedStatusSeedVerifier("test-key", key.ExportSubjectPublicKeyInfo())
                 .Load(payload, await File.ReadAllBytesAsync(signaturePath), Path.Combine(root, "status.json"));
-            var rss = await File.ReadAllBytesAsync(Path.Combine(fixtures, "nasdaq-status-rss.xml"));
+            var rss = Encoding.UTF8.GetBytes("""
+                <rss><channel><link>https://api.news.eu.nasdaq.com/news/rss/mainMarketNotices</link>
+                  <item><guid>suspend-at-ten</guid><title>SE0000108656 suspension</title><description>suspension</description><pubDate>Thu, 06 Aug 2026 10:00:00 GMT</pubDate><link>https://view.news.eu.nasdaq.com/view?id=suspend-at-ten</link></item>
+                  <item><guid>resume-at-eleven</guid><title>SE0000108656 resumption</title><description>resumption</description><pubDate>Thu, 06 Aug 2026 11:00:00 GMT</pubDate><link>https://view.news.eu.nasdaq.com/view?id=resume-at-eleven</link></item>
+                </channel></rss>
+                """);
             var rssHash = Convert.ToHexStringLower(SHA256.HashData(rss));
             var rssPath = Path.Combine(root, rssHash + ".xml");
             await File.WriteAllBytesAsync(rssPath, rss);
             statuses.ApplyRssSnapshot(new MemoryStream(rss), new Uri("https://api.news.eu.nasdaq.com/news/rss/mainMarketNotices"),
-                DateTimeOffset.Parse("2026-08-06T09:00:00Z"), rssHash, rssPath);
+                DateTimeOffset.Parse("2026-08-06T12:00:00Z"), rssHash, rssPath);
             var session = StockholmCalendar.GetSession(new DateOnly(2026, 8, 6))!;
             var csv = await File.ReadAllBytesAsync(Path.Combine(fixtures, "nasdaq-posttrade.csv"));
             var reports = SessionManifest.ExpectedReports(session).Select(name => archive.Archive(name, csv,
                 new Uri($"https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName={name}"), session.Close.AddMinutes(15))).ToArray();
             var manifestPath = manifests.Save(session, reports, session.Close.AddHours(1));
+            var listing = string.Join(',', reports.Select(x => $"\"{x.Report}\""));
+            using var http = new HttpClient(new StubHandler(request =>
+            {
+                if (request.RequestUri!.AbsolutePath.EndsWith("trade-reports", StringComparison.Ordinal))
+                    return new(System.Net.HttpStatusCode.OK)
+                    {
+                        Content = new StringContent($"{{\"message\":null,\"reports\":[{listing}]}}")
+                    };
+                throw new InvalidOperationException("Verified archive replay must not download reports.");
+            }))
+            { BaseAddress = new Uri("https://tradereports.nasdaq.com") };
+            var replay = await new NasdaqCollector(new NasdaqPostTradeClient(http, archive), archive, manifests)
+                .CollectOnceAsync(session.Close.AddHours(1), CancellationToken.None);
+            Assert.Equal(new[] { manifestPath }, replay.FinalizedManifests);
             var persistence = new PostgresCollectorPersistence(connectionString, archive, manifests, firds, statuses, payloadPath, signaturePath);
             await persistence.PollStartedAsync(session.Close.AddHours(1), CancellationToken.None);
-            await persistence.PersistAsync(new CollectionResult([], [manifestPath], []), session.Close.AddHours(1), CancellationToken.None);
+            await persistence.PersistAsync(replay, session.Close.AddHours(1), CancellationToken.None);
             await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
             Assert.Equal(511L, await ScalarLong(connection, "SELECT count(*) FROM raw_market_reports"));
             Assert.Equal(1L, await ScalarLong(connection, "SELECT count(*) FROM market_session_manifests"));
@@ -393,6 +413,19 @@ public sealed class PostgresIntegrationTests
                 WHERE t.id IS NULL OR t.instrument_id<>o.instrument_id OR t.raw_market_report_id<>o.raw_market_report_id
                    OR t.traded_at<>o.traded_at OR t.price<>o.price OR t.quantity<>o.quantity
                 """));
+            Assert.Equal(511L, await ScalarLong(connection, """
+                SELECT count(*) FROM market_observations
+                WHERE traded_at='2026-08-06T09:59:59Z' AND NOT warning AND NOT suspended AND verified
+                """));
+            Assert.Equal(1022L, await ScalarLong(connection, """
+                SELECT count(*) FROM market_observations
+                WHERE traded_at>'2026-08-06T10:00:00Z' AND traded_at<'2026-08-06T11:00:00Z'
+                  AND NOT warning AND suspended AND NOT verified
+                """));
+            Assert.Equal(511L, await ScalarLong(connection, """
+                SELECT count(*) FROM market_observations
+                WHERE traded_at='2026-08-06T15:30:00Z' AND NOT warning AND NOT suspended AND verified
+                """));
             Assert.Equal(1L, await ScalarLong(connection, "SELECT count(*) FROM instrument_session_stats WHERE complete"));
             await persistence.PersistAsync(new CollectionResult([], [manifestPath], []), session.Close.AddHours(1), CancellationToken.None);
             Assert.Equal(await ScalarLong(connection, "SELECT count(*) FROM market_strict_trade_rows"),
@@ -408,6 +441,7 @@ public sealed class PostgresIntegrationTests
     public async Task RealPostgresRejectsSplitResearchAttestationReplayIdentity()
     {
         if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ResetDatabase(dataSource);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
@@ -597,6 +631,16 @@ public sealed class PostgresIntegrationTests
         }
         Assert.Equal("CLAIMED", await Scalar(connection, "SELECT status::text FROM scheduled_agent_runs WHERE id=$1", id));
         Assert.Equal(0L, await ScalarLong(connection, "SELECT count(*) FROM orders WHERE decision_id='expired'"));
+    }
+
+    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var response = respond(request);
+            response.RequestMessage ??= request;
+            return Task.FromResult(response);
+        }
     }
 
     private static async Task ResetDatabase(NpgsqlDataSource source)

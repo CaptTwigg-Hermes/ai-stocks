@@ -31,6 +31,30 @@ public sealed class MarketDataSecurityRegressionTests
         Assert.Equal(1, requests);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReportDownloadEnforcesStreamingByteBoundWithMissingOrLyingLength(bool lyingLength)
+    {
+        using var temp = new TemporaryDirectory();
+        var stream = new OversizedReportStream(52_428_800 + 8_192);
+        using var http = new HttpClient(new StubHandler(_ =>
+        {
+            var content = new StreamContent(stream);
+            if (lyingLength) content.Headers.ContentLength = 1;
+            return new(System.Net.HttpStatusCode.OK) { Content = content };
+        }))
+        { BaseAddress = new Uri("https://tradereports.nasdaq.com") };
+
+        var exception = await Assert.ThrowsAsync<MarketDataException>(() =>
+            new NasdaqPostTradeClient(http, new ImmutableArchive(temp.Path))
+                .DownloadAsync(Report, DateTimeOffset.Parse("2026-08-06T10:17:00Z"), CancellationToken.None));
+
+        Assert.Contains("oversized", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.InRange(stream.BytesRead, 1, 52_428_801);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(temp.Path));
+    }
+
     [Fact]
     public void CsvRejectsCharactersAfterClosingQuote()
     {
@@ -67,6 +91,27 @@ public sealed class MarketDataSecurityRegressionTests
         var restarted = verifier.Load(payload, pinned.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256), Path.Combine(temp.Path, "status.json"));
         Assert.Equal(InstrumentTradingState.Suspended, restarted.StateOf("SE0000108656"));
         Assert.Throws<MarketDataException>(() => restarted.ApplyRss(Rss("new", "Thu, 06 Aug 2026 08:00:00 GMT", "suspension")));
+    }
+
+    [Fact]
+    public void StatusHistoryProjectsSuspensionAndResumptionAtEachTradeTimestamp()
+    {
+        using var temp = new TemporaryDirectory();
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var payload = "{\"asOf\":\"2026-08-06T07:00:00Z\",\"states\":{\"SE0000108656\":\"Clear\"}}";
+        var machine = new PinnedStatusSeedVerifier("ops", key.ExportSubjectPublicKeyInfo()).Load(payload,
+            key.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256), Path.Combine(temp.Path, "status.json"));
+        machine.ApplyRss(Rss("suspend", "Thu, 06 Aug 2026 10:00:00 GMT", "suspension"));
+        machine.ApplyRss(Rss("resume", "Thu, 06 Aug 2026 11:00:00 GMT", "resumption"));
+
+        Assert.Equal(InstrumentTradingState.Clear,
+            machine.StateAt("SE0000108656", DateTimeOffset.Parse("2026-08-06T09:59:59Z")));
+        Assert.Equal(InstrumentTradingState.Suspended,
+            machine.StateAt("SE0000108656", DateTimeOffset.Parse("2026-08-06T10:30:00Z")));
+        Assert.Equal(InstrumentTradingState.Clear,
+            machine.StateAt("SE0000108656", DateTimeOffset.Parse("2026-08-06T11:00:00Z")));
+        Assert.Equal(InstrumentTradingState.Unknown,
+            machine.StateAt("SE0000108656", DateTimeOffset.Parse("2026-08-06T06:59:59Z")));
     }
 
     [Fact]
@@ -393,6 +438,39 @@ public sealed class MarketDataSecurityRegressionTests
             response.RequestMessage ??= request;
             return Task.FromResult(response);
         }
+    }
+
+    private sealed class OversizedReportStream(long length) : Stream
+    {
+        private static readonly byte[] Prefix = "\"sep=;\""u8.ToArray();
+        private long position;
+        public long BytesRead => position;
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => length;
+        public override long Position { get => position; set => throw new NotSupportedException(); }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (position >= length) return 0;
+            var read = (int)Math.Min(count, length - position);
+            for (var index = 0; index < read; index++)
+            {
+                var absolute = position + index;
+                buffer[offset + index] = absolute < Prefix.Length ? Prefix[absolute] : (byte)'x';
+            }
+            position += read;
+            return read;
+        }
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(Read(buffer.ToArray(), 0, buffer.Length));
+        }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private sealed class TemporaryDirectory : IDisposable

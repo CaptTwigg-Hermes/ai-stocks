@@ -320,7 +320,7 @@ public sealed class PostgresCollectorPersistence(
             var averageDailyValue = historyReader.GetDecimal(0);
             var completeSessions = historyReader.GetInt64(1);
             await historyReader.DisposeAsync().ConfigureAwait(false);
-            var state = statuses.StateOf(item.Instrument.Isin);
+            var state = statuses.StateAt(item.Instrument.Isin, item.Trade.ExecutedAt);
             var sourceJson = JsonSerializer.Serialize(new
             {
                 strictTradeRowId = item.StrictId,

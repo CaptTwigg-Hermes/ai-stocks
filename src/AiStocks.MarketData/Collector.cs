@@ -5,6 +5,7 @@ namespace AiStocks.MarketData;
 public sealed class NasdaqPostTradeClient(HttpClient http, ImmutableArchive archive)
 {
     private const string Listing = "/api/regulatory/trade-reports?type=POST_TRADE&assetClass=EQUITY";
+    private const int MaximumReportBytes = 52_428_800;
 
     public async Task<IReadOnlyList<string>> ListReportsAsync(CancellationToken cancellationToken)
     {
@@ -33,10 +34,28 @@ public sealed class NasdaqPostTradeClient(HttpClient http, ImmutableArchive arch
         var path = $"/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName={Uri.EscapeDataString(report)}";
         using var response = await http.GetAsync(path, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        if (response.Content.Headers.ContentLength is > 52_428_800) throw new MarketDataException("Nasdaq report is oversized");
-        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        if (response.Content.Headers.ContentLength is > MaximumReportBytes)
+            throw new MarketDataException("Nasdaq report is oversized");
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var bytes = await ReadReportAsync(stream, cancellationToken).ConfigureAwait(false);
         var source = response.RequestMessage?.RequestUri ?? (http.BaseAddress is { } baseAddress ? new Uri(baseAddress, path) : throw new MarketDataException("Nasdaq response source is missing"));
         return archive.Archive(report, bytes, source, fetchedAt);
+    }
+
+    private static async Task<byte[]> ReadReportAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        using var output = new MemoryStream(81_920);
+        var buffer = new byte[81_920];
+        while (true)
+        {
+            var remainingWithSentinel = checked(MaximumReportBytes - (int)output.Length + 1);
+            var read = await stream.ReadAsync(buffer.AsMemory(0, Math.Min(buffer.Length, remainingWithSentinel)), cancellationToken)
+                .ConfigureAwait(false);
+            if (read == 0) return output.ToArray();
+            if (output.Length + read > MaximumReportBytes)
+                throw new MarketDataException("Nasdaq report is oversized");
+            output.Write(buffer, 0, read);
+        }
     }
 }
 
@@ -93,6 +112,7 @@ public sealed class NasdaqCollector
                     var archivedReport = archive.Verify(report.Report);
                     if (archivedReport.Sha256 != report.Sha256) throw new MarketDataException("Finalized manifest archive provenance mismatch");
                 }
+                finalized.Add(complete.Path);
                 continue;
             }
             var due = listing.Where(x =>
