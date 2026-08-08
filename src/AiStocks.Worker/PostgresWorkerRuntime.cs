@@ -154,7 +154,7 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
             throw new DecisionValidationException("Decision instrument is not in the reviewed universe.");
         using var requestDocument = JsonDocument.Parse(result.Decision);
         var requestJson = CanonicalJson.Serialize(requestDocument.RootElement);
-        await using var submit = new NpgsqlCommand("SELECT submit_order($1,$2,$3,$4,$5::order_side,$6,$7,$8,$9,$10::jsonb,canonical_jsonb_sha256($10::jsonb))", connection, transaction);
+        await using var submit = new NpgsqlCommand("SELECT submit_order($1,$2,$3,$4,$5::order_side,$6,$7,$8,$9::jsonb,canonical_jsonb_sha256($9::jsonb))", connection, transaction);
         submit.Parameters.AddWithValue(Guid.NewGuid());
         submit.Parameters.AddWithValue(run.AgentId);
         submit.Parameters.AddWithValue(decision.DecisionId);
@@ -163,7 +163,6 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
         submit.Parameters.AddWithValue(instrumentId);
         submit.Parameters.AddWithValue(decision.Quantity);
         submit.Parameters.AddWithValue(decision.DecisionAt);
-        submit.Parameters.AddWithValue(decision.ObservedPrice!.Value);
         submit.Parameters.AddWithValue(requestJson);
         await submit.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);

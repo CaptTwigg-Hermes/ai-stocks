@@ -94,7 +94,15 @@ CREATE TABLE trading_sessions (
     opens_at timestamptz NOT NULL,
     closes_at timestamptz NOT NULL,
     is_final boolean NOT NULL DEFAULT false,
-    CHECK (closes_at > opens_at)
+    calendar_sha256 sha256_hex,
+    trading_hours_sha256 sha256_hex,
+    CHECK (closes_at > opens_at),
+    CHECK (NOT is_final OR (
+      session_id='XSTO-2026-12-30' AND session_day=date '2026-12-30'
+      AND opens_at=timestamptz '2026-12-30 08:00:00Z'
+      AND closes_at=timestamptz '2026-12-30 16:30:00Z'
+      AND calendar_sha256='867f80011a2d8cf91f29dce6de8b6c77d4c4fda0954efa8f757f40b25c585395'
+      AND trading_hours_sha256='f16f58c7520eaaae3210ddab666e7bde2609d1935c69e9f5d706bbd0d14fe395'))
 );
 
 CREATE TABLE instrument_session_stats (
@@ -242,7 +250,11 @@ CREATE TABLE corporate_actions (
     primary_evidence_hash sha256_hex NOT NULL CHECK (primary_evidence_hash = canonical_jsonb_sha256(primary_evidence_json)),
     secondary_evidence_json jsonb NOT NULL,
     secondary_evidence_hash sha256_hex NOT NULL CHECK (secondary_evidence_hash = canonical_jsonb_sha256(secondary_evidence_json)),
-    approved_by text,
+    approved_by text NOT NULL CHECK (length(approved_by) BETWEEN 1 AND 300),
+    CHECK (primary_evidence_json <> secondary_evidence_json),
+    CHECK (length(primary_evidence_json->>'authority') > 0),
+    CHECK (length(secondary_evidence_json->>'authority') > 0),
+    CHECK (primary_evidence_json->>'authority' <> secondary_evidence_json->>'authority'),
     created_at timestamptz NOT NULL
 );
 
@@ -466,9 +478,9 @@ FOR EACH ROW EXECUTE FUNCTION enforce_fill_identity();
 CREATE OR REPLACE FUNCTION submit_order(
   p_id uuid, p_agent_id uuid, p_decision_id text, p_idempotency_key text,
   p_side order_side, p_instrument_id uuid, p_quantity integer, p_decision_at timestamptz,
-  p_observed_price numeric, p_request_json jsonb, p_request_hash sha256_hex
+  p_request_json jsonb, p_request_hash sha256_hex
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
-DECLARE existing orders%ROWTYPE;
+DECLARE existing orders%ROWTYPE; authoritative_price numeric;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtextextended('lifecycle',0));
   PERFORM pg_advisory_xact_lock(hashtextextended(p_agent_id::text,0));
@@ -481,10 +493,18 @@ BEGIN
     IF existing.request_hash = p_request_hash THEN RETURN existing.id; END IF;
     RAISE EXCEPTION 'same idempotency key has conflicting canonical hash';
   END IF;
+  SELECT mo.price INTO authoritative_price FROM market_observations mo
+  JOIN trading_sessions ts ON ts.session_id=mo.session_id
+  WHERE mo.instrument_id=p_instrument_id AND mo.verified AND NOT mo.warning AND NOT mo.suspended
+    AND mo.traded_at<=p_decision_at AND mo.retrieved_at<=p_decision_at
+    AND mo.traded_at BETWEEN ts.opens_at AND ts.closes_at
+    AND mo.retrieved_at-mo.traded_at BETWEEN interval '15 minutes' AND interval '20 minutes'
+  ORDER BY mo.traded_at DESC,mo.id DESC LIMIT 1;
+  IF authoritative_price IS NULL THEN RAISE EXCEPTION 'latest verified pre-decision observation is required'; END IF;
   INSERT INTO orders(id,agent_id,decision_id,idempotency_key,side,instrument_id,quantity,
                      decision_at,observed_price,request_json,request_hash)
     VALUES(p_id,p_agent_id,p_decision_id,p_idempotency_key,p_side,p_instrument_id,p_quantity,
-           p_decision_at,p_observed_price,p_request_json,p_request_hash);
+           p_decision_at,authoritative_price,p_request_json,p_request_hash);
   RETURN p_id;
 END $$;
 
@@ -494,7 +514,11 @@ CREATE OR REPLACE FUNCTION cancel_order(
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE existing order_outcomes%ROWTYPE;
 BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('lifecycle',0));
   PERFORM pg_advisory_xact_lock(hashtextextended(p_agent_id::text,0));
+  IF (SELECT status FROM contest_state WHERE singleton FOR SHARE) <> 'RUNNING' THEN
+    RAISE EXCEPTION 'contest is not running';
+  END IF;
   PERFORM 1 FROM orders WHERE id=p_order_id AND agent_id=p_agent_id FOR KEY SHARE;
   IF NOT FOUND THEN RAISE EXCEPTION 'order ownership mismatch'; END IF;
   SELECT * INTO existing FROM order_outcomes WHERE order_id=p_order_id FOR KEY SHARE;
@@ -530,6 +554,7 @@ DECLARE
   expected_execution numeric;
   expected_gross numeric;
   expected_fee numeric;
+  slippage_adv numeric;
   active_tier fee_tier;
   trade_count integer;
 BEGIN
@@ -555,6 +580,13 @@ BEGIN
      OR p_executed_at<>obs.retrieved_at THEN
     RAISE EXCEPTION 'observation is not eligible for order';
   END IF;
+  IF EXISTS (SELECT 1 FROM contest_state_events pause_event
+    WHERE pause_event.to_status='PAUSED' AND obs.traded_at>=pause_event.occurred_at
+      AND obs.traded_at<COALESCE((SELECT min(resume_event.occurred_at) FROM contest_state_events resume_event
+        WHERE resume_event.from_status='PAUSED' AND resume_event.to_status='RUNNING'
+          AND resume_event.occurred_at>pause_event.occurred_at),'infinity'::timestamptz)) THEN
+    RAISE EXCEPTION 'observations traded during a pause are ineligible';
+  END IF;
 
   SELECT count(*),avg(stats.traded_value) INTO history_count,derived_adv
   FROM (SELECT session_id FROM trading_sessions WHERE session_day<s.session_day
@@ -573,6 +605,11 @@ BEGIN
     WHERE earlier.instrument_id=o.instrument_id AND earlier.verified AND NOT earlier.warning AND NOT earlier.suspended
       AND earlier.traded_at>=o.decision_at AND earlier.traded_at>=es.opens_at AND earlier.traded_at<=es.closes_at
       AND earlier.retrieved_at-earlier.traded_at BETWEEN interval '15 minutes' AND interval '20 minutes'
+      AND NOT EXISTS (SELECT 1 FROM contest_state_events pause_event
+        WHERE pause_event.to_status='PAUSED' AND earlier.traded_at>=pause_event.occurred_at
+          AND earlier.traded_at<COALESCE((SELECT min(resume_event.occurred_at) FROM contest_state_events resume_event
+            WHERE resume_event.from_status='PAUSED' AND resume_event.to_status='RUNNING'
+              AND resume_event.occurred_at>pause_event.occurred_at),'infinity'::timestamptz))
       AND (earlier.traded_at,earlier.id)<(obs.traded_at,obs.id)
       AND (o.side='SELL' OR (earlier.complete_history_sessions>=20
            AND earlier.average_daily_value_20=round(derived_adv,2)
@@ -587,7 +624,9 @@ BEGIN
     SELECT mo.price FROM market_observations mo
     JOIN trading_sessions ms ON ms.session_id=mo.session_id
     WHERE mo.instrument_id=p.instrument_id AND mo.verified AND NOT mo.warning AND NOT mo.suspended
-      AND mo.traded_at BETWEEN ms.opens_at AND ms.closes_at AND mo.traded_at<=obs.traded_at
+      AND mo.session_id=obs.session_id AND mo.traded_at BETWEEN ms.opens_at AND ms.closes_at
+      AND mo.traded_at<=obs.traded_at AND obs.traded_at-mo.traded_at<=interval '20 minutes'
+      AND mo.retrieved_at-mo.traded_at BETWEEN interval '15 minutes' AND interval '20 minutes'
       AND mo.retrieved_at<=p_executed_at
     ORDER BY mo.traded_at DESC,mo.id DESC LIMIT 1
   ) mark ON true
@@ -597,15 +636,18 @@ BEGIN
       SELECT 1 FROM positions p WHERE p.agent_id=p_agent_id AND p.quantity>0 AND NOT EXISTS (
         SELECT 1 FROM market_observations mo JOIN trading_sessions ms ON ms.session_id=mo.session_id
         WHERE mo.instrument_id=p.instrument_id AND mo.verified AND NOT mo.warning AND NOT mo.suspended
-          AND mo.traded_at BETWEEN ms.opens_at AND ms.closes_at AND mo.traded_at<=obs.traded_at
+          AND mo.session_id=obs.session_id AND mo.traded_at BETWEEN ms.opens_at AND ms.closes_at
+          AND mo.traded_at<=obs.traded_at AND obs.traded_at-mo.traded_at<=interval '20 minutes'
+          AND mo.retrieved_at-mo.traded_at BETWEEN interval '15 minutes' AND interval '20 minutes'
           AND mo.retrieved_at<=p_executed_at)) THEN
     RAISE EXCEPTION 'verified current marks are required';
   END IF;
   IF active_tier='MINI' OR marked_capital>=50000 OR trade_count>=500 THEN active_tier:='MINI'; END IF;
 
+  slippage_adv:=CASE WHEN o.side='BUY' THEN derived_adv ELSE obs.average_daily_value_20 END;
   expected_slippage:=round(least(0.01,greatest(0.001,
     CASE WHEN obs.bid IS NOT NULL AND obs.ask IS NOT NULL THEN (obs.ask-obs.bid)/(2*obs.price) ELSE 0.001 END)
-    +0.0025*sqrt((obs.price*o.quantity/derived_adv)::numeric)),8);
+    +0.0025*sqrt((obs.price*o.quantity/slippage_adv)::numeric)),8);
   expected_execution:=round(obs.price*(CASE WHEN o.side='BUY' THEN 1+expected_slippage ELSE 1-expected_slippage END),4);
   expected_gross:=round(expected_execution*o.quantity,2);
   expected_fee:=CASE WHEN active_tier='STARTER' THEN 0 ELSE greatest(1,round(expected_gross*0.0025,2)) END;
@@ -620,7 +662,9 @@ BEGIN
     LEFT JOIN positions p ON p.agent_id=p_agent_id
     LEFT JOIN instruments held ON held.id=p.instrument_id AND held.issuer_id=target.issuer_id
     LEFT JOIN LATERAL (SELECT mo.price FROM market_observations mo WHERE mo.instrument_id=p.instrument_id
-      AND mo.verified AND NOT mo.warning AND NOT mo.suspended AND mo.traded_at<=obs.traded_at
+      AND mo.verified AND NOT mo.warning AND NOT mo.suspended AND mo.session_id=obs.session_id
+      AND mo.traded_at<=obs.traded_at AND obs.traded_at-mo.traded_at<=interval '20 minutes'
+      AND mo.retrieved_at-mo.traded_at BETWEEN interval '15 minutes' AND interval '20 minutes'
       AND mo.retrieved_at<=p_executed_at ORDER BY mo.traded_at DESC,mo.id DESC LIMIT 1) mark ON held.id IS NOT NULL
     WHERE target.id=o.instrument_id;
     IF issuer_exposure/(marked_capital+obs.price*o.quantity-expected_gross-expected_fee)>0.25 THEN
@@ -840,9 +884,11 @@ BEGIN
  END IF;
  IF p_hash<>canonical_jsonb_sha256(p_request) THEN RAISE EXCEPTION 'request hash mismatch'; END IF;
  SELECT status INTO state_before FROM contest_state WHERE singleton FOR UPDATE;
- IF state_before NOT IN ('RUNNING','PAUSED') THEN RAISE EXCEPTION 'contest may only finish once'; END IF;
- IF p_at < (SELECT closes_at+interval '15 minutes' FROM trading_sessions WHERE is_final) THEN
-   RAISE EXCEPTION 'finalization is before official close availability';
+ IF state_before <> 'RUNNING' THEN RAISE EXCEPTION 'contest may only finish once from running state'; END IF;
+ IF p_reference<>'XSTO-2026-12-30-final' OR p_key<>'XSTO-2026-12-30-final'
+    OR p_at<>timestamptz '2026-12-30 16:50:00Z'
+    OR p_request<>jsonb_build_object('session_id','XSTO-2026-12-30') THEN
+   RAISE EXCEPTION 'finalization identity and time must match the pinned XSTO contract';
  END IF;
  IF (SELECT count(*) FROM trading_sessions WHERE is_final)<>1 THEN
    RAISE EXCEPTION 'exactly one official final session is required';
@@ -867,6 +913,9 @@ BEGIN
      JOIN trading_sessions ts ON ts.session_id=observation.session_id
      WHERE observation.instrument_id=p.instrument_id AND ts.is_final AND observation.is_official_pats
        AND observation.verified AND NOT observation.warning AND NOT observation.suspended
+       AND observation.traded_at=ts.closes_at
+       AND observation.retrieved_at-observation.traded_at BETWEEN interval '15 minutes' AND interval '20 minutes'
+       AND observation.retrieved_at<=p_at
      ORDER BY observation.id LIMIT 1) mo ON NOT p.frozen
    WHERE p.agent_id=account_row.agent_id;
    active_tier:=account_row.fee_tier;
@@ -941,8 +990,8 @@ GRANT SELECT ON agents,contest_state,instruments,trading_sessions,instrument_ses
  strategies,orders,order_outcomes,ledger_events,fills,corporate_actions,corporate_action_applications,
  account_balances,positions,portfolio_snapshots,final_rankings,contest_state_events,fractional_entitlements TO ai_stocks_runtime;
 GRANT INSERT ON instruments,trading_sessions,instrument_session_stats,raw_market_reports,market_observations,prompts,scheduled_agent_runs,agent_runs,strategies,
- corporate_actions,portfolio_snapshots TO ai_stocks_runtime;
-GRANT EXECUTE ON FUNCTION submit_order(uuid,uuid,text,text,order_side,uuid,integer,timestamptz,numeric,jsonb,sha256_hex) TO ai_stocks_runtime;
+ portfolio_snapshots TO ai_stocks_runtime;
+GRANT EXECUTE ON FUNCTION submit_order(uuid,uuid,text,text,order_side,uuid,integer,timestamptz,jsonb,sha256_hex) TO ai_stocks_runtime;
 GRANT EXECUTE ON FUNCTION cancel_order(uuid,uuid,uuid,text,jsonb,sha256_hex,timestamptz) TO ai_stocks_runtime;
 GRANT EXECUTE ON FUNCTION record_fill(uuid,uuid,uuid,uuid,uuid,uuid,integer,numeric,numeric,numeric,numeric,timestamptz,jsonb,sha256_hex,jsonb,sha256_hex,jsonb,sha256_hex,text) TO ai_stocks_runtime;
 GRANT EXECUTE ON FUNCTION apply_corporate_action(uuid,uuid,uuid,uuid,timestamptz) TO ai_stocks_runtime;

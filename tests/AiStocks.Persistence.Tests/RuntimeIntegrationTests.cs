@@ -72,6 +72,21 @@ public sealed class RuntimeIntegrationTests
                    '{"source":"runtime-test"}',canonical_jsonb_sha256('{"source":"runtime-test"}'))
             """, setup))
             await instrument.ExecuteNonQueryAsync();
+        await using (var setup = await source.OpenConnectionAsync())
+        await using (var observation = new NpgsqlCommand("""
+            INSERT INTO trading_sessions(session_id,session_day,opens_at,closes_at)
+            VALUES('runtime-authority','2026-08-07','2026-08-07T07:00:00Z','2026-08-07T15:30:00Z');
+            INSERT INTO raw_market_reports VALUES(gen_random_uuid(),'runtime-authority-report','https://example.test/runtime',
+              '2026-08-07T14:15:00Z','x',encode(digest('x','sha256'),'hex'),'{"fixture":true}',
+              canonical_jsonb_sha256('{"fixture":true}'));
+            INSERT INTO market_observations(id,instrument_id,raw_market_report_id,traded_at,retrieved_at,price,quantity,
+              average_daily_value_20,complete_history_sessions,session_id,is_official_pats,warning,suspended,verified,source_json,source_hash)
+            SELECT gen_random_uuid(),i.id,r.id,'2026-08-07T14:00:00Z','2026-08-07T14:15:00Z',100,10,
+              1000000,20,'runtime-authority',false,false,false,true,'{"price":100}',canonical_jsonb_sha256('{"price":100}')
+            FROM instruments i CROSS JOIN raw_market_reports r
+            WHERE i.isin='SE0000000001' AND r.report_name='runtime-authority-report'
+            """, setup))
+            await observation.ExecuteNonQueryAsync();
         var decision = $$"""
             {"decisionId":"runtime-buy","agentId":"{{claimed.Run.AgentId:D}}","modelId":"{{claimed.Run.ModelId}}",
              "action":"buy","instrument":{"isin":"SE0000000001","orderBookId":"book-runtime","mic":"XSTO"},

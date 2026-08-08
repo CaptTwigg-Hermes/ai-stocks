@@ -28,14 +28,18 @@ internal static class TestData
         InstrumentId? instrument = null, decimal price = 100m, decimal adv = 20_000_000m,
         int sessions = 20, DateTimeOffset? tradedAt = null, decimal? bid = null,
         decimal? ask = null, bool warning = false, bool suspended = false,
-        long quantity = 1_000_000) =>
+        long quantity = 1_000_000, bool officialPats = false) =>
         new(instrument ?? Volvo, price, bid, ask, quantity, adv, sessions,
             tradedAt ?? Open.AddHours(1), (tradedAt ?? Open.AddHours(1)).AddMinutes(15),
             Session.Id, new string('c', 64), warning, suspended,
             "NordicEquity-posttrade-2026-08-06T1015",
             new Uri("https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName=NordicEquity-posttrade-2026-08-06T1015"),
-            new string('d', 64));
+            new string('d', 64), officialPats);
 
-    internal static IReadOnlyDictionary<InstrumentId, decimal> Marks(params (InstrumentId Instrument, decimal Price)[] marks) =>
-        marks.ToDictionary(mark => mark.Instrument, mark => mark.Price);
+    internal static IReadOnlyDictionary<InstrumentId, VerifiedMarketObservation> Marks(
+        params (InstrumentId Instrument, decimal Price)[] marks) =>
+        marks.ToDictionary(mark => mark.Instrument, mark => Quote(mark.Instrument, mark.Price));
+
+    internal static CorporateActionAuthorization Authorization(string suffix = "default") =>
+        new($"nasdaq:{suffix}", $"independent:{suffix}", $"owner:{suffix}");
 }

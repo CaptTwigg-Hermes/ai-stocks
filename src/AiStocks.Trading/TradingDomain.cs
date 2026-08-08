@@ -46,7 +46,7 @@ public static class ExecutionMath
         }
 
         var impact = 0.0025m * DecimalMath.Sqrt(orderValue / quote.AverageDailyValue20);
-        return decimal.Min(0.01m, spread + impact);
+        return decimal.Round(decimal.Min(0.01m, spread + impact), 8, MidpointRounding.AwayFromZero);
     }
 
     public static decimal ExecutionPrice(OrderSide side, VerifiedMarketObservation quote, decimal orderValue)
@@ -103,7 +103,7 @@ public sealed class PaperTradingEngine
         OrderDecision decision,
         VerifiedMarketObservation? quote,
         TradingSession? session,
-        IReadOnlyDictionary<InstrumentId, decimal> marks)
+        IReadOnlyDictionary<InstrumentId, VerifiedMarketObservation> marks)
     {
         EnsureRunning();
         ValidateDecision(decision);
@@ -137,7 +137,7 @@ public sealed class PaperTradingEngine
         Guid orderId,
         IReadOnlyCollection<VerifiedMarketObservation> observations,
         TradingSession session,
-        IReadOnlyDictionary<InstrumentId, decimal> marks)
+        IReadOnlyDictionary<InstrumentId, VerifiedMarketObservation> marks)
     {
         EnsureRunning();
         var order = GetQueuedOrder(orderId);
@@ -253,13 +253,15 @@ public sealed class PaperTradingEngine
     }
 
     public void ApplyDividend(Guid agentId, InstrumentId instrument, decimal perShare,
-        DateTimeOffset ownershipClose, DateOnly exDate, DateTimeOffset paymentAt, string reference)
+        DateTimeOffset ownershipClose, DateOnly exDate, DateTimeOffset paymentAt, string reference,
+        CorporateActionAuthorization authorization)
     {
         EnsureRunning();
         if (perShare < 0m || DateOnly.FromDateTime(ownershipClose.Date) >= exDate ||
             DateOnly.FromDateTime(paymentAt.Date) < exDate)
             throw new TradingException("corporate-action", "Dividend dates or amount are invalid.");
-        var payload = $"dividend|{instrument}|{perShare}|{ownershipClose:O}|{exDate}|{paymentAt:O}";
+        ValidateAuthorization(authorization);
+        var payload = $"dividend|{instrument}|{perShare}|{ownershipClose:O}|{exDate}|{paymentAt:O}|{authorization}";
         if (!BeginAction(agentId, reference, payload)) return;
         var quantity = QuantityAt(agentId, instrument, ownershipClose);
         var cash = Money.Round(perShare * quantity);
@@ -270,12 +272,13 @@ public sealed class PaperTradingEngine
     }
 
     public void ApplySplit(Guid agentId, InstrumentId instrument, int numerator, int denominator,
-        DateTimeOffset at, string reference)
+        DateTimeOffset at, string reference, CorporateActionAuthorization authorization)
     {
         EnsureRunning();
         if (numerator <= 0 || denominator <= 0)
             throw new TradingException("corporate-action", "Split ratio is invalid.");
-        var payload = $"split|{instrument}|{numerator}|{denominator}|{at:O}";
+        ValidateAuthorization(authorization);
+        var payload = $"split|{instrument}|{numerator}|{denominator}|{at:O}|{authorization}";
         if (!BeginAction(agentId, reference, payload)) return;
         var account = GetAccount(agentId);
         if (!account.Positions.TryGetValue(instrument, out var position))
@@ -299,12 +302,14 @@ public sealed class PaperTradingEngine
     }
 
     public void ApplyStockMerger(Guid agentId, InstrumentId oldInstrument, InstrumentId newInstrument,
-        int numerator, int denominator, DateTimeOffset at, string reference)
+        int numerator, int denominator, DateTimeOffset at, string reference,
+        CorporateActionAuthorization authorization)
     {
         EnsureRunning();
         if (numerator <= 0 || denominator <= 0 || oldInstrument == newInstrument)
             throw new TradingException("corporate-action", "Stock merger ratio is invalid.");
-        var payload = $"stock-merger|{oldInstrument}|{newInstrument}|{numerator}|{denominator}|{at:O}";
+        ValidateAuthorization(authorization);
+        var payload = $"stock-merger|{oldInstrument}|{newInstrument}|{numerator}|{denominator}|{at:O}|{authorization}";
         if (!BeginAction(agentId, reference, payload)) return;
         var account = GetAccount(agentId);
         if (!account.Positions.TryGetValue(oldInstrument, out var old)) return;
@@ -333,21 +338,23 @@ public sealed class PaperTradingEngine
     }
 
     public void ApplyCashMerger(Guid agentId, InstrumentId instrument, decimal perShare,
-        DateTimeOffset at, string reference)
+        DateTimeOffset at, string reference, CorporateActionAuthorization authorization)
     {
         EnsureRunning();
         if (perShare < 0m) throw new TradingException("corporate-action", "Cash consideration is invalid.");
-        var payload = $"cash-merger|{instrument}|{perShare}|{at:O}";
+        ValidateAuthorization(authorization);
+        var payload = $"cash-merger|{instrument}|{perShare}|{at:O}|{authorization}";
         if (!BeginAction(agentId, reference, payload)) return;
         SettlePosition(agentId, instrument, perShare, at, reference, "CASH_MERGER");
     }
 
     public void ApplyDelisting(Guid agentId, InstrumentId instrument, decimal? officialProceeds,
-        DateTimeOffset at, string reference)
+        DateTimeOffset at, string reference, CorporateActionAuthorization authorization)
     {
         EnsureRunning();
         if (officialProceeds < 0m) throw new TradingException("corporate-action", "Delisting proceeds are invalid.");
-        var payload = $"delisting|{instrument}|{officialProceeds}|{at:O}";
+        ValidateAuthorization(authorization);
+        var payload = $"delisting|{instrument}|{officialProceeds}|{at:O}|{authorization}";
         if (!BeginAction(agentId, reference, payload)) return;
         var account = GetAccount(agentId);
         if (officialProceeds is null)
@@ -360,12 +367,13 @@ public sealed class PaperTradingEngine
     }
 
     public void SettleDelisting(Guid agentId, InstrumentId instrument, decimal officialProceeds,
-        DateTimeOffset at, string reference)
+        DateTimeOffset at, string reference, CorporateActionAuthorization authorization)
     {
         EnsureRunning();
         if (officialProceeds < 0m || !IsFrozen(agentId, instrument))
             throw new TradingException("corporate-action", "No frozen delisting can be settled.");
-        var payload = $"delisting-settlement|{instrument}|{officialProceeds}|{at:O}";
+        ValidateAuthorization(authorization);
+        var payload = $"delisting-settlement|{instrument}|{officialProceeds}|{at:O}|{authorization}";
         if (!BeginAction(agentId, reference, payload)) return;
         SettlePosition(agentId, instrument, officialProceeds, at, reference, "DELISTING_SETTLED");
         GetAccount(agentId).Frozen.Remove(instrument);
@@ -391,7 +399,11 @@ public sealed class PaperTradingEngine
         EnsureRunning();
         if (session.CloseAt.Date != ContestContract.FinalTradingDate.ToDateTime(TimeOnly.MinValue).Date)
             throw new TradingException("final-date", "Liquidation is only valid on the final XSTO trading day.");
-        if (string.IsNullOrWhiteSpace(reference) || finalizedAt < session.CloseAt)
+        if (session.Id != "XSTO-2026-12-30" ||
+            session.OpenAt != new DateTimeOffset(2026, 12, 30, 8, 0, 0, TimeSpan.Zero) ||
+            session.CloseAt != new DateTimeOffset(2026, 12, 30, 16, 30, 0, TimeSpan.Zero))
+            throw new TradingException("final-session", "Final session must match the pinned XSTO calendar.");
+        if (reference != "XSTO-2026-12-30-final" || finalizedAt != session.CloseAt.AddMinutes(20))
             throw new TradingException("final-input", "Final liquidation reference or timestamp is invalid.");
 
         // Validate every required quote before mutating any account.
@@ -466,9 +478,10 @@ public sealed class PaperTradingEngine
 
     public void ApplyCorrection(Guid agentId, string reference, decimal cashDelta,
         InstrumentId? instrument, int quantityDelta, decimal averageCostAfter, DateTimeOffset at,
-        string reason, int completedTradeCountDelta = 0)
+        string reason, CorporateActionAuthorization authorization, int completedTradeCountDelta = 0)
     {
         EnsureRunning();
+        ValidateAuthorization(authorization);
         if (string.IsNullOrWhiteSpace(reason) || completedTradeCountDelta < 0)
         {
             throw new TradingException("correction", "Audited correction input is invalid.");
@@ -480,7 +493,7 @@ public sealed class PaperTradingEngine
         if (resultingCash < 0m || resultingQuantity < 0 ||
             (resultingQuantity > 0 && averageCostAfter < 0m))
             throw new TradingException("correction", "Correction creates invalid accounting state.");
-        var payload = $"{cashDelta}|{instrument}|{quantityDelta}|{averageCostAfter}|{completedTradeCountDelta}|{at:O}|{reason}";
+        var payload = $"{cashDelta}|{instrument}|{quantityDelta}|{averageCostAfter}|{completedTradeCountDelta}|{at:O}|{reason}|{authorization}";
         if (!BeginAction(agentId, reference, payload)) return;
         account.Cash = resultingCash;
         account.CompletedTradeCount += completedTradeCountDelta;
@@ -494,7 +507,7 @@ public sealed class PaperTradingEngine
     }
 
     private OrderOutcome Fill(Guid orderId, VerifiedMarketObservation quote, TradingSession session,
-        IReadOnlyDictionary<InstrumentId, decimal> marks)
+        IReadOnlyDictionary<InstrumentId, VerifiedMarketObservation> marks)
     {
         var order = GetQueuedOrder(orderId);
         var decision = order.Decision;
@@ -520,9 +533,10 @@ public sealed class PaperTradingEngine
         var markedCapital = account.Cash;
         foreach (var position in account.Positions.Values)
         {
-            if (!marks.TryGetValue(position.Instrument, out var mark) || mark <= 0m)
+            if (!marks.TryGetValue(position.Instrument, out var mark) ||
+                !IsEligibleMark(mark, position.Instrument, quote, session))
                 throw Reject(order, "marks", "Verified mark missing for held instrument.");
-            markedCapital += mark * position.Quantity;
+            markedCapital += mark.Price * position.Quantity;
         }
         if (account.FeeTier == FeeTier.Mini || markedCapital >= 50_000m || account.CompletedTradeCount >= 500)
             account.FeeTier = FeeTier.Mini;
@@ -539,7 +553,7 @@ public sealed class PaperTradingEngine
             var targetValue = account.Positions.Values
                 .Where(position => string.Equals(position.Instrument.IssuerKey, instrument.IssuerKey,
                     StringComparison.Ordinal) && position.Instrument != instrument)
-                .Sum(position => marks[position.Instrument] * position.Quantity) +
+                .Sum(position => marks[position.Instrument].Price * position.Quantity) +
                 quote.Price * resultingQuantity;
             var postCapital = markedCapital + raw - total;
             if (postCapital <= 0m || targetValue / postCapital > ContestContract.MaximumIssuerWeight)
@@ -627,6 +641,26 @@ public sealed class PaperTradingEngine
         return Uri.UnescapeDataString(quote.RawSourceUrl.Query.TrimStart('?')) == expected;
     }
 
+    private static bool IsEligibleMark(VerifiedMarketObservation mark, InstrumentId instrument,
+        VerifiedMarketObservation executionQuote, TradingSession session) =>
+        mark.Instrument == instrument && mark.Price > 0m && mark.Quantity > 0 &&
+        mark.SessionId == session.Id && session.Contains(mark.TradedAt) &&
+        mark.TradedAt <= executionQuote.TradedAt && executionQuote.TradedAt - mark.TradedAt <= TimeSpan.FromMinutes(20) &&
+        mark.RetrievedAt <= executionQuote.RetrievedAt &&
+        mark.RetrievedAt - mark.TradedAt >= TimeSpan.FromMinutes(15) &&
+        mark.RetrievedAt - mark.TradedAt <= TimeSpan.FromMinutes(20) &&
+        !mark.HasWarning && !mark.IsSuspended && HasArchiveProvenance(mark);
+
+    private static void ValidateAuthorization(CorporateActionAuthorization authorization)
+    {
+        if (authorization is null || string.IsNullOrWhiteSpace(authorization.PrimaryEvidenceAuthority) ||
+            string.IsNullOrWhiteSpace(authorization.IndependentEvidenceAuthority) ||
+            string.IsNullOrWhiteSpace(authorization.ApprovedBy) ||
+            string.Equals(authorization.PrimaryEvidenceAuthority, authorization.IndependentEvidenceAuthority,
+                StringComparison.Ordinal))
+            throw new TradingException("authorization", "Independent evidence and owner approval are required.");
+    }
+
     private static void ValidateClosingQuote(InstrumentId instrument, VerifiedMarketObservation quote,
         TradingSession session, DateTimeOffset finalizedAt)
     {
@@ -634,7 +668,7 @@ public sealed class PaperTradingEngine
             quote.AverageDailyValue20 <= 0m || quote.SessionId != session.Id ||
             quote.TradedAt != session.CloseAt || quote.RetrievedAt - quote.TradedAt < TimeSpan.FromMinutes(15) ||
             quote.RetrievedAt - quote.TradedAt > TimeSpan.FromMinutes(20) ||
-            quote.RetrievedAt > finalizedAt || !HasArchiveProvenance(quote) ||
+            quote.RetrievedAt > finalizedAt || !quote.IsOfficialPats || !HasArchiveProvenance(quote) ||
             quote.HasWarning || quote.IsSuspended || (quote.Bid is null) != (quote.Ask is null) ||
             quote.Bid is not null && (quote.Bid <= 0m || quote.Ask < quote.Bid))
             throw new TradingException("closing-quote", "Official closing-auction quote is invalid.");

@@ -18,6 +18,30 @@ public sealed class ExecutionAndRiskTests
     }
 
     [Fact]
+    public void Slippage_rate_is_rounded_to_sql_scale_before_execution_price()
+    {
+        var quote = TestData.Quote(price: 102.75m, adv: 1_234_567.89m);
+        Assert.Equal(102.8589m, ExecutionMath.ExecutionPrice(OrderSide.Buy, quote, 719.25m));
+    }
+
+    [Fact]
+    public void Stale_or_wrong_session_marks_cannot_select_fee_tier_or_concentration()
+    {
+        var engine = PaperTradingEngine.CreateContest();
+        engine.ApplyCorrection(TestData.Agent.Id, "seed", 0m, TestData.Atlas, 1, 20_000m,
+            TestData.Open, "authorized seed", TestData.Authorization());
+        var stale = TestData.Quote(TestData.Atlas, 20_000m,
+            tradedAt: TestData.Open.AddDays(-1)) with
+        { SessionId = "old-session" };
+
+        var error = Assert.Throws<TradingException>(() => engine.Submit(TestData.Decision(),
+            TestData.Quote(), TestData.Session,
+            new Dictionary<InstrumentId, VerifiedMarketObservation> { [TestData.Atlas] = stale }));
+
+        Assert.Equal("marks", error.Code);
+    }
+
+    [Fact]
     public void Buy_fill_is_adverse_and_updates_cash_holdings_and_weighted_average_cost()
     {
         var engine = PaperTradingEngine.CreateContest();
@@ -117,20 +141,20 @@ public sealed class ExecutionAndRiskTests
     {
         var byCapital = PaperTradingEngine.CreateContest();
         byCapital.ApplyCorrection(TestData.Agent.Id, "capital", 20_000m, null, 0, 0m,
-            TestData.Open, "verified correction");
+            TestData.Open, "verified correction", TestData.Authorization("capital"));
         var capitalFill = byCapital.Submit(TestData.Decision(quantity: 1), TestData.Quote(), TestData.Session,
             TestData.Marks());
         Assert.Equal(1m, capitalFill.Fee);
         Assert.Equal(FeeTier.Mini, byCapital.Portfolio(TestData.Agent.Id).FeeTier);
         byCapital.ApplyCorrection(TestData.Agent.Id, "down", -25_000m, null, 0, 0m,
-            TestData.Open, "verified correction");
+            TestData.Open, "verified correction", TestData.Authorization("down"));
         var permanent = byCapital.Submit(TestData.Decision("later", quantity: 1), TestData.Quote(),
             TestData.Session, TestData.Marks((TestData.Volvo, 100m)));
         Assert.Equal(1m, permanent.Fee);
 
         var byCount = PaperTradingEngine.CreateContest();
         byCount.ApplyCorrection(TestData.Agent.Id, "count", 0m, null, 0, 0m,
-            TestData.Open, "verified correction", completedTradeCountDelta: 500);
+            TestData.Open, "verified correction", TestData.Authorization("count"), completedTradeCountDelta: 500);
         var trade501 = byCount.Submit(TestData.Decision(quantity: 1), TestData.Quote(), TestData.Session,
             TestData.Marks());
         Assert.Equal(1m, trade501.Fee);

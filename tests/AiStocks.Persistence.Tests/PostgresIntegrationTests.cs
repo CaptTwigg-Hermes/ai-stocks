@@ -23,6 +23,7 @@ public sealed class PostgresIntegrationTests
     public async Task RealPostgresEnforcesMigrationReplayAuditAndIdempotency()
     {
         if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ResetDatabase(dataSource);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
@@ -49,17 +50,33 @@ public sealed class PostgresIntegrationTests
             VALUES($1,'SE0000000001','TESTISSUER0000000001','book-1','XSTO','TEST','ESVUFR','2026-01-01',
                    '{"source":"test"}',canonical_jsonb_sha256('{"source":"test"}'))
             """, instrument);
+        await Execute(connection, """
+            INSERT INTO trading_sessions(session_id,session_day,opens_at,closes_at)
+            VALUES('authority-session','2026-06-01','2026-06-01T08:00:00Z','2026-06-01T16:00:00Z')
+            """);
+        await Execute(connection, """
+            INSERT INTO raw_market_reports VALUES(gen_random_uuid(),'authority-report','https://example.test/report',
+              '2026-06-01T09:15:00Z','x',encode(digest('x','sha256'),'hex'),'{"fixture":true}',
+              canonical_jsonb_sha256('{"fixture":true}'))
+            """);
+        await Execute(connection, """
+            INSERT INTO market_observations(id,instrument_id,raw_market_report_id,traded_at,retrieved_at,price,quantity,
+              average_daily_value_20,complete_history_sessions,session_id,is_official_pats,warning,suspended,verified,source_json,source_hash)
+            SELECT gen_random_uuid(),$1,id,'2026-06-01T09:00:00Z','2026-06-01T09:15:00Z',99,10,
+              1000000,20,'authority-session',false,false,false,true,'{"price":99}',canonical_jsonb_sha256('{"price":99}')
+            FROM raw_market_reports WHERE report_name='authority-report'
+            """, instrument);
 
         using var request = JsonDocument.Parse("{\"decision\":\"same\",\"quantity\":1}");
         var json = CanonicalJson.Serialize(request.RootElement);
         var hash = CanonicalJson.Sha256(request.RootElement);
         var order = Guid.NewGuid();
         var first = await ScalarGuid(connection, """
-            SELECT submit_order($1,$2,'same-decision','same-key','BUY',$3,1,clock_timestamp(),100,
+            SELECT submit_order($1,$2,'same-decision','same-key','BUY',$3,1,'2026-06-01T09:16:00Z',
                                 $4::jsonb,$5::sha256_hex)
             """, order, Guid.Parse("11111111-1111-1111-1111-111111111111"), instrument, json, hash);
         var replay = await ScalarGuid(connection, """
-            SELECT submit_order($1,$2,'same-decision','same-key','BUY',$3,1,clock_timestamp(),100,
+            SELECT submit_order($1,$2,'same-decision','same-key','BUY',$3,1,'2026-06-01T09:16:00Z',
                                 $4::jsonb,$5::sha256_hex)
             """, Guid.NewGuid(), Guid.Parse("11111111-1111-1111-1111-111111111111"), instrument, json, hash);
         Assert.Equal(first, replay);
@@ -67,7 +84,7 @@ public sealed class PostgresIntegrationTests
         using var conflictDocument = JsonDocument.Parse("{\"decision\":\"different\",\"quantity\":1}");
         var conflictJson = CanonicalJson.Serialize(conflictDocument.RootElement);
         var conflict = await Assert.ThrowsAsync<PostgresException>(() => ScalarGuid(connection, """
-            SELECT submit_order($1,$2,'other-decision','same-key','BUY',$3,1,clock_timestamp(),100,
+            SELECT submit_order($1,$2,'other-decision','same-key','BUY',$3,1,'2026-06-01T09:16:00Z',
                                 $4::jsonb,$5::sha256_hex)
             """, Guid.NewGuid(), Guid.Parse("11111111-1111-1111-1111-111111111111"), instrument,
             conflictJson, CanonicalJson.Sha256(conflictDocument.RootElement)));
@@ -78,6 +95,7 @@ public sealed class PostgresIntegrationTests
     public async Task RealPostgresSerializesConcurrentOverspendAndOversell()
     {
         if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ResetDatabase(dataSource);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
@@ -127,6 +145,7 @@ public sealed class PostgresIntegrationTests
     public async Task RealPostgresEnforcesFirstEligibleFillCostBasisCorporateActionsAndReplay()
     {
         if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ResetDatabase(dataSource);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
@@ -160,6 +179,8 @@ public sealed class PostgresIntegrationTests
             INSERT INTO market_observations(id,instrument_id,raw_market_report_id,traded_at,retrieved_at,price,quantity,
               bid,ask,average_daily_value_20,complete_history_sessions,session_id,is_official_pats,warning,suspended,verified,source_json,source_hash)
             VALUES
+              (gen_random_uuid(),$2,$3,'2026-06-21T09:40:00Z','2026-06-21T09:55:00Z',99,10,99,99,1000000,20,'s20',false,false,false,true,
+               '{"observation":0}',canonical_jsonb_sha256('{"observation":0}')),
               ($1,$2,$3,'2026-06-21T10:00:00Z','2026-06-21T10:15:00Z',100,10,99.9,100.1,1000000,20,'s20',false,false,false,true,
                '{"observation":1}',canonical_jsonb_sha256('{"observation":1}')),
               ($4,$2,$3,'2026-06-21T10:01:00Z','2026-06-21T10:16:00Z',100,10,99.9,100.1,1000000,20,'s20',false,false,false,true,
@@ -167,7 +188,7 @@ public sealed class PostgresIntegrationTests
             """, firstObservation, instrument, report, laterObservation);
         await ScalarGuid(connection, """
             SELECT submit_order($1,'11111111-1111-1111-1111-111111111111','basis-order','basis-key','BUY',$2,1,
-              '2026-06-21T09:59:00Z',100,'{"order":"basis"}',canonical_jsonb_sha256('{"order":"basis"}'))
+              '2026-06-21T09:59:00Z','{"order":"basis"}',canonical_jsonb_sha256('{"order":"basis"}'))
             """, order, instrument);
         var rejected = await Assert.ThrowsAsync<PostgresException>(() => ScalarGuid(connection, """
             SELECT record_fill(gen_random_uuid(),gen_random_uuid(),gen_random_uuid(),$1,
@@ -202,8 +223,8 @@ public sealed class PostgresIntegrationTests
         await Execute(connection, """
             INSERT INTO corporate_actions VALUES($1,'split-fixture',$2,'SPLIT','2026-06-22T08:00:00Z',
               '{"numerator":3,"denominator":2}',canonical_jsonb_sha256('{"numerator":3,"denominator":2}'),
-              '{"primary":true}',canonical_jsonb_sha256('{"primary":true}'),
-              '{"secondary":true}',canonical_jsonb_sha256('{"secondary":true}'),'test','2026-06-21T12:00:00Z')
+              '{"authority":"nasdaq","primary":true}',canonical_jsonb_sha256('{"authority":"nasdaq","primary":true}'),
+              '{"authority":"independent","secondary":true}',canonical_jsonb_sha256('{"authority":"independent","secondary":true}'),'owner:test','2026-06-21T12:00:00Z')
             """, action, instrument);
         var applied = await ScalarGuid(connection,
             "SELECT apply_corporate_action($1,'11111111-1111-1111-1111-111111111111',$2,$3,'2026-06-22T08:00:00Z')",
@@ -227,6 +248,7 @@ public sealed class PostgresIntegrationTests
     public async Task RealPostgresFinalLiquidationUsesOfficialCloseCompetitionRankingAndReplay()
     {
         if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ResetDatabase(dataSource);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
@@ -240,17 +262,20 @@ public sealed class PostgresIntegrationTests
               '{"instrument":20}',canonical_jsonb_sha256('{"instrument":20}'))
             """, instrument);
         await Execute(connection, """
-            INSERT INTO trading_sessions VALUES('final','2026-12-30','2026-12-30T08:00:00Z','2026-12-30T16:00:00Z',true)
+            INSERT INTO trading_sessions(session_id,session_day,opens_at,closes_at,is_final,calendar_sha256,trading_hours_sha256)
+            VALUES('XSTO-2026-12-30','2026-12-30','2026-12-30T08:00:00Z','2026-12-30T16:30:00Z',true,
+              '867f80011a2d8cf91f29dce6de8b6c77d4c4fda0954efa8f757f40b25c585395',
+              'f16f58c7520eaaae3210ddab666e7bde2609d1935c69e9f5d706bbd0d14fe395')
             """);
         await Execute(connection, """
-            INSERT INTO raw_market_reports VALUES($1,'final-fixture','https://example.test/final','2026-12-30T16:15:00Z',
+            INSERT INTO raw_market_reports VALUES($1,'final-fixture','https://example.test/final','2026-12-30T16:45:00Z',
               'x',encode(digest('x','sha256'),'hex'),'{"final":true}',canonical_jsonb_sha256('{"final":true}'))
             """, report);
         await Execute(connection, """
             INSERT INTO market_observations(id,instrument_id,raw_market_report_id,traded_at,retrieved_at,price,quantity,bid,ask,
               average_daily_value_20,complete_history_sessions,session_id,is_official_pats,warning,suspended,verified,source_json,source_hash)
-            VALUES(gen_random_uuid(),$1,$2,'2026-12-30T16:00:00Z','2026-12-30T16:15:00Z',100,100,NULL,NULL,
-              1000000,20,'final',true,false,false,true,'{"official":true}',canonical_jsonb_sha256('{"official":true}'))
+            VALUES(gen_random_uuid(),$1,$2,'2026-12-30T16:30:00Z','2026-12-30T16:45:00Z',100,100,NULL,NULL,
+              1000000,20,'XSTO-2026-12-30',true,false,false,true,'{"official":true}',canonical_jsonb_sha256('{"official":true}'))
             """, instrument, report);
         foreach (var agent in new[] { "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222" })
             await Execute(connection, """
@@ -260,29 +285,33 @@ public sealed class PostgresIntegrationTests
                   jsonb_build_object('seed_agent',$1),canonical_jsonb_sha256(jsonb_build_object('seed_agent',$1)))
                 """, agent, instrument);
         await Execute(connection, """
-            SELECT finalize_contest('final-2026',gen_random_uuid(),'final-key','{"final":2026}',
-              canonical_jsonb_sha256('{"final":2026}'),'2026-12-30T16:16:00Z')
+            SELECT finalize_contest('XSTO-2026-12-30-final',gen_random_uuid(),'XSTO-2026-12-30-final',
+              '{"session_id":"XSTO-2026-12-30"}',canonical_jsonb_sha256('{"session_id":"XSTO-2026-12-30"}'),
+              '2026-12-30T16:50:00Z')
             """);
         Assert.Equal(2L, await ScalarLong(connection, "SELECT count(*) FROM ledger_events WHERE event_type='FINAL_LIQUIDATION'"));
         Assert.Equal(0L, await ScalarLong(connection, "SELECT sum(quantity) FROM positions"));
         Assert.Equal(1L, await ScalarLong(connection,
-            "SELECT rank FROM final_rankings WHERE reference='final-2026' AND agent_id='11111111-1111-1111-1111-111111111111'"));
+            "SELECT rank FROM final_rankings WHERE reference='XSTO-2026-12-30-final' AND agent_id='11111111-1111-1111-1111-111111111111'"));
         Assert.Equal(1L, await ScalarLong(connection,
-            "SELECT rank FROM final_rankings WHERE reference='final-2026' AND agent_id='22222222-2222-2222-2222-222222222222'"));
+            "SELECT rank FROM final_rankings WHERE reference='XSTO-2026-12-30-final' AND agent_id='22222222-2222-2222-2222-222222222222'"));
         Assert.Equal(3L, await ScalarLong(connection,
-            "SELECT rank FROM final_rankings WHERE reference='final-2026' AND agent_id='33333333-3333-3333-3333-333333333333'"));
+            "SELECT rank FROM final_rankings WHERE reference='XSTO-2026-12-30-final' AND agent_id='33333333-3333-3333-3333-333333333333'"));
         await Execute(connection, """
-            SELECT finalize_contest('final-2026',gen_random_uuid(),'final-key','{"final":2026}',
-              canonical_jsonb_sha256('{"final":2026}'),'2026-12-30T16:17:00Z')
+            SELECT finalize_contest('XSTO-2026-12-30-final',gen_random_uuid(),'XSTO-2026-12-30-final',
+              '{"session_id":"XSTO-2026-12-30"}',canonical_jsonb_sha256('{"session_id":"XSTO-2026-12-30"}'),
+              '2026-12-30T16:50:00Z')
             """);
         Assert.Equal(2L, await ScalarLong(connection, "SELECT count(*) FROM ledger_events WHERE event_type='FINAL_LIQUIDATION'"));
-        Assert.Equal(4L, await ScalarLong(connection, "SELECT count(*) FROM final_rankings WHERE reference='final-2026'"));
+        Assert.Equal(4L, await ScalarLong(connection,
+            "SELECT count(*) FROM final_rankings WHERE reference='XSTO-2026-12-30-final'"));
     }
 
     [Fact]
     public async Task MigrationRefusesUnmanagedLegacyApplicationTables()
     {
         if (ConnectionString is not { } connectionString) return;
+        await EnsureTestDatabase(connectionString);
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ResetDatabase(dataSource);
         try
@@ -307,6 +336,25 @@ public sealed class PostgresIntegrationTests
         await using var connection = await source.OpenConnectionAsync(CancellationToken.None);
         await Execute(connection, "DROP SCHEMA public CASCADE; CREATE SCHEMA public");
     }
+
+    private static async Task EnsureTestDatabase(string connectionString)
+    {
+        var target = new NpgsqlConnectionStringBuilder(connectionString);
+        var database = target.Database ?? throw new InvalidOperationException("Test database is required.");
+        if (!database.Contains("test", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Test database name must contain test.");
+        var maintenance = new NpgsqlConnectionStringBuilder(connectionString) { Database = "postgres" };
+        await using var connection = new NpgsqlConnection(maintenance.ConnectionString);
+        await connection.OpenAsync(CancellationToken.None);
+        await using var exists = new NpgsqlCommand("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)", connection);
+        exists.Parameters.AddWithValue(database);
+        if (await exists.ExecuteScalarAsync(CancellationToken.None) is true) return;
+        await using var create = new NpgsqlCommand($"CREATE DATABASE {QuoteIdentifier(database)} TEMPLATE template0", connection);
+        await create.ExecuteNonQueryAsync(CancellationToken.None);
+    }
+
+    private static string QuoteIdentifier(string value) =>
+        $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
 
     private static async Task<bool[]> Race(NpgsqlDataSource source, IEnumerable<(string Sql, object P1)> commands)
         => await Race(source, commands.Select(x => (x.Sql, x.P1, (object?)null)));

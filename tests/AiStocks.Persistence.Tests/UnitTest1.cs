@@ -45,7 +45,10 @@ public sealed class PersistenceContractTests
             "corporate_action_id", "pg_advisory_xact_lock", "pg_try_advisory_xact_lock",
             "FOR UPDATE SKIP LOCKED", "same idempotency key has conflicting canonical hash",
             "contest may only finish once", "rank() OVER", "apply_corporate_action",
-            "observation is not the first eligible quote", "issuer_id", "is_official_pats"
+            "observation is not the first eligible quote", "issuer_id", "is_official_pats",
+            "observations traded during a pause are ineligible", "latest verified pre-decision observation is required",
+            "XSTO-2026-12-30-final", "867f80011a2d8cf91f29dce6de8b6c77d4c4fda0954efa8f757f40b25c585395",
+            "primary_evidence_json->>'authority' <> secondary_evidence_json->>'authority'"
         ];
         foreach (var fragment in required)
             Assert.Contains(fragment, Sql, StringComparison.OrdinalIgnoreCase);

@@ -60,7 +60,7 @@ public sealed class ValidationBoundaryTests
         var first = new InstrumentId("SE-A", "A", "XSTO", "issuer-1");
         var second = new InstrumentId("SE-B", "B", "XSTO", "issuer-1");
         engine.ApplyCorrection(TestData.Agent.Id, "seed", 0m, first, 75, 100m,
-            TestData.Open, "verified seed");
+            TestData.Open, "verified seed", TestData.Authorization("seed"));
         var decision = TestData.Decision(instrument: second, quantity: 20);
         var quote = TestData.Quote(instrument: second, adv: 1_000_000m);
         var error = Assert.Throws<TradingException>(() => engine.Submit(decision, quote,

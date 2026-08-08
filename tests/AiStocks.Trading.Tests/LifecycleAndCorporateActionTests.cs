@@ -87,10 +87,24 @@ public sealed class LifecycleAndCorporateActionTests
             engine.Pause(TestData.Open.AddMinutes(1), "again")).Code);
         Assert.Equal("paused", Assert.Throws<TradingException>(() => engine.Submit(
             TestData.Decision(), null, null, TestData.Marks())).Code);
+        Assert.Equal("paused", Assert.Throws<TradingException>(() => engine.Cancel(
+            TestData.Agent.Id, Guid.NewGuid(), "cancel", "paused-cancel", TestData.Open)).Code);
         Assert.Equal("pause-state", Assert.Throws<TradingException>(() =>
             engine.Resume(TestData.Open, "too soon")).Code);
         engine.Resume(TestData.Open.AddMinutes(1), "safe");
         Assert.Equal(ContestStatus.Running, engine.Status);
+    }
+
+    [Fact]
+    public void Corrections_require_independent_non_null_authorization()
+    {
+        var engine = PaperTradingEngine.CreateContest();
+        Assert.Equal("authorization", Assert.Throws<TradingException>(() => engine.ApplyCorrection(
+            TestData.Agent.Id, "mint", 10_000m, null, 0, 0m, TestData.Open, "mint", null!)).Code);
+        Assert.Equal("authorization", Assert.Throws<TradingException>(() => engine.ApplyCorrection(
+            TestData.Agent.Id, "same-source", 10_000m, null, 0, 0m, TestData.Open, "mint",
+            new CorporateActionAuthorization("same", "same", "owner"))).Code);
+        Assert.Equal(30_000m, engine.Portfolio(TestData.Agent.Id).Cash);
     }
 
     [Fact]
@@ -99,9 +113,11 @@ public sealed class LifecycleAndCorporateActionTests
         var engine = SeedTenShares();
         var closeBeforeExDate = TestData.Open.AddDays(1).AddHours(8);
         engine.ApplyDividend(TestData.Agent.Id, TestData.Volvo, 5m, closeBeforeExDate,
-            DateOnly.FromDateTime(closeBeforeExDate.AddDays(1).Date), closeBeforeExDate.AddDays(10), "div-1");
+            DateOnly.FromDateTime(closeBeforeExDate.AddDays(1).Date), closeBeforeExDate.AddDays(10), "div-1",
+            TestData.Authorization("div"));
         engine.ApplyDividend(TestData.Agent.Id, TestData.Volvo, 5m, closeBeforeExDate,
-            DateOnly.FromDateTime(closeBeforeExDate.AddDays(1).Date), closeBeforeExDate.AddDays(10), "div-1");
+            DateOnly.FromDateTime(closeBeforeExDate.AddDays(1).Date), closeBeforeExDate.AddDays(10), "div-1",
+            TestData.Authorization("div"));
         Assert.Equal(29_048.98m, engine.Portfolio(TestData.Agent.Id).Cash);
         var dividend = Assert.Single(engine.AuditTrail, item => item.Type == "DIVIDEND");
         Assert.Equal(closeBeforeExDate.AddDays(10), dividend.OccurredAt);
@@ -112,7 +128,8 @@ public sealed class LifecycleAndCorporateActionTests
     public void Split_preserves_total_cost_and_freezes_fractional_entitlement()
     {
         var engine = SeedTenShares();
-        engine.ApplySplit(TestData.Agent.Id, TestData.Volvo, 3, 4, TestData.Open.AddDays(1), "split-1");
+        engine.ApplySplit(TestData.Agent.Id, TestData.Volvo, 3, 4, TestData.Open.AddDays(1), "split-1",
+            TestData.Authorization("split"));
         var position = Assert.Single(engine.Portfolio(TestData.Agent.Id).Positions);
         Assert.Equal(7, position.Quantity);
         Assert.Equal(133.4693m, position.AverageCost);
@@ -125,13 +142,13 @@ public sealed class LifecycleAndCorporateActionTests
     {
         var engine = SeedTenShares();
         engine.ApplyStockMerger(TestData.Agent.Id, TestData.Volvo, TestData.Atlas, 1, 2,
-            TestData.Open.AddDays(1), "stock-merger");
+            TestData.Open.AddDays(1), "stock-merger", TestData.Authorization("stock-merger"));
         var transferred = Assert.Single(engine.Portfolio(TestData.Agent.Id).Positions);
         Assert.Equal(TestData.Atlas, transferred.Instrument);
         Assert.Equal(5, transferred.Quantity);
         Assert.Equal(200.204m, transferred.AverageCost);
         engine.ApplyCashMerger(TestData.Agent.Id, TestData.Atlas, 250m,
-            TestData.Open.AddDays(2), "cash-merger");
+            TestData.Open.AddDays(2), "cash-merger", TestData.Authorization("cash-merger"));
         Assert.Empty(engine.Portfolio(TestData.Agent.Id).Positions);
         Assert.Equal(30_248.98m, engine.Portfolio(TestData.Agent.Id).Cash);
     }
@@ -141,12 +158,12 @@ public sealed class LifecycleAndCorporateActionTests
     {
         var engine = PaperTradingEngine.CreateContest();
         engine.ApplyCorrection(TestData.Agent.Id, "old", 0m, TestData.Volvo, 3, 100m,
-            TestData.Open, "verified old shares");
+            TestData.Open, "verified old shares", TestData.Authorization("old"));
         engine.ApplyCorrection(TestData.Agent.Id, "target", 0m, TestData.Atlas, 1, 100m,
-            TestData.Open, "verified target share");
+            TestData.Open, "verified target share", TestData.Authorization("target"));
 
         engine.ApplyStockMerger(TestData.Agent.Id, TestData.Volvo, TestData.Atlas, 1, 2,
-            TestData.Open.AddDays(1), "fractional-merger");
+            TestData.Open.AddDays(1), "fractional-merger", TestData.Authorization("fractional"));
 
         var position = Assert.Single(engine.Portfolio(TestData.Agent.Id).Positions);
         Assert.Equal(2, position.Quantity);
@@ -161,12 +178,12 @@ public sealed class LifecycleAndCorporateActionTests
     {
         var engine = SeedTenShares();
         engine.ApplyDelisting(TestData.Agent.Id, TestData.Volvo, null,
-            TestData.Open.AddDays(1), "delist");
+            TestData.Open.AddDays(1), "delist", TestData.Authorization("delist"));
         Assert.True(engine.IsFrozen(TestData.Agent.Id, TestData.Volvo));
         Assert.Throws<TradingException>(() => engine.Submit(TestData.Decision("sell", DecisionAction.Sell),
             TestData.Quote(), TestData.Session, TestData.Marks((TestData.Volvo, 100m))));
         engine.SettleDelisting(TestData.Agent.Id, TestData.Volvo, 80m,
-            TestData.Open.AddDays(5), "delist-settlement");
+            TestData.Open.AddDays(5), "delist-settlement", TestData.Authorization("settlement"));
         Assert.False(engine.IsFrozen(TestData.Agent.Id, TestData.Volvo));
         Assert.Empty(engine.Portfolio(TestData.Agent.Id).Positions);
         Assert.Equal(29_798.98m, engine.Portfolio(TestData.Agent.Id).Cash);
@@ -177,13 +194,13 @@ public sealed class LifecycleAndCorporateActionTests
     {
         var engine = PaperTradingEngine.CreateContest();
         engine.ApplyCorrection(TestData.Agent.Id, "fix-1", 10m, null, 0, 0m,
-            TestData.Open, "bad source corrected");
+            TestData.Open, "bad source corrected", TestData.Authorization("fix"));
         engine.ApplyCorrection(TestData.Agent.Id, "fix-1", 10m, null, 0, 0m,
-            TestData.Open, "bad source corrected");
+            TestData.Open, "bad source corrected", TestData.Authorization("fix"));
         Assert.Equal(30_010m, engine.Portfolio(TestData.Agent.Id).Cash);
         Assert.Equal("reference-conflict", Assert.Throws<TradingException>(() => engine.ApplyCorrection(
             TestData.Agent.Id, "fix-1", 11m, null, 0, 0m, TestData.Open,
-            "bad source corrected")).Code);
+            "bad source corrected", TestData.Authorization("fix"))).Code);
         Assert.Single(engine.AuditTrail, item => item.Type == "CORRECTION");
     }
 

@@ -109,7 +109,13 @@ public sealed record VerifiedMarketObservation(
     bool IsSuspended,
     string RawReportName,
     Uri RawSourceUrl,
-    string ManifestSha256);
+    string ManifestSha256,
+    bool IsOfficialPats);
+
+public sealed record CorporateActionAuthorization(
+    string PrimaryEvidenceAuthority,
+    string IndependentEvidenceAuthority,
+    string ApprovedBy);
 
 public sealed record OrderDecision(
     string DecisionId,
