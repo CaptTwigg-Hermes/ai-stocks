@@ -1,16 +1,16 @@
 # Graph Report - coordinator  (2026-08-08)
 
 ## Corpus Check
-- 176 files · ~98,391 words
+- 177 files · ~98,397 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2779 nodes · 6131 edges · 216 communities (197 shown, 19 thin omitted)
+- 2780 nodes · 6131 edges · 215 communities (196 shown, 19 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 250 edges (avg confidence: 0.57)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2bb15b27`
+- Built from commit: `8d38ef5d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -182,7 +182,6 @@
 - [[_COMMUNITY_Community 170|Community 170]]
 - [[_COMMUNITY_Community 171|Community 171]]
 - [[_COMMUNITY_Community 172|Community 172]]
-- [[_COMMUNITY_Community 173|Community 173]]
 - [[_COMMUNITY_Community 174|Community 174]]
 - [[_COMMUNITY_Community 175|Community 175]]
 - [[_COMMUNITY_Community 176|Community 176]]
@@ -223,7 +222,6 @@
 - [[_COMMUNITY_Community 211|Community 211]]
 - [[_COMMUNITY_Community 212|Community 212]]
 - [[_COMMUNITY_Community 213|Community 213]]
-- [[_COMMUNITY_Community 214|Community 214]]
 - [[_COMMUNITY_Community 215|Community 215]]
 
 ## God Nodes (most connected - your core abstractions)
@@ -253,7 +251,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (216 total, 19 thin omitted)
+## Communities (215 total, 19 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.16
@@ -325,7 +323,7 @@ Nodes (24): AgentOrchestrator, Database-backed scheduler-to-runner-to-trading or
 
 ### Community 29 - "Community 29"
 Cohesion: 0.08
-Nodes (22): AgentRunRequest, AgentRunResult, FakeDecisionPort, FakePausePort, FakeRunner, FakeRunStore, FakeSchedulePort, DurableOrchestrator (+14 more)
+Nodes (23): AgentRunRequest, AgentRunResult, FakeDecisionPort, FakeDiscord, FakePausePort, FakeRunner, FakeRunStore, FakeSchedulePort (+15 more)
 
 ### Community 30 - "Community 30"
 Cohesion: 0.16
@@ -336,8 +334,8 @@ Cohesion: 0.05
 Nodes (49): Microsoft.Extensions.Configuration, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.Configuration.FileExtensions, Microsoft.Extensions.Configuration.Json, Microsoft.Extensions.Diagnostics.Abstractions, Microsoft.Extensions.FileProviders.Abstractions, Microsoft.Extensions.FileProviders.Physical, Microsoft.Extensions.FileSystemGlobbing (+41 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.05
-Nodes (43): type, dependencies, net10.0, contentHash, resolved, type, contentHash, resolved (+35 more)
+Cohesion: 0.04
+Nodes (46): type, dependencies, net10.0, contentHash, resolved, type, contentHash, resolved (+38 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.05
@@ -369,7 +367,7 @@ Nodes (16): PostgresCollectorPersistence, PostgresDashboardFacade, AuditRow, Div
 
 ### Community 40 - "Community 40"
 Cohesion: 0.08
-Nodes (21): FakeBootstrapPort, FakeDeliveryStore, FakeDiscord, Acquired(), AlreadyCompleted(), AuditedDiscordDelivery, Busy(), Conflict() (+13 more)
+Nodes (20): FakeBootstrapPort, FakeDeliveryStore, Acquired(), AlreadyCompleted(), AuditedDiscordDelivery, Busy(), Conflict(), ContestBootstrapper (+12 more)
 
 ### Community 41 - "Community 41"
 Cohesion: 0.10
@@ -492,8 +490,8 @@ Cohesion: 0.09
 Nodes (9): IPaperTradingCommands, MarketReferenceAcquirer, PostgresMigrationRunner, CancellationToken, FirdsPlan, HttpContent, HttpRequestMessage, HttpResponseMessage (+1 more)
 
 ### Community 72 - "Community 72"
-Cohesion: 0.20
-Nodes (9): type, dependencies, type, dependencies, AiStocks.Core, net10.0, aistocks.core, aistocks.marketdata (+1 more)
+Cohesion: 0.14
+Nodes (13): type, dependencies, type, dependencies, AiStocks.Core, net10.0, aistocks.core, aistocks.marketdata (+5 more)
 
 ### Community 73 - "Community 73"
 Cohesion: 0.10
@@ -581,7 +579,7 @@ Nodes (5): CloudflareAccessValidatorTests, FakeJwksFetcher, MutableTimeProvider,
 
 ### Community 99 - "Community 99"
 Cohesion: 0.20
-Nodes (9): type, dependencies, net10.0, aistocks.core, xunit.assert, version, contentHash, resolved (+1 more)
+Nodes (9): type, dependencies, net10.0, aistocks.core, xunit.analyzers, version, contentHash, resolved (+1 more)
 
 ### Community 100 - "Community 100"
 Cohesion: 0.20
@@ -708,8 +706,8 @@ Cohesion: 0.29
 Nodes (6): net10.0, coverlet.collector (6.0.4), Microsoft.NET.Test.Sdk (17.14.1), xunit (2.9.3), xunit.runner.visualstudio (3.1.4), Microsoft.NET.Sdk
 
 ### Community 131 - "Community 131"
-Cohesion: 0.50
-Nodes (4): xunit.abstractions, contentHash, resolved, type
+Cohesion: 0.40
+Nodes (5): xunit.runner.visualstudio, contentHash, requested, resolved, type
 
 ### Community 132 - "Community 132"
 Cohesion: 0.29
@@ -721,7 +719,7 @@ Nodes (7): Microsoft.TestPlatform.ObjectModel, Newtonsoft.Json, contentHash, dep
 
 ### Community 134 - "Community 134"
 Cohesion: 0.50
-Nodes (4): xunit.analyzers, contentHash, resolved, type
+Nodes (4): xunit.assert, contentHash, resolved, type
 
 ### Community 135 - "Community 135"
 Cohesion: 0.33
@@ -867,10 +865,6 @@ Nodes (4): Newtonsoft.Json, contentHash, resolved, type
 Cohesion: 0.50
 Nodes (4): xunit.abstractions, contentHash, resolved, type
 
-### Community 173 - "Community 173"
-Cohesion: 0.50
-Nodes (4): xunit.analyzers, contentHash, resolved, type
-
 ### Community 174 - "Community 174"
 Cohesion: 0.50
 Nodes (4): contentHash, resolved, type, AngleSharp
@@ -1011,10 +1005,6 @@ Nodes (4): net10.0, Microsoft.NET.Sdk, net10.0, Microsoft.NET.Sdk.Web
 Cohesion: 0.50
 Nodes (4): xunit.assert, contentHash, resolved, type
 
-### Community 214 - "Community 214"
-Cohesion: 0.50
-Nodes (4): xunit.analyzers, contentHash, resolved, type
-
 ### Community 215 - "Community 215"
 Cohesion: 0.50
 Nodes (4): xunit.assert, contentHash, resolved, type
@@ -1028,11 +1018,11 @@ Nodes (4): xunit.assert, contentHash, resolved, type
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `TradingSession` connect `Community 25` to `Community 97`, `Community 68`, `Community 39`, `Community 105`, `Community 78`, `Community 18`, `Community 20`, `Community 54`, `Community 28`, `Community 29`?**
-  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+  _High betweenness centrality (0.039) - this node is a cross-community bridge._
 - **Why does `AgentContext` connect `Community 17` to `Community 5`, `Community 73`, `Community 86`, `Community 28`, `Community 29`?**
-  _High betweenness centrality (0.027) - this node is a cross-community bridge._
+  _High betweenness centrality (0.026) - this node is a cross-community bridge._
 - **Why does `AccessIdentity` connect `Community 19` to `Community 2`, `Community 3`, `Community 71`, `Community 46`, `Community 176`, `Community 50`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
 - **Are the 13 inferred relationships involving `TradingService` (e.g. with `MarketProvider` and `Quote`) actually correct?**
   _`TradingService` has 13 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `An Access assertion could not be authenticated or locally authorized.`, `One-time, idempotent initialization of the immutable contest state.`, `Pinned Nasdaq Stockholm equity calendar for the 2026 contest.` to the rest of the system?**

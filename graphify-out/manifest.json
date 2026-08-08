@@ -888,5 +888,10 @@
     "mtime": 1786206787.9536598,
     "ast_hash": "9d98f5bf978808a0c537955ec440feb7",
     "semantic_hash": ""
+  },
+  "tests/AiStocks.Persistence.Tests/AssemblyInfo.cs": {
+    "mtime": 1786206851.5669193,
+    "ast_hash": "312068e2bd97799bb5d90526200f0b6f",
+    "semantic_hash": ""
   }
 }

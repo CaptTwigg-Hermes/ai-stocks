@@ -14179,7 +14179,7 @@
       "source_location": "L352",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakediscord",
-      "community": 40,
+      "community": 29,
       "norm_label": "fakediscord"
     },
     {
@@ -14189,7 +14189,7 @@
       "source_location": "L355",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakediscord_sendasync",
-      "community": 40,
+      "community": 29,
       "norm_label": ".sendasync()"
     },
     {
@@ -16699,7 +16699,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "aistocks_marketdata_tests_packages_lock_net10_0_xunit_analyzers",
-      "community": 173,
+      "community": 72,
       "norm_label": "xunit.analyzers"
     },
     {
@@ -16709,7 +16709,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "aistocks_marketdata_tests_packages_lock_xunit_analyzers_type",
-      "community": 173,
+      "community": 72,
       "norm_label": "type"
     },
     {
@@ -16719,7 +16719,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "aistocks_marketdata_tests_packages_lock_xunit_analyzers_resolved",
-      "community": 173,
+      "community": 72,
       "norm_label": "resolved"
     },
     {
@@ -16729,7 +16729,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "aistocks_marketdata_tests_packages_lock_xunit_analyzers_contenthash",
-      "community": 173,
+      "community": 72,
       "norm_label": "contenthash"
     },
     {
@@ -17081,6 +17081,16 @@
       "id": "tests_aistocks_persistence_tests_aistocks_persistence_tests_csproj_sdk_microsoft_net_sdk",
       "community": 116,
       "norm_label": "microsoft.net.sdk"
+    },
+    {
+      "label": "AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "tests/AiStocks.Persistence.Tests/AssemblyInfo.cs",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "aistocks_persistence_tests_assemblyinfo",
+      "community": 173,
+      "norm_label": "assemblyinfo.cs"
     },
     {
       "label": "PostgresIntegrationTests.cs",
@@ -20629,7 +20639,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_net10_0_xunit_analyzers",
-      "community": 214,
+      "community": 99,
       "norm_label": "xunit.analyzers"
     },
     {
@@ -20639,7 +20649,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_analyzers_type",
-      "community": 214,
+      "community": 99,
       "norm_label": "type"
     },
     {
@@ -20649,7 +20659,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_analyzers_resolved",
-      "community": 214,
+      "community": 99,
       "norm_label": "resolved"
     },
     {
@@ -20659,7 +20669,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_analyzers_contenthash",
-      "community": 214,
+      "community": 99,
       "norm_label": "contenthash"
     },
     {
@@ -20669,7 +20679,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_net10_0_xunit_assert",
-      "community": 99,
+      "community": 134,
       "norm_label": "xunit.assert"
     },
     {
@@ -20679,7 +20689,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_assert_type",
-      "community": 99,
+      "community": 134,
       "norm_label": "type"
     },
     {
@@ -20689,7 +20699,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_assert_resolved",
-      "community": 99,
+      "community": 134,
       "norm_label": "resolved"
     },
     {
@@ -20699,7 +20709,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "aistocks_research_tests_packages_lock_xunit_assert_contenthash",
-      "community": 99,
+      "community": 134,
       "norm_label": "contenthash"
     },
     {
@@ -23269,7 +23279,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_net10_0_xunit_runner_visualstudio",
-      "community": 32,
+      "community": 131,
       "norm_label": "xunit.runner.visualstudio"
     },
     {
@@ -23279,7 +23289,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_runner_visualstudio_type",
-      "community": 32,
+      "community": 131,
       "norm_label": "type"
     },
     {
@@ -23289,7 +23299,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_runner_visualstudio_requested",
-      "community": 32,
+      "community": 131,
       "norm_label": "requested"
     },
     {
@@ -23299,7 +23309,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_runner_visualstudio_resolved",
-      "community": 32,
+      "community": 131,
       "norm_label": "resolved"
     },
     {
@@ -23309,7 +23319,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_runner_visualstudio_contenthash",
-      "community": 32,
+      "community": 131,
       "norm_label": "contenthash"
     },
     {
@@ -25369,7 +25379,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_net10_0_xunit_abstractions",
-      "community": 131,
+      "community": 32,
       "norm_label": "xunit.abstractions"
     },
     {
@@ -25379,7 +25389,7 @@
       "source_location": "L389",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_abstractions_type",
-      "community": 131,
+      "community": 32,
       "norm_label": "type"
     },
     {
@@ -25389,7 +25399,7 @@
       "source_location": "L390",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_abstractions_resolved",
-      "community": 131,
+      "community": 32,
       "norm_label": "resolved"
     },
     {
@@ -25399,7 +25409,7 @@
       "source_location": "L391",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_abstractions_contenthash",
-      "community": 131,
+      "community": 32,
       "norm_label": "contenthash"
     },
     {
@@ -25409,7 +25419,7 @@
       "source_location": "L393",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_net10_0_xunit_analyzers",
-      "community": 134,
+      "community": 32,
       "norm_label": "xunit.analyzers"
     },
     {
@@ -25419,7 +25429,7 @@
       "source_location": "L394",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_analyzers_type",
-      "community": 134,
+      "community": 32,
       "norm_label": "type"
     },
     {
@@ -25429,7 +25439,7 @@
       "source_location": "L395",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_analyzers_resolved",
-      "community": 134,
+      "community": 32,
       "norm_label": "resolved"
     },
     {
@@ -25439,7 +25449,7 @@
       "source_location": "L396",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_xunit_analyzers_contenthash",
-      "community": 134,
+      "community": 32,
       "norm_label": "contenthash"
     },
     {
@@ -39315,9 +39325,9 @@
       "source_location": "L135",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqcsv_tradeinstrumentmapper_resolve",
-      "target": "ai_stocks_nasdaq_feed_nasdaqtrade",
-      "confidence_score": 1.0
+      "target": "ai_stocks_nasdaq_feed_nasdaqtrade"
     },
     {
       "relation": "calls",
@@ -44996,9 +45006,9 @@
       "source_location": "L314",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postrunacceptance_ensurewithindeadline",
-      "target": "ai_stocks_schedule_runwindow",
-      "confidence_score": 1.0
+      "target": "ai_stocks_schedule_runwindow"
     },
     {
       "relation": "references",
@@ -48506,9 +48516,9 @@
       "source_file": "scripts/prove_no_broker.py",
       "source_location": "L40",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_prove_no_broker",
-      "target": "scripts_prove_no_broker_configuration_reads",
-      "confidence_score": 1.0
+      "target": "scripts_prove_no_broker_configuration_reads"
     },
     {
       "relation": "contains",
@@ -48536,9 +48546,9 @@
       "source_file": "scripts/prove_no_broker.py",
       "source_location": "L55",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_prove_no_broker",
-      "target": "scripts_prove_no_broker_order_path_denial_probe",
-      "confidence_score": 1.0
+      "target": "scripts_prove_no_broker_order_path_denial_probe"
     },
     {
       "relation": "contains",
@@ -48589,9 +48599,9 @@
       "source_file": "scripts/prove_no_broker.py",
       "source_location": "L182",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_prove_no_broker_inventory",
-      "target": "scripts_prove_no_broker_configuration_reads",
-      "confidence_score": 1.0
+      "target": "scripts_prove_no_broker_configuration_reads"
     },
     {
       "relation": "calls",
@@ -48600,9 +48610,9 @@
       "source_file": "scripts/prove_no_broker.py",
       "source_location": "L226",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_prove_no_broker_inventory",
-      "target": "scripts_prove_no_broker_order_path_denial_probe",
-      "confidence_score": 1.0
+      "target": "scripts_prove_no_broker_order_path_denial_probe"
     },
     {
       "relation": "calls",
@@ -48611,9 +48621,9 @@
       "source_file": "scripts/prove_no_broker.py",
       "source_location": "L58",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_prove_no_broker_order_path_denial_probe",
-      "target": "scripts_verify_release_path",
-      "confidence_score": 1.0
+      "target": "scripts_verify_release_path"
     },
     {
       "relation": "calls",
@@ -48981,9 +48991,9 @@
       "source_location": "L386",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -49267,9 +49277,9 @@
       "source_location": "L15",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_acquireasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -49278,9 +49288,9 @@
       "source_location": "L51",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_loadplanasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -49289,9 +49299,9 @@
       "source_location": "L68",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_readboundedasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -49575,9 +49585,9 @@
       "source_location": "L176",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport_sendasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -49586,9 +49596,9 @@
       "source_location": "L230",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_operationsruntimeservice_runasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -49597,9 +49607,9 @@
       "source_location": "L13",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgrescontestoperations_applyduecorporateactionsasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -49608,9 +49618,9 @@
       "source_location": "L42",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgrescontestoperations_finalizeifdueasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -49619,9 +49629,9 @@
       "source_location": "L111",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -49630,9 +49640,9 @@
       "source_location": "L67",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_publishifdueasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -49674,9 +49684,9 @@
       "source_location": "L166",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_recordingdiscord_sendasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -50224,9 +50234,9 @@
       "source_location": "L32",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_executeasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -50235,9 +50245,9 @@
       "source_location": "L8",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_loadreadyasync",
-      "target": "cancellationtoken",
-      "confidence_score": 1.0
+      "target": "cancellationtoken"
     },
     {
       "relation": "references",
@@ -50609,9 +50619,9 @@
       "source_location": "L386",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -50884,9 +50894,9 @@
       "source_location": "L164",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_core_tests_orchestrationtests_orchestrationtests_failingqueuedorderdoesnotpoisonlaterorders",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51016,9 +51026,9 @@
       "source_location": "L15",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_acquireasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51027,9 +51037,9 @@
       "source_location": "L51",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_loadplanasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51038,9 +51048,9 @@
       "source_location": "L68",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_readboundedasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51049,9 +51059,9 @@
       "source_location": "L152",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_activesessiondownloadsareboundedandverifiedrecentarchivesareskipped",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51060,9 +51070,9 @@
       "source_location": "L182",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_archivedreportisrefetchedonlyoncontrolledconflictcheckschedule",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51071,9 +51081,9 @@
       "source_location": "L209",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_cleanstartacquireschecksummedfirdsplanandarchivesnasdaqrssprovenance",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51401,9 +51411,9 @@
       "source_location": "L176",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport_sendasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51412,9 +51422,9 @@
       "source_location": "L230",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_operationsruntimeservice_runasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51423,9 +51433,9 @@
       "source_location": "L13",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgrescontestoperations_applyduecorporateactionsasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51434,9 +51444,9 @@
       "source_location": "L42",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgrescontestoperations_finalizeifdueasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51445,9 +51455,9 @@
       "source_location": "L111",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51456,9 +51466,9 @@
       "source_location": "L67",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_publishifdueasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51500,9 +51510,9 @@
       "source_location": "L615",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_assertinsufficientprivilege",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51566,9 +51576,9 @@
       "source_location": "L493",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresdeniescollectorandwebrunaccountingresetandfinalizationauthority",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51621,9 +51631,9 @@
       "source_location": "L518",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresrejectssuccessfulcompletionafterimmutabledeadline",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51698,9 +51708,9 @@
       "source_location": "L210",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase_createasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51709,9 +51719,9 @@
       "source_location": "L20",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_acceptedqueueflowsthroughfillactionsfinalizationreportandleaseddelivery",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51720,9 +51730,9 @@
       "source_location": "L175",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_executeasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51731,9 +51741,9 @@
       "source_location": "L196",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarboolasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51742,9 +51752,9 @@
       "source_location": "L182",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarlongasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51753,9 +51763,9 @@
       "source_location": "L189",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarstringasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51764,9 +51774,9 @@
       "source_location": "L166",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_recordingdiscord_sendasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -51885,9 +51895,9 @@
       "source_location": "L56",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_verifyasync_rejectsambiguouscssvisibility",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -52754,9 +52764,9 @@
       "source_location": "L32",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_executeasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -52765,9 +52775,9 @@
       "source_location": "L8",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_loadreadyasync",
-      "target": "task",
-      "confidence_score": 1.0
+      "target": "task"
     },
     {
       "relation": "references",
@@ -53173,9 +53183,9 @@
       "source_file": "src/AiStocks.Collector/PostgresCollectorPersistence.cs",
       "source_location": "L386",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence",
-      "target": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync",
-      "confidence_score": 1.0
+      "target": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync"
     },
     {
       "relation": "method",
@@ -53468,9 +53478,9 @@
       "source_location": "L103",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrss",
-      "target": "datetimeoffset",
-      "confidence_score": 1.0
+      "target": "datetimeoffset"
     },
     {
       "relation": "references",
@@ -53479,9 +53489,9 @@
       "source_location": "L112",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsssnapshot",
-      "target": "datetimeoffset",
-      "confidence_score": 1.0
+      "target": "datetimeoffset"
     },
     {
       "relation": "references",
@@ -53512,9 +53522,9 @@
       "source_location": "L15",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_acquireasync",
-      "target": "datetimeoffset",
-      "confidence_score": 1.0
+      "target": "datetimeoffset"
     },
     {
       "relation": "references",
@@ -53545,9 +53555,9 @@
       "source_location": "L11",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgrescontestoperations",
-      "target": "datetimeoffset",
-      "confidence_score": 1.0
+      "target": "datetimeoffset"
     },
     {
       "relation": "references",
@@ -53556,9 +53566,9 @@
       "source_location": "L13",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgrescontestoperations_applyduecorporateactionsasync",
-      "target": "datetimeoffset",
-      "confidence_score": 1.0
+      "target": "datetimeoffset"
     },
     {
       "relation": "references",
@@ -53567,9 +53577,9 @@
       "source_location": "L42",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgrescontestoperations_finalizeifdueasync",
-      "target": "datetimeoffset",
-      "confidence_score": 1.0
+      "target": "datetimeoffset"
     },
     {
       "relation": "references",
@@ -53578,9 +53588,9 @@
       "source_location": "L111",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync",
-      "target": "datetimeoffset",
-      "confidence_score": 1.0
+      "target": "datetimeoffset"
     },
     {
       "relation": "references",
@@ -53589,9 +53599,9 @@
       "source_location": "L67",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_publishifdueasync",
-      "target": "datetimeoffset",
-      "confidence_score": 1.0
+      "target": "datetimeoffset"
     },
     {
       "relation": "references",
@@ -53963,9 +53973,9 @@
       "source_location": "L314",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postrunacceptance_ensurewithindeadline",
-      "target": "datetimeoffset",
-      "confidence_score": 1.0
+      "target": "datetimeoffset"
     },
     {
       "relation": "references",
@@ -54073,9 +54083,9 @@
       "source_file": "src/AiStocks.Collector/PostgresCollectorPersistence.cs",
       "source_location": "L63",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_persistfirdsasync",
-      "target": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync",
-      "confidence_score": 1.0
+      "target": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync"
     },
     {
       "relation": "calls",
@@ -54161,9 +54171,9 @@
       "source_location": "L386",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync",
-      "target": "npgsqlconnection",
-      "confidence_score": 1.0
+      "target": "npgsqlconnection"
     },
     {
       "relation": "references",
@@ -54183,9 +54193,9 @@
       "source_location": "L111",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync",
-      "target": "npgsqlconnection",
-      "confidence_score": 1.0
+      "target": "npgsqlconnection"
     },
     {
       "relation": "references",
@@ -54216,9 +54226,9 @@
       "source_location": "L615",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_assertinsufficientprivilege",
-      "target": "npgsqlconnection",
-      "confidence_score": 1.0
+      "target": "npgsqlconnection"
     },
     {
       "relation": "references",
@@ -54282,9 +54292,9 @@
       "source_location": "L175",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_executeasync",
-      "target": "npgsqlconnection",
-      "confidence_score": 1.0
+      "target": "npgsqlconnection"
     },
     {
       "relation": "references",
@@ -54293,9 +54303,9 @@
       "source_location": "L196",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarboolasync",
-      "target": "npgsqlconnection",
-      "confidence_score": 1.0
+      "target": "npgsqlconnection"
     },
     {
       "relation": "references",
@@ -54304,9 +54314,9 @@
       "source_location": "L182",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarlongasync",
-      "target": "npgsqlconnection",
-      "confidence_score": 1.0
+      "target": "npgsqlconnection"
     },
     {
       "relation": "references",
@@ -54315,9 +54325,9 @@
       "source_location": "L189",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarstringasync",
-      "target": "npgsqlconnection",
-      "confidence_score": 1.0
+      "target": "npgsqlconnection"
     },
     {
       "relation": "references",
@@ -54447,9 +54457,9 @@
       "source_location": "L386",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync",
-      "target": "npgsqltransaction",
-      "confidence_score": 1.0
+      "target": "npgsqltransaction"
     },
     {
       "relation": "references",
@@ -54502,9 +54512,9 @@
       "source_file": "src/AiStocks.Collector/PostgresCollectorPersistence.cs",
       "source_location": "L129",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_persiststatusasync",
-      "target": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync",
-      "confidence_score": 1.0
+      "target": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync"
     },
     {
       "relation": "references",
@@ -54788,9 +54798,9 @@
       "source_location": "L111",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync",
-      "target": "ireadonlylist",
-      "confidence_score": 1.0
+      "target": "ireadonlylist"
     },
     {
       "relation": "references",
@@ -55008,9 +55018,9 @@
       "source_location": "L8",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_loadreadyasync",
-      "target": "ireadonlylist",
-      "confidence_score": 1.0
+      "target": "ireadonlylist"
     },
     {
       "relation": "references",
@@ -55173,9 +55183,9 @@
       "source_location": "L135",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqcsv_tradeinstrumentmapper_resolve",
-      "target": "firdsinstrument",
-      "confidence_score": 1.0
+      "target": "firdsinstrument"
     },
     {
       "relation": "references",
@@ -55206,9 +55216,9 @@
       "source_file": "src/AiStocks.Collector/PostgresCollectorPersistence.cs",
       "source_location": "L201",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_persistsessionasync",
-      "target": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync",
-      "confidence_score": 1.0
+      "target": "aistocks_collector_postgrescollectorpersistence_postgrescollectorpersistence_requirematchasync"
     },
     {
       "relation": "calls",
@@ -55283,9 +55293,9 @@
       "source_location": "L60",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_collector_nasdaqcollector",
-      "target": "dictionary",
-      "confidence_score": 1.0
+      "target": "dictionary"
     },
     {
       "relation": "references",
@@ -55952,9 +55962,9 @@
       "source_location": "L105",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart",
-      "target": "dateonly",
-      "confidence_score": 1.0
+      "target": "dateonly"
     },
     {
       "relation": "references",
@@ -56062,9 +56072,9 @@
       "source_location": "L111",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync",
-      "target": "dateonly",
-      "confidence_score": 1.0
+      "target": "dateonly"
     },
     {
       "relation": "references",
@@ -56575,9 +56585,9 @@
       "source_location": "L167",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport",
-      "target": "string",
-      "confidence_score": 1.0
+      "target": "string"
     },
     {
       "relation": "references",
@@ -56586,9 +56596,9 @@
       "source_location": "L205",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase",
-      "target": "string",
-      "confidence_score": 1.0
+      "target": "string"
     },
     {
       "relation": "references",
@@ -56685,9 +56695,9 @@
       "source_location": "L165",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport",
-      "target": "int",
-      "confidence_score": 1.0
+      "target": "int"
     },
     {
       "relation": "references",
@@ -56791,9 +56801,9 @@
       "source_file": "src/AiStocks.Operations/Program.cs",
       "source_location": "L48",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_program_systemoperationsclock",
-      "target": "aistocks_core_domaincontracts_iclock",
-      "confidence_score": 1.0
+      "target": "aistocks_core_domaincontracts_iclock"
     },
     {
       "relation": "implements",
@@ -56801,9 +56811,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L173",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_fixedclock",
-      "target": "aistocks_core_domaincontracts_iclock",
-      "confidence_score": 1.0
+      "target": "aistocks_core_domaincontracts_iclock"
     },
     {
       "relation": "references",
@@ -57160,9 +57170,9 @@
       "source_location": "L57",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_collector_nasdaqcollector",
-      "target": "aistocks_marketdata_archive_immutablearchive",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_archive_immutablearchive"
     },
     {
       "relation": "references",
@@ -57270,9 +57280,9 @@
       "source_location": "L105",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart",
-      "target": "uri",
-      "confidence_score": 1.0
+      "target": "uri"
     },
     {
       "relation": "references",
@@ -57281,9 +57291,9 @@
       "source_location": "L147",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_isofficialsource",
-      "target": "uri",
-      "confidence_score": 1.0
+      "target": "uri"
     },
     {
       "relation": "references",
@@ -57303,9 +57313,9 @@
       "source_location": "L103",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrss",
-      "target": "uri",
-      "confidence_score": 1.0
+      "target": "uri"
     },
     {
       "relation": "references",
@@ -57314,9 +57324,9 @@
       "source_location": "L112",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsssnapshot",
-      "target": "uri",
-      "confidence_score": 1.0
+      "target": "uri"
     },
     {
       "relation": "references",
@@ -57325,9 +57335,9 @@
       "source_location": "L13",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer",
-      "target": "uri",
-      "confidence_score": 1.0
+      "target": "uri"
     },
     {
       "relation": "references",
@@ -57616,9 +57626,9 @@
       "source_location": "L58",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_collector_nasdaqcollector",
-      "target": "aistocks_marketdata_archive_sessionmanifeststore",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_archive_sessionmanifeststore"
     },
     {
       "relation": "references",
@@ -57726,9 +57736,9 @@
       "source_location": "L135",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqcsv_tradeinstrumentmapper_resolve",
-      "target": "ienumerable",
-      "confidence_score": 1.0
+      "target": "ienumerable"
     },
     {
       "relation": "references",
@@ -57981,9 +57991,9 @@
       "source_location": "L323",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_core_tests_orchestrationtests_fakequeuedorderport",
-      "target": "hashset",
-      "confidence_score": 1.0
+      "target": "hashset"
     },
     {
       "relation": "references",
@@ -58143,9 +58153,9 @@
       "source_location": "L56",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_collector_nasdaqcollector",
-      "target": "aistocks_marketdata_collector_nasdaqposttradeclient",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_collector_nasdaqposttradeclient"
     },
     {
       "relation": "method",
@@ -58206,9 +58216,9 @@
       "source_location": "L59",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_collector_nasdaqcollector",
-      "target": "collectordownloadpolicy",
-      "confidence_score": 1.0
+      "target": "collectordownloadpolicy"
     },
     {
       "relation": "method",
@@ -58449,9 +58459,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L111",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart",
-      "target": "aistocks_marketdata_firds_firdsuniverseparser_parsefull",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_firdsuniverseparser_parsefull"
     },
     {
       "relation": "calls",
@@ -58515,9 +58525,9 @@
       "source_location": "L105",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart",
-      "target": "stream",
-      "confidence_score": 1.0
+      "target": "stream"
     },
     {
       "relation": "references",
@@ -58526,9 +58536,9 @@
       "source_location": "L153",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_openxmlpayload",
-      "target": "stream",
-      "confidence_score": 1.0
+      "target": "stream"
     },
     {
       "relation": "references",
@@ -58581,9 +58591,9 @@
       "source_location": "L121",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore",
-      "target": "stream",
-      "confidence_score": 1.0
+      "target": "stream"
     },
     {
       "relation": "references",
@@ -58592,9 +58602,9 @@
       "source_location": "L112",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsssnapshot",
-      "target": "stream",
-      "confidence_score": 1.0
+      "target": "stream"
     },
     {
       "relation": "references",
@@ -58701,9 +58711,9 @@
       "source_location": "L193",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_tryparseevent",
-      "target": "xelement",
-      "confidence_score": 1.0
+      "target": "xelement"
     },
     {
       "relation": "method",
@@ -58731,9 +58741,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L105",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart"
     },
     {
       "relation": "method",
@@ -58751,9 +58761,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L147",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_isofficialsource",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_isofficialsource"
     },
     {
       "relation": "method",
@@ -58771,9 +58781,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L153",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_openxmlpayload",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_openxmlpayload"
     },
     {
       "relation": "method",
@@ -58824,9 +58834,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L88",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applyfull",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_openxmlpayload",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_openxmlpayload"
     },
     {
       "relation": "calls",
@@ -58879,9 +58889,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L101",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applydelta",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_openxmlpayload",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_openxmlpayload"
     },
     {
       "relation": "calls",
@@ -58912,9 +58922,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L115",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_archiveraw",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_archiveraw"
     },
     {
       "relation": "calls",
@@ -58923,9 +58933,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L107",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_loadverified",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_loadverified"
     },
     {
       "relation": "calls",
@@ -58934,9 +58944,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L111",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_openxmlpayload",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_openxmlpayload"
     },
     {
       "relation": "calls",
@@ -58945,9 +58955,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L114",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_persist",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_persist"
     },
     {
       "relation": "calls",
@@ -58956,9 +58966,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L110",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_applyfullpart",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_readandverify",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_readandverify"
     },
     {
       "relation": "calls",
@@ -58967,9 +58977,9 @@
       "source_file": "src/AiStocks.MarketData/Firds.cs",
       "source_location": "L139",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_firds_durablefirdsstore_readandverify",
-      "target": "aistocks_marketdata_firds_durablefirdsstore_isofficialsource",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_firds_durablefirdsstore_isofficialsource"
     },
     {
       "relation": "contains",
@@ -58997,9 +59007,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqCsv.cs",
       "source_location": "L133",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqcsv",
-      "target": "aistocks_marketdata_nasdaqcsv_tradeinstrumentmapper",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqcsv_tradeinstrumentmapper"
     },
     {
       "relation": "method",
@@ -59188,9 +59198,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqCsv.cs",
       "source_location": "L135",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqcsv_tradeinstrumentmapper",
-      "target": "aistocks_marketdata_nasdaqcsv_tradeinstrumentmapper_resolve",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqcsv_tradeinstrumentmapper_resolve"
     },
     {
       "relation": "contains",
@@ -59261,9 +59271,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqStatus.cs",
       "source_location": "L127",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore",
-      "target": "aistocks_marketdata_nasdaqstatus_pinnedstatusseedverifier_load",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqstatus_pinnedstatusseedverifier_load"
     },
     {
       "relation": "references",
@@ -59303,9 +59313,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqStatus.cs",
       "source_location": "L121",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine",
-      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore"
     },
     {
       "relation": "method",
@@ -59313,9 +59323,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqStatus.cs",
       "source_location": "L112",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine",
-      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsssnapshot",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsssnapshot"
     },
     {
       "relation": "method",
@@ -59384,9 +59394,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqStatus.cs",
       "source_location": "L158",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine",
-      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_samenotice",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_samenotice"
     },
     {
       "relation": "method",
@@ -59404,9 +59414,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqStatus.cs",
       "source_location": "L193",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine",
-      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_tryparseevent",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_tryparseevent"
     },
     {
       "relation": "calls",
@@ -59470,9 +59480,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqStatus.cs",
       "source_location": "L101",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrss",
-      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore"
     },
     {
       "relation": "calls",
@@ -59492,9 +59502,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqStatus.cs",
       "source_location": "L118",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsssnapshot",
-      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore"
     },
     {
       "relation": "calls",
@@ -59503,9 +59513,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqStatus.cs",
       "source_location": "L155",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore",
-      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_persist",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_persist"
     },
     {
       "relation": "calls",
@@ -59514,9 +59524,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqStatus.cs",
       "source_location": "L144",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore",
-      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_samenotice",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_samenotice"
     },
     {
       "relation": "references",
@@ -59525,9 +59535,9 @@
       "source_location": "L121",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_applyrsscore",
-      "target": "nasdaqrssartifact",
-      "confidence_score": 1.0
+      "target": "nasdaqrssartifact"
     },
     {
       "relation": "references",
@@ -59536,9 +59546,9 @@
       "source_location": "L158",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_samenotice",
-      "target": "nasdaqstatusevent",
-      "confidence_score": 1.0
+      "target": "nasdaqstatusevent"
     },
     {
       "relation": "references",
@@ -59547,9 +59557,9 @@
       "source_location": "L193",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_tryparseevent",
-      "target": "nasdaqstatusevent",
-      "confidence_score": 1.0
+      "target": "nasdaqstatusevent"
     },
     {
       "relation": "calls",
@@ -59602,9 +59612,9 @@
       "source_file": "src/AiStocks.MarketData/NasdaqStatus.cs",
       "source_location": "L197",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_tryparseevent",
-      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_isinpattern",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_isinpattern"
     },
     {
       "relation": "references",
@@ -59646,9 +59656,9 @@
       "source_location": "L220",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport_targetpattern",
-      "target": "regex",
-      "confidence_score": 1.0
+      "target": "regex"
     },
     {
       "relation": "references",
@@ -59734,9 +59744,9 @@
       "source_location": "L220",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport_targetpattern",
-      "target": "generatedregex",
-      "confidence_score": 1.0
+      "target": "generatedregex"
     },
     {
       "relation": "references",
@@ -60040,9 +60050,9 @@
       "source_file": "src/AiStocks.MarketData/ReferenceAcquisition.cs",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition",
-      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer"
     },
     {
       "relation": "method",
@@ -60050,9 +60060,9 @@
       "source_file": "src/AiStocks.MarketData/ReferenceAcquisition.cs",
       "source_location": "L15",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer",
-      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_acquireasync",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_acquireasync"
     },
     {
       "relation": "method",
@@ -60060,9 +60070,9 @@
       "source_file": "src/AiStocks.MarketData/ReferenceAcquisition.cs",
       "source_location": "L51",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer",
-      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_loadplanasync",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_loadplanasync"
     },
     {
       "relation": "method",
@@ -60070,9 +60080,9 @@
       "source_file": "src/AiStocks.MarketData/ReferenceAcquisition.cs",
       "source_location": "L68",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer",
-      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_readboundedasync",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_readboundedasync"
     },
     {
       "relation": "calls",
@@ -60081,9 +60091,9 @@
       "source_file": "src/AiStocks.MarketData/ReferenceAcquisition.cs",
       "source_location": "L17",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_acquireasync",
-      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_loadplanasync",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_loadplanasync"
     },
     {
       "relation": "calls",
@@ -60092,9 +60102,9 @@
       "source_file": "src/AiStocks.MarketData/ReferenceAcquisition.cs",
       "source_location": "L27",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_acquireasync",
-      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_readboundedasync",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_readboundedasync"
     },
     {
       "relation": "references",
@@ -60103,9 +60113,9 @@
       "source_location": "L51",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_loadplanasync",
-      "target": "firdsplan",
-      "confidence_score": 1.0
+      "target": "firdsplan"
     },
     {
       "relation": "references",
@@ -60114,9 +60124,9 @@
       "source_location": "L68",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_referenceacquisition_marketreferenceacquirer_readboundedasync",
-      "target": "httpcontent",
-      "confidence_score": 1.0
+      "target": "httpcontent"
     },
     {
       "relation": "contains",
@@ -60652,9 +60662,9 @@
       "source_location": "L65",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher",
-      "target": "timezoneinfo",
-      "confidence_score": 1.0
+      "target": "timezoneinfo"
     },
     {
       "relation": "calls",
@@ -60707,9 +60717,9 @@
       "source_location": "L111",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync",
-      "target": "dailyagentsnapshot",
-      "confidence_score": 1.0
+      "target": "dailyagentsnapshot"
     },
     {
       "relation": "calls",
@@ -61007,9 +61017,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L163",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport",
-      "target": "aistocks_operations_operations_idiscordport",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_operations_idiscordport"
     },
     {
       "relation": "implements",
@@ -61017,9 +61027,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L163",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_recordingdiscord",
-      "target": "aistocks_operations_operations_idiscordport",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_operations_idiscordport"
     },
     {
       "relation": "calls",
@@ -61793,9 +61803,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L163",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime",
-      "target": "aistocks_operations_productionruntime_hermesdiscordport",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_hermesdiscordport"
     },
     {
       "relation": "contains",
@@ -61803,9 +61813,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L224",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime",
-      "target": "aistocks_operations_productionruntime_operationsruntimeservice",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_operationsruntimeservice"
     },
     {
       "relation": "contains",
@@ -61813,9 +61823,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L9",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime",
-      "target": "aistocks_operations_productionruntime_postgrescontestoperations",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_postgrescontestoperations"
     },
     {
       "relation": "contains",
@@ -61823,9 +61833,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L60",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime",
-      "target": "aistocks_operations_productionruntime_postgresdailyreportpublisher",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_postgresdailyreportpublisher"
     },
     {
       "relation": "method",
@@ -61833,9 +61843,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgrescontestoperations",
-      "target": "aistocks_operations_productionruntime_postgrescontestoperations_applyduecorporateactionsasync",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_postgrescontestoperations_applyduecorporateactionsasync"
     },
     {
       "relation": "method",
@@ -61843,9 +61853,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L42",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgrescontestoperations",
-      "target": "aistocks_operations_productionruntime_postgrescontestoperations_finalizeifdueasync",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_postgrescontestoperations_finalizeifdueasync"
     },
     {
       "relation": "calls",
@@ -61854,9 +61864,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L237",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_operationsruntimeservice_runasync",
-      "target": "aistocks_operations_productionruntime_postgrescontestoperations_applyduecorporateactionsasync",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_postgrescontestoperations_applyduecorporateactionsasync"
     },
     {
       "relation": "calls",
@@ -61865,9 +61875,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L238",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_operationsruntimeservice_runasync",
-      "target": "aistocks_operations_productionruntime_postgrescontestoperations_finalizeifdueasync",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_postgrescontestoperations_finalizeifdueasync"
     },
     {
       "relation": "method",
@@ -61875,9 +61885,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L111",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher",
-      "target": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync"
     },
     {
       "relation": "method",
@@ -61885,9 +61895,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L67",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher",
-      "target": "aistocks_operations_productionruntime_postgresdailyreportpublisher_publishifdueasync",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_postgresdailyreportpublisher_publishifdueasync"
     },
     {
       "relation": "calls",
@@ -61896,9 +61906,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L239",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_operationsruntimeservice_runasync",
-      "target": "aistocks_operations_productionruntime_postgresdailyreportpublisher_publishifdueasync",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_postgresdailyreportpublisher_publishifdueasync"
     },
     {
       "relation": "calls",
@@ -61907,9 +61917,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L86",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_postgresdailyreportpublisher_publishifdueasync",
-      "target": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_postgresdailyreportpublisher_loadsnapshotsasync"
     },
     {
       "relation": "method",
@@ -61917,9 +61927,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L205",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport",
-      "target": "aistocks_operations_productionruntime_hermesdiscordport_parsereceipt",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_hermesdiscordport_parsereceipt"
     },
     {
       "relation": "method",
@@ -61927,9 +61937,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L176",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport",
-      "target": "aistocks_operations_productionruntime_hermesdiscordport_sendasync",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_hermesdiscordport_sendasync"
     },
     {
       "relation": "method",
@@ -61937,9 +61947,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L220",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport",
-      "target": "aistocks_operations_productionruntime_hermesdiscordport_targetpattern",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_hermesdiscordport_targetpattern"
     },
     {
       "relation": "calls",
@@ -61948,9 +61958,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L202",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_hermesdiscordport_sendasync",
-      "target": "aistocks_operations_productionruntime_hermesdiscordport_parsereceipt",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_hermesdiscordport_parsereceipt"
     },
     {
       "relation": "method",
@@ -61958,9 +61968,9 @@
       "source_file": "src/AiStocks.Operations/ProductionRuntime.cs",
       "source_location": "L230",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_productionruntime_operationsruntimeservice",
-      "target": "aistocks_operations_productionruntime_operationsruntimeservice_runasync",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_productionruntime_operationsruntimeservice_runasync"
     },
     {
       "relation": "contains",
@@ -61968,9 +61978,9 @@
       "source_file": "src/AiStocks.Operations/Program.cs",
       "source_location": "L48",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_operations_program",
-      "target": "aistocks_operations_program_systemoperationsclock",
-      "confidence_score": 1.0
+      "target": "aistocks_operations_program_systemoperationsclock"
     },
     {
       "relation": "contains",
@@ -63263,9 +63273,9 @@
       "source_location": "L241",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postgresworkerstate_hashmatches",
-      "target": "readonlyspan",
-      "confidence_score": 1.0
+      "target": "readonlyspan"
     },
     {
       "relation": "references",
@@ -65292,9 +65302,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L202",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase",
-      "target": "iasyncdisposable",
-      "confidence_score": 1.0
+      "target": "iasyncdisposable"
     },
     {
       "relation": "implements",
@@ -65355,9 +65365,9 @@
       "source_location": "L224",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase_disposeasync",
-      "target": "valuetask",
-      "confidence_score": 1.0
+      "target": "valuetask"
     },
     {
       "relation": "references",
@@ -70819,9 +70829,9 @@
       "source_file": "src/AiStocks.Worker/NoBrokerOrderPathProbe.cs",
       "source_location": "L46",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_nobrokerorderpathprobe",
-      "target": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener"
     },
     {
       "relation": "contains",
@@ -70829,9 +70839,9 @@
       "source_file": "src/AiStocks.Worker/NoBrokerOrderPathProbe.cs",
       "source_location": "L11",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_nobrokerorderpathprobe",
-      "target": "aistocks_worker_nobrokerorderpathprobe_nobrokerorderpathprobe",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_nobrokerorderpathprobe_nobrokerorderpathprobe"
     },
     {
       "relation": "method",
@@ -70839,9 +70849,9 @@
       "source_file": "src/AiStocks.Worker/NoBrokerOrderPathProbe.cs",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_nobrokerorderpathprobe_nobrokerorderpathprobe",
-      "target": "aistocks_worker_nobrokerorderpathprobe_nobrokerorderpathprobe_run",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_nobrokerorderpathprobe_nobrokerorderpathprobe_run"
     },
     {
       "relation": "method",
@@ -70849,9 +70859,9 @@
       "source_file": "src/AiStocks.Worker/NoBrokerOrderPathProbe.cs",
       "source_location": "L51",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener",
-      "target": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener_oneventsourcecreated",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener_oneventsourcecreated"
     },
     {
       "relation": "method",
@@ -70859,9 +70869,9 @@
       "source_file": "src/AiStocks.Worker/NoBrokerOrderPathProbe.cs",
       "source_location": "L57",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener",
-      "target": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener_oneventwritten",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener_oneventwritten"
     },
     {
       "relation": "references",
@@ -70870,9 +70880,9 @@
       "source_location": "L48",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener",
-      "target": "concurrentbag",
-      "confidence_score": 1.0
+      "target": "concurrentbag"
     },
     {
       "relation": "inherits",
@@ -70880,9 +70890,9 @@
       "source_file": "src/AiStocks.Worker/NoBrokerOrderPathProbe.cs",
       "source_location": "L46",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener",
-      "target": "eventlistener",
-      "confidence_score": 1.0
+      "target": "eventlistener"
     },
     {
       "relation": "references",
@@ -70891,9 +70901,9 @@
       "source_location": "L51",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener_oneventsourcecreated",
-      "target": "eventsource",
-      "confidence_score": 1.0
+      "target": "eventsource"
     },
     {
       "relation": "references",
@@ -70902,9 +70912,9 @@
       "source_location": "L57",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_nobrokerorderpathprobe_denynetworkeventlistener_oneventwritten",
-      "target": "eventwritteneventargs",
-      "confidence_score": 1.0
+      "target": "eventwritteneventargs"
     },
     {
       "relation": "contains",
@@ -71396,9 +71406,9 @@
       "source_location": "L230",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postgresworkerstate_validateattestedbytes",
-      "target": "agentrunresult",
-      "confidence_score": 1.0
+      "target": "agentrunresult"
     },
     {
       "relation": "implements",
@@ -71772,9 +71782,9 @@
       "source_file": "src/AiStocks.Worker/PostgresQueuedExecutionPort.cs",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport",
-      "target": "aistocks_worker_orchestration_iqueuedexecutionport",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_orchestration_iqueuedexecutionport"
     },
     {
       "relation": "references",
@@ -71838,9 +71848,9 @@
       "source_location": "L32",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_executeasync",
-      "target": "queuedexecution",
-      "confidence_score": 1.0
+      "target": "queuedexecution"
     },
     {
       "relation": "references",
@@ -71849,9 +71859,9 @@
       "source_location": "L8",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_loadreadyasync",
-      "target": "queuedexecution",
-      "confidence_score": 1.0
+      "target": "queuedexecution"
     },
     {
       "relation": "calls",
@@ -71880,9 +71890,9 @@
       "source_file": "src/AiStocks.Worker/PostgresQueuedExecutionPort.cs",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport",
-      "target": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport"
     },
     {
       "relation": "method",
@@ -71890,9 +71900,9 @@
       "source_file": "src/AiStocks.Worker/PostgresQueuedExecutionPort.cs",
       "source_location": "L32",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport",
-      "target": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_executeasync",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_executeasync"
     },
     {
       "relation": "method",
@@ -71900,9 +71910,9 @@
       "source_file": "src/AiStocks.Worker/PostgresQueuedExecutionPort.cs",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport",
-      "target": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_loadreadyasync",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresqueuedexecutionport_postgresqueuedexecutionport_loadreadyasync"
     },
     {
       "relation": "contains",
@@ -71930,9 +71940,9 @@
       "source_file": "src/AiStocks.Worker/PostgresWorkerRuntime.cs",
       "source_location": "L312",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime",
-      "target": "aistocks_worker_postgresworkerruntime_postrunacceptance",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresworkerruntime_postrunacceptance"
     },
     {
       "relation": "contains",
@@ -72030,9 +72040,9 @@
       "source_file": "src/AiStocks.Worker/PostgresWorkerRuntime.cs",
       "source_location": "L241",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postgresworkerstate",
-      "target": "aistocks_worker_postgresworkerruntime_postgresworkerstate_hashmatches",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresworkerruntime_postgresworkerstate_hashmatches"
     },
     {
       "relation": "method",
@@ -72120,9 +72130,9 @@
       "source_file": "src/AiStocks.Worker/PostgresWorkerRuntime.cs",
       "source_location": "L230",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postgresworkerstate",
-      "target": "aistocks_worker_postgresworkerruntime_postgresworkerstate_validateattestedbytes",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresworkerruntime_postgresworkerstate_validateattestedbytes"
     },
     {
       "relation": "calls",
@@ -72197,9 +72207,9 @@
       "source_file": "src/AiStocks.Worker/PostgresWorkerRuntime.cs",
       "source_location": "L66",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postgresworkerstate_completeasync",
-      "target": "aistocks_worker_postgresworkerruntime_postgresworkerstate_validateattestedbytes",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresworkerruntime_postgresworkerstate_validateattestedbytes"
     },
     {
       "relation": "calls",
@@ -72208,9 +72218,9 @@
       "source_file": "src/AiStocks.Worker/PostgresWorkerRuntime.cs",
       "source_location": "L65",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postgresworkerstate_completeasync",
-      "target": "aistocks_worker_postgresworkerruntime_postrunacceptance_ensurewithindeadline",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresworkerruntime_postrunacceptance_ensurewithindeadline"
     },
     {
       "relation": "calls",
@@ -72230,9 +72240,9 @@
       "source_file": "src/AiStocks.Worker/PostgresWorkerRuntime.cs",
       "source_location": "L178",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postgresworkerstate_tryacceptwhilerunningasync",
-      "target": "aistocks_worker_postgresworkerruntime_postrunacceptance_ensurewithindeadline",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresworkerruntime_postrunacceptance_ensurewithindeadline"
     },
     {
       "relation": "calls",
@@ -72241,9 +72251,9 @@
       "source_file": "src/AiStocks.Worker/PostgresWorkerRuntime.cs",
       "source_location": "L233",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postgresworkerstate_validateattestedbytes",
-      "target": "aistocks_worker_postgresworkerruntime_postgresworkerstate_hashmatches",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresworkerruntime_postgresworkerstate_hashmatches"
     },
     {
       "relation": "calls",
@@ -72273,9 +72283,9 @@
       "source_file": "src/AiStocks.Worker/PostgresWorkerRuntime.cs",
       "source_location": "L314",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_worker_postgresworkerruntime_postrunacceptance",
-      "target": "aistocks_worker_postgresworkerruntime_postrunacceptance_ensurewithindeadline",
-      "confidence_score": 1.0
+      "target": "aistocks_worker_postgresworkerruntime_postrunacceptance_ensurewithindeadline"
     },
     {
       "relation": "method",
@@ -73020,9 +73030,9 @@
       "source_location": "L56",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_verifyasync_rejectsambiguouscssvisibility",
-      "target": "theory",
-      "confidence_score": 1.0
+      "target": "theory"
     },
     {
       "relation": "references",
@@ -73185,9 +73195,9 @@
       "source_location": "L56",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_verifyasync_rejectsambiguouscssvisibility",
-      "target": "inlinedata",
-      "confidence_score": 1.0
+      "target": "inlinedata"
     },
     {
       "relation": "references",
@@ -73394,9 +73404,9 @@
       "source_location": "L164",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_core_tests_orchestrationtests_orchestrationtests_failingqueuedorderdoesnotpoisonlaterorders",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -73526,9 +73536,9 @@
       "source_location": "L241",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_acquiredrsssnapshotignoresknownentriesbutappliesnewernotice",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -73537,9 +73547,9 @@
       "source_location": "L152",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_activesessiondownloadsareboundedandverifiedrecentarchivesareskipped",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -73559,9 +73569,9 @@
       "source_location": "L182",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_archivedreportisrefetchedonlyoncontrolledconflictcheckschedule",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -73570,9 +73580,9 @@
       "source_location": "L209",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_cleanstartacquireschecksummedfirdsplanandarchivesnasdaqrssprovenance",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -73636,9 +73646,9 @@
       "source_location": "L333",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_isinonlytradefailsclosedwhenfirdshasmultipleorderbooks",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -73669,9 +73679,9 @@
       "source_location": "L105",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_officialfirdszipisextractedandmultipartfullretainseverypartprovenance",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -73856,9 +73866,9 @@
       "source_location": "L493",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresdeniescollectorandwebrunaccountingresetandfinalizationauthority",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -73911,9 +73921,9 @@
       "source_location": "L518",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresrejectssuccessfulcompletionafterimmutabledeadline",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -73933,9 +73943,9 @@
       "source_location": "L20",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_acceptedqueueflowsthroughfillactionsfinalizationreportandleaseddelivery",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -73944,9 +73954,9 @@
       "source_location": "L10",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_hermesdiscordreceiptrequiresclisuccessandexternalmessageidentity",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -74065,9 +74075,9 @@
       "source_location": "L113",
       "weight": 1.0,
       "context": "attribute",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_unittest1_persistencecontracttests_postrunacceptancerejectsresultscompletedafterimmutabledeadline",
-      "target": "fact",
-      "confidence_score": 1.0
+      "target": "fact"
     },
     {
       "relation": "references",
@@ -74982,9 +74992,9 @@
       "source_file": "tests/AiStocks.Core.Tests/OrchestrationTests.cs",
       "source_location": "L164",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_core_tests_orchestrationtests_orchestrationtests",
-      "target": "aistocks_core_tests_orchestrationtests_orchestrationtests_failingqueuedorderdoesnotpoisonlaterorders",
-      "confidence_score": 1.0
+      "target": "aistocks_core_tests_orchestrationtests_orchestrationtests_failingqueuedorderdoesnotpoisonlaterorders"
     },
     {
       "relation": "method",
@@ -76765,9 +76775,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L241",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_acquiredrsssnapshotignoresknownentriesbutappliesnewernotice",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_acquiredrsssnapshotignoresknownentriesbutappliesnewernotice"
     },
     {
       "relation": "method",
@@ -76775,9 +76785,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L152",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_activesessiondownloadsareboundedandverifiedrecentarchivesareskipped",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_activesessiondownloadsareboundedandverifiedrecentarchivesareskipped"
     },
     {
       "relation": "method",
@@ -76795,9 +76805,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L182",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_archivedreportisrefetchedonlyoncontrolledconflictcheckschedule",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_archivedreportisrefetchedonlyoncontrolledconflictcheckschedule"
     },
     {
       "relation": "method",
@@ -76805,9 +76815,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L209",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_cleanstartacquireschecksummedfirdsplanandarchivesnasdaqrssprovenance",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_cleanstartacquireschecksummedfirdsplanandarchivesnasdaqrssprovenance"
     },
     {
       "relation": "method",
@@ -76885,9 +76895,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L333",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_isinonlytradefailsclosedwhenfirdshasmultipleorderbooks",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_isinonlytradefailsclosedwhenfirdshasmultipleorderbooks"
     },
     {
       "relation": "method",
@@ -76915,9 +76925,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L105",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_officialfirdszipisextractedandmultipartfullretainseverypartprovenance",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_officialfirdszipisextractedandmultipartfullretainseverypartprovenance"
     },
     {
       "relation": "method",
@@ -76985,9 +76995,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L380",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_zipxml",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_zipxml"
     },
     {
       "relation": "calls",
@@ -77073,9 +77083,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L110",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_officialfirdszipisextractedandmultipartfullretainseverypartprovenance",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_fixture",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_fixture"
     },
     {
       "relation": "calls",
@@ -77084,9 +77094,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L110",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_officialfirdszipisextractedandmultipartfullretainseverypartprovenance",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_zipxml",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_zipxml"
     },
     {
       "relation": "calls",
@@ -77117,9 +77127,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L159",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_activesessiondownloadsareboundedandverifiedrecentarchivesareskipped",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_fixture",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_fixture"
     },
     {
       "relation": "calls",
@@ -77128,9 +77138,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L161",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_activesessiondownloadsareboundedandverifiedrecentarchivesareskipped",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_source",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_source"
     },
     {
       "relation": "calls",
@@ -77139,9 +77149,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L188",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_archivedreportisrefetchedonlyoncontrolledconflictcheckschedule",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_fixture",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_fixture"
     },
     {
       "relation": "calls",
@@ -77150,9 +77160,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L190",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_archivedreportisrefetchedonlyoncontrolledconflictcheckschedule",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_source",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_source"
     },
     {
       "relation": "calls",
@@ -77161,9 +77171,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L217",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_cleanstartacquireschecksummedfirdsplanandarchivesnasdaqrssprovenance",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_fixture",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_fixture"
     },
     {
       "relation": "calls",
@@ -77172,9 +77182,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L249",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_acquiredrsssnapshotignoresknownentriesbutappliesnewernotice",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_rss",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_rss"
     },
     {
       "relation": "calls",
@@ -77249,9 +77259,9 @@
       "source_file": "tests/AiStocks.MarketData.Tests/MarketDataSecurityRegressionTests.cs",
       "source_location": "L336",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_isinonlytradefailsclosedwhenfirdshasmultipleorderbooks",
-      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_fixture",
-      "confidence_score": 1.0
+      "target": "aistocks_marketdata_tests_marketdatasecurityregressiontests_marketdatasecurityregressiontests_fixture"
     },
     {
       "relation": "method",
@@ -78471,9 +78481,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L615",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_assertinsufficientprivilege",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_assertinsufficientprivilege"
     },
     {
       "relation": "method",
@@ -78541,9 +78551,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L493",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresdeniescollectorandwebrunaccountingresetandfinalizationauthority",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresdeniescollectorandwebrunaccountingresetandfinalizationauthority"
     },
     {
       "relation": "method",
@@ -78591,9 +78601,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L518",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresrejectssuccessfulcompletionafterimmutabledeadline",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresrejectssuccessfulcompletionafterimmutabledeadline"
     },
     {
       "relation": "method",
@@ -78992,9 +79002,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L509",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresdeniescollectorandwebrunaccountingresetandfinalizationauthority",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_assertinsufficientprivilege",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_assertinsufficientprivilege"
     },
     {
       "relation": "calls",
@@ -79003,9 +79013,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L497",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresdeniescollectorandwebrunaccountingresetandfinalizationauthority",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_ensuretestdatabase",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_ensuretestdatabase"
     },
     {
       "relation": "calls",
@@ -79014,9 +79024,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L502",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresdeniescollectorandwebrunaccountingresetandfinalizationauthority",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_execute",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_execute"
     },
     {
       "relation": "calls",
@@ -79025,9 +79035,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L499",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresdeniescollectorandwebrunaccountingresetandfinalizationauthority",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_resetdatabase",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_resetdatabase"
     },
     {
       "relation": "calls",
@@ -79036,9 +79046,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L522",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresrejectssuccessfulcompletionafterimmutabledeadline",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_ensuretestdatabase",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_ensuretestdatabase"
     },
     {
       "relation": "calls",
@@ -79047,9 +79057,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L529",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresrejectssuccessfulcompletionafterimmutabledeadline",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_execute",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_execute"
     },
     {
       "relation": "calls",
@@ -79058,9 +79068,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L524",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresrejectssuccessfulcompletionafterimmutabledeadline",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_resetdatabase",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_resetdatabase"
     },
     {
       "relation": "calls",
@@ -79069,9 +79079,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L551",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresrejectssuccessfulcompletionafterimmutabledeadline",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_scalar",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_scalar"
     },
     {
       "relation": "calls",
@@ -79080,9 +79090,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L552",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_realpostgresrejectssuccessfulcompletionafterimmutabledeadline",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_scalarlong",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_scalarlong"
     },
     {
       "relation": "calls",
@@ -79179,9 +79189,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs",
       "source_location": "L617",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_assertinsufficientprivilege",
-      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_execute",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_postgresintegrationtests_postgresintegrationtests_execute"
     },
     {
       "relation": "calls",
@@ -79222,9 +79232,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L202",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase"
     },
     {
       "relation": "contains",
@@ -79232,9 +79242,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L173",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_fixedclock",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_fixedclock"
     },
     {
       "relation": "contains",
@@ -79242,9 +79252,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests"
     },
     {
       "relation": "contains",
@@ -79252,9 +79262,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L163",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_recordingdiscord",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_recordingdiscord"
     },
     {
       "relation": "method",
@@ -79262,9 +79272,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_acceptedqueueflowsthroughfillactionsfinalizationreportandleaseddelivery",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_acceptedqueueflowsthroughfillactionsfinalizationreportandleaseddelivery"
     },
     {
       "relation": "method",
@@ -79272,9 +79282,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L175",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_executeasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_executeasync"
     },
     {
       "relation": "method",
@@ -79282,9 +79292,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L10",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_hermesdiscordreceiptrequiresclisuccessandexternalmessageidentity",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_hermesdiscordreceiptrequiresclisuccessandexternalmessageidentity"
     },
     {
       "relation": "method",
@@ -79292,9 +79302,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L196",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarboolasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarboolasync"
     },
     {
       "relation": "method",
@@ -79302,9 +79312,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L182",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarlongasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarlongasync"
     },
     {
       "relation": "method",
@@ -79312,9 +79322,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L189",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarstringasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarstringasync"
     },
     {
       "relation": "calls",
@@ -79323,9 +79333,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L25",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_acceptedqueueflowsthroughfillactionsfinalizationreportandleaseddelivery",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase_createasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase_createasync"
     },
     {
       "relation": "calls",
@@ -79334,9 +79344,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L34",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_acceptedqueueflowsthroughfillactionsfinalizationreportandleaseddelivery",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_executeasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_executeasync"
     },
     {
       "relation": "calls",
@@ -79345,9 +79355,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L151",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_acceptedqueueflowsthroughfillactionsfinalizationreportandleaseddelivery",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarboolasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarboolasync"
     },
     {
       "relation": "calls",
@@ -79356,9 +79366,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L87",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_acceptedqueueflowsthroughfillactionsfinalizationreportandleaseddelivery",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarlongasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarlongasync"
     },
     {
       "relation": "calls",
@@ -79367,9 +79377,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L88",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_acceptedqueueflowsthroughfillactionsfinalizationreportandleaseddelivery",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarstringasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_productioncompositionintegrationtests_scalarstringasync"
     },
     {
       "relation": "method",
@@ -79377,9 +79387,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L166",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_recordingdiscord",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_recordingdiscord_sendasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_recordingdiscord_sendasync"
     },
     {
       "relation": "references",
@@ -79388,9 +79398,9 @@
       "source_location": "L210",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase_createasync",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase"
     },
     {
       "relation": "method",
@@ -79398,9 +79408,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/ProductionCompositionIntegrationTests.cs",
       "source_location": "L224",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase",
-      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase_disposeasync",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_productioncompositionintegrationtests_disposabledatabase_disposeasync"
     },
     {
       "relation": "contains",
@@ -79643,9 +79653,9 @@
       "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
       "source_location": "L113",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_unittest1_persistencecontracttests",
-      "target": "aistocks_persistence_tests_unittest1_persistencecontracttests_postrunacceptancerejectsresultscompletedafterimmutabledeadline",
-      "confidence_score": 1.0
+      "target": "aistocks_persistence_tests_unittest1_persistencecontracttests_postrunacceptancerejectsresultscompletedafterimmutabledeadline"
     },
     {
       "relation": "method",
@@ -81511,9 +81521,9 @@
       "source_file": "tests/AiStocks.Research.Tests/EvidenceVerifierTests.cs",
       "source_location": "L56",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests",
-      "target": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_verifyasync_rejectsambiguouscssvisibility",
-      "confidence_score": 1.0
+      "target": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_verifyasync_rejectsambiguouscssvisibility"
     },
     {
       "relation": "method",
@@ -81687,9 +81697,9 @@
       "source_file": "tests/AiStocks.Research.Tests/EvidenceVerifierTests.cs",
       "source_location": "L70",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_verifyasync_rejectsambiguouscssvisibility",
-      "target": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_claim",
-      "confidence_score": 1.0
+      "target": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_claim"
     },
     {
       "relation": "calls",
@@ -81698,9 +81708,9 @@
       "source_file": "tests/AiStocks.Research.Tests/EvidenceVerifierTests.cs",
       "source_location": "L69",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_verifyasync_rejectsambiguouscssvisibility",
-      "target": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_verifier",
-      "confidence_score": 1.0
+      "target": "aistocks_research_tests_evidenceverifiertests_evidenceverifiertests_verifier"
     },
     {
       "relation": "calls",
@@ -90450,9 +90460,9 @@
       "source_file": "tests/test_no_broker_capability.py",
       "source_location": "L53",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "tests_test_no_broker_capability",
-      "target": "tests_test_no_broker_capability_test_inventory_fails_closed_on_unseen_dynamic_configuration_name",
-      "confidence_score": 1.0
+      "target": "tests_test_no_broker_capability_test_inventory_fails_closed_on_unseen_dynamic_configuration_name"
     },
     {
       "relation": "contains",
@@ -91056,9 +91066,9 @@
       "source_file": "tests/test_release_artifacts.py",
       "source_location": "L92",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "tests_test_release_artifacts",
-      "target": "tests_test_release_artifacts_test_clean_start_documents_composed_reference_acquisition_not_preseed_importer_magic",
-      "confidence_score": 1.0
+      "target": "tests_test_release_artifacts_test_clean_start_documents_composed_reference_acquisition_not_preseed_importer_magic"
     },
     {
       "relation": "contains",
@@ -91076,9 +91086,9 @@
       "source_file": "tests/test_release_artifacts.py",
       "source_location": "L50",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "tests_test_release_artifacts",
-      "target": "tests_test_release_artifacts_test_example_environment_renders_compose_with_fail_closed_proxy_configuration",
-      "confidence_score": 1.0
+      "target": "tests_test_release_artifacts_test_example_environment_renders_compose_with_fail_closed_proxy_configuration"
     },
     {
       "relation": "contains",
@@ -92336,5 +92346,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "2bb15b275f78e68cdd4a24697c49b890670dc7cc"
+  "built_at_commit": "8d38ef5d8713105d6f7cdeffdf52bfd9235bcc86"
 }
