@@ -76,7 +76,7 @@ services:
       NASDAQ_ARCHIVE_PATH: /data/nasdaq
       NASDAQ_STATUS_PATH: /data/status
       WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-5}
-      DISCORD_TARGET: ${DISCORD_TARGET:?set the Hermes Discord target for #ai-stocks}
+      DISCORD_TARGET: "${DISCORD_TARGET:?set the Hermes Discord delivery target}"
     volumes:
       - ${HERMES_AUTH_DIR:?set a UID-10001 private Hermes auth directory}:/run/hermes-auth:ro
       - ${NASDAQ_ARCHIVE_DIR:?set the Nasdaq archive dataset}:/data/nasdaq:ro
