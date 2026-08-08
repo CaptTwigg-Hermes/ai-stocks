@@ -10,7 +10,7 @@ def test_dockge_compose_separates_and_hardens_services():
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     services = compose["services"]
     assert {"app", "collector", "worker"} <= set(services)
-    assert services["app"]["ports"] == ["${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8000"]
+    assert services["app"]["ports"] == ["${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8080"]
     for name in ("app", "collector", "worker"):
         service = services[name]
         assert service["read_only"] is True
@@ -18,8 +18,9 @@ def test_dockge_compose_separates_and_hardens_services():
         assert "no-new-privileges:true" in service["security_opt"]
         assert service["init"] is True
     assert "HERMES_HOME" not in services["app"]["environment"]
-    assert services["collector"]["command"] == ["python", "-m", "ai_stocks.collector"]
-    assert services["worker"]["command"] == ["python", "-m", "ai_stocks.worker_cli"]
+    assert services["app"]["build"]["target"] == "app"
+    assert services["collector"]["build"]["target"] == "collector"
+    assert services["worker"]["build"]["target"] == "worker"
     assert services["collector"]["volumes"] == [
         "${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq"
     ]
@@ -30,21 +31,18 @@ def test_dockge_compose_separates_and_hardens_services():
     backup = services["backup-tools"]["environment"]
     assert "DATABASE_URL" not in backup
     assert backup["BACKUP_DATABASE_URL"].startswith("${BACKUP_DATABASE_URL:")
-    assert "urllib.request.urlopen" in " ".join(services["app"]["healthcheck"]["test"])
-    assert services["worker"]["healthcheck"]["test"] == [
+    expected_health = [
         "CMD",
-        "python",
-        "-m",
-        "ai_stocks.health",
-        "worker",
+        "curl",
+        "--fail",
+        "--silent",
+        "--max-time",
+        "2",
+        "http://127.0.0.1:8080/healthz",
     ]
-    assert services["collector"]["healthcheck"]["test"] == [
-        "CMD",
-        "python",
-        "-m",
-        "ai_stocks.health",
-        "collector",
-    ]
+    assert services["app"]["healthcheck"]["test"] == expected_health
+    assert services["worker"]["healthcheck"]["test"] == expected_health
+    assert services["collector"]["healthcheck"]["test"] == expected_health
 
 
 def test_backup_and_restore_handoff_exports_libpq_urls():
