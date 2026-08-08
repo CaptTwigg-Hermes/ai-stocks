@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using AiStocks.Core;
 
 namespace AiStocks.Research.Execution;
@@ -14,6 +16,8 @@ public sealed record ResearchExecutionOptions
     public int MaximumErrorBytes { get; init; } = 256 * 1024;
     public TimeSpan Timeout { get; init; } = TimeSpan.FromMinutes(10);
     public TimeSpan DrainTimeout { get; init; } = TimeSpan.FromSeconds(10);
+    public string RuntimeAttestationDirectory { get; init; } =
+        Path.Combine(Path.GetTempPath(), "aistocks-hermes-runtime-attestation");
     public IReadOnlyDictionary<string, string> Environment { get; init; } =
         System.Environment.GetEnvironmentVariables()
             .Cast<System.Collections.DictionaryEntry>()
@@ -24,8 +28,12 @@ public sealed record ResearchExecutionOptions
 public sealed record InvocationProvenance
 {
     public required Guid AgentId { get; init; }
+    public required string RequestedModelId { get; init; }
+    public required string RequestedProvider { get; init; }
     public required string ModelId { get; init; }
     public required string Provider { get; init; }
+    public required ImmutableArray<byte> RuntimeReport { get; init; }
+    public required string RuntimeReportSha256 { get; init; }
     public required string Executable { get; init; }
     public required ImmutableArray<string> Arguments { get; init; }
     public required ImmutableArray<string> EnvironmentVariableNames { get; init; }
@@ -66,29 +74,63 @@ public sealed class SystemResearchProcessLauncher : IResearchProcessLauncher
 {
     public IResearchProcess Start(ProcessStartInfo startInfo)
     {
-        var process = new Process { StartInfo = startInfo };
+        var effectiveStartInfo = OperatingSystem.IsWindows() ? startInfo : WrapInDedicatedSession(startInfo);
+        var process = new Process { StartInfo = effectiveStartInfo };
         if (!process.Start())
         {
             process.Dispose();
             throw new ResearchExecutionException("Hermes process did not start.");
         }
 
-        return new SystemResearchProcess(process);
+        return new SystemResearchProcess(process, !OperatingSystem.IsWindows());
     }
 
-    private sealed class SystemResearchProcess(Process process) : IResearchProcess
+    private static ProcessStartInfo WrapInDedicatedSession(ProcessStartInfo source)
     {
+        var wrapped = new ProcessStartInfo
+        {
+            FileName = "/usr/bin/setsid",
+            UseShellExecute = false,
+            RedirectStandardInput = source.RedirectStandardInput,
+            RedirectStandardOutput = source.RedirectStandardOutput,
+            RedirectStandardError = source.RedirectStandardError,
+            CreateNoWindow = source.CreateNoWindow
+        };
+        wrapped.ArgumentList.Add("--wait");
+        wrapped.ArgumentList.Add(source.FileName);
+        foreach (var argument in source.ArgumentList) wrapped.ArgumentList.Add(argument);
+        wrapped.Environment.Clear();
+        foreach (var pair in source.Environment) wrapped.Environment[pair.Key] = pair.Value;
+        return wrapped;
+    }
+
+    private sealed class SystemResearchProcess(Process process, bool dedicatedProcessGroup) : IResearchProcess
+    {
+        private const int SigKill = 9;
         public Stream StandardOutput => process.StandardOutput.BaseStream;
         public Stream StandardError => process.StandardError.BaseStream;
         public bool HasExited => process.HasExited;
         public int ExitCode => process.ExitCode;
         public Task WaitForExitAsync(CancellationToken cancellationToken) => process.WaitForExitAsync(cancellationToken);
-        public void Kill(bool entireProcessTree) => process.Kill(entireProcessTree);
+        public void Kill(bool entireProcessTree)
+        {
+            if (entireProcessTree && dedicatedProcessGroup)
+            {
+                // The setsid wrapper's PID is also the process-group ID. kill(2) with a
+                // negative PID remains able to reap descendants after the leader exits.
+                _ = NativeKill(-process.Id, SigKill);
+                return;
+            }
+            process.Kill(entireProcessTree);
+        }
         public ValueTask DisposeAsync()
         {
             process.Dispose();
             return ValueTask.CompletedTask;
         }
+
+        [DllImport("libc", EntryPoint = "kill", SetLastError = true)]
+        private static extern int NativeKill(int processGroup, int signal);
     }
 }
 
@@ -123,7 +165,9 @@ public sealed class HermesResearchRunner
         var startedAt = DateTimeOffset.UtcNow;
         var promptBytes = StrictUtf8.GetBytes(prompt);
         var promptHash = Sha256(promptBytes);
-        var startInfo = BuildStartInfo(modelId, prompt);
+        Directory.CreateDirectory(_options.RuntimeAttestationDirectory);
+        var runtimeReportPath = Path.Combine(_options.RuntimeAttestationDirectory, $"{Guid.NewGuid():N}.json");
+        var startInfo = BuildStartInfo(modelId, prompt, runtimeReportPath);
         var arguments = startInfo.ArgumentList.ToImmutableArray();
         var environmentNames = startInfo.Environment.Keys.Order(StringComparer.Ordinal).ToImmutableArray();
 
@@ -137,72 +181,86 @@ public sealed class HermesResearchRunner
             throw new ResearchExecutionException("Hermes process could not be started.", exception);
         }
 
-        await using (process.ConfigureAwait(false))
+        try
         {
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            deadline.CancelAfter(_options.Timeout);
-            var stdoutTask = ReadBoundedAsync(process.StandardOutput, _options.MaximumOutputBytes, deadline.Token);
-            var stderrTask = ReadBoundedAsync(process.StandardError, _options.MaximumErrorBytes, deadline.Token);
-            var waitTask = process.WaitForExitAsync(deadline.Token);
+            await using (process.ConfigureAwait(false))
+            {
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                deadline.CancelAfter(_options.Timeout);
+                var stdoutTask = ReadBoundedAsync(process.StandardOutput, _options.MaximumOutputBytes, deadline.Token);
+                var stderrTask = ReadBoundedAsync(process.StandardError, _options.MaximumErrorBytes, deadline.Token);
+                var waitTask = process.WaitForExitAsync(deadline.Token);
 
-            try
-            {
-                await Task.WhenAll(stdoutTask, stderrTask, waitTask).ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                await KillAndDrainAsync(process, stdoutTask, stderrTask).ConfigureAwait(false);
-                if (cancellationToken.IsCancellationRequested)
+                try
                 {
-                    throw new OperationCanceledException(cancellationToken);
+                    await Task.WhenAll(stdoutTask, stderrTask, waitTask).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    await KillAndDrainAsync(process, stdoutTask, stderrTask).ConfigureAwait(false);
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException(cancellationToken);
+                    }
+
+                    var message = deadline.IsCancellationRequested
+                        ? "Hermes process exceeded its execution deadline."
+                        : "Hermes process output was invalid or exceeded its configured bound.";
+                    throw new ResearchExecutionException(message, exception);
                 }
 
-                var message = deadline.IsCancellationRequested
-                    ? "Hermes process exceeded its execution deadline."
-                    : "Hermes process output was invalid or exceeded its configured bound.";
-                throw new ResearchExecutionException(message, exception);
-            }
+                var stdoutBytes = await stdoutTask.ConfigureAwait(false);
+                var stderrBytes = await stderrTask.ConfigureAwait(false);
+                string stdout;
+                string stderr;
+                try
+                {
+                    stdout = StrictUtf8.GetString(stdoutBytes);
+                    stderr = StrictUtf8.GetString(stderrBytes);
+                }
+                catch (DecoderFallbackException exception)
+                {
+                    throw new ResearchExecutionException("Hermes emitted non-UTF-8 output.", exception);
+                }
 
-            var stdoutBytes = await stdoutTask.ConfigureAwait(false);
-            var stderrBytes = await stderrTask.ConfigureAwait(false);
-            string stdout;
-            string stderr;
-            try
-            {
-                stdout = StrictUtf8.GetString(stdoutBytes);
-                stderr = StrictUtf8.GetString(stderrBytes);
-            }
-            catch (DecoderFallbackException exception)
-            {
-                throw new ResearchExecutionException("Hermes emitted non-UTF-8 output.", exception);
-            }
+                if (process.ExitCode != 0)
+                {
+                    throw new ResearchExecutionException($"Hermes exited with code {process.ExitCode}.");
+                }
 
-            var provenance = new InvocationProvenance
-            {
-                AgentId = agentId,
-                ModelId = modelId,
-                Provider = "copilot",
-                Executable = startInfo.FileName,
-                Arguments = arguments,
-                EnvironmentVariableNames = environmentNames,
-                PromptSha256 = promptHash,
-                StartedAt = startedAt,
-                CompletedAt = DateTimeOffset.UtcNow,
-                ExitCode = process.ExitCode,
-                StandardOutputSha256 = Sha256(stdoutBytes),
-                StandardErrorSha256 = Sha256(stderrBytes)
-            };
+                var runtimeReport = await ReadRuntimeReportAsync(runtimeReportPath, modelId, cancellationToken).ConfigureAwait(false);
+                var provenance = new InvocationProvenance
+                {
+                    AgentId = agentId,
+                    RequestedModelId = modelId,
+                    RequestedProvider = "copilot",
+                    ModelId = runtimeReport.Model,
+                    Provider = runtimeReport.Provider,
+                    RuntimeReport = runtimeReport.Bytes.ToImmutableArray(),
+                    RuntimeReportSha256 = Sha256(runtimeReport.Bytes),
+                    Executable = startInfo.FileName,
+                    Arguments = arguments,
+                    EnvironmentVariableNames = environmentNames,
+                    PromptSha256 = promptHash,
+                    StartedAt = startedAt,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    ExitCode = process.ExitCode,
+                    StandardOutputSha256 = Sha256(stdoutBytes),
+                    StandardErrorSha256 = Sha256(stderrBytes)
+                };
 
-            if (process.ExitCode != 0)
-            {
-                throw new ResearchExecutionException($"Hermes exited with code {process.ExitCode}.");
+                return new ResearchExecutionResult(stdout, stderr, provenance);
             }
-
-            return new ResearchExecutionResult(stdout, stderr, provenance);
+        }
+        finally
+        {
+            try { File.Delete(runtimeReportPath); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
     }
 
-    private ProcessStartInfo BuildStartInfo(string modelId, string prompt)
+    private ProcessStartInfo BuildStartInfo(string modelId, string prompt, string runtimeReportPath)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -220,6 +278,8 @@ public sealed class HermesResearchRunner
         startInfo.ArgumentList.Add("-t");
         startInfo.ArgumentList.Add("web");
         startInfo.ArgumentList.Add("--safe-mode");
+        startInfo.ArgumentList.Add("--usage-file");
+        startInfo.ArgumentList.Add(runtimeReportPath);
         startInfo.ArgumentList.Add("-z");
         startInfo.ArgumentList.Add(prompt);
         startInfo.Environment.Clear();
@@ -266,10 +326,9 @@ public sealed class HermesResearchRunner
     {
         try
         {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-            }
+            // Always target the dedicated process group: its leader may have exited
+            // while a descendant still owns the redirected pipes.
+            process.Kill(entireProcessTree: true);
         }
         catch (InvalidOperationException)
         {
@@ -317,9 +376,77 @@ public sealed class HermesResearchRunner
 
     private static string Sha256(ReadOnlySpan<byte> bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
+    private static async Task<RuntimeReport> ReadRuntimeReportAsync(
+        string path, string expectedModel, CancellationToken cancellationToken)
+    {
+        byte[] bytes;
+        try
+        {
+            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            bytes = await ReadBoundedAsync(stream, 64 * 1024, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new ResearchExecutionException("Hermes runtime usage report is absent or unreadable.", exception);
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 8 });
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !TrySingleString(root, "model", out var model) ||
+                !TrySingleString(root, "provider", out var provider) ||
+                !TrySingleBoolean(root, "completed", out var completed) ||
+                !TrySingleBoolean(root, "failed", out var failed) ||
+                !TrySingleInt64(root, "api_calls", out var apiCalls) ||
+                !completed || failed || apiCalls <= 0 ||
+                !StringComparer.Ordinal.Equals(model, expectedModel) ||
+                !StringComparer.Ordinal.Equals(provider, "copilot"))
+            {
+                throw new ResearchExecutionException("Hermes runtime usage report does not attest the requested successful model/provider invocation.");
+            }
+            return new RuntimeReport(model, provider, bytes);
+        }
+        catch (JsonException exception)
+        {
+            throw new ResearchExecutionException("Hermes runtime usage report is malformed.", exception);
+        }
+    }
+
+    private static bool TrySingleString(JsonElement root, string name, out string value)
+    {
+        value = string.Empty;
+        var matches = root.EnumerateObject().Where(property => property.NameEquals(name)).ToArray();
+        if (matches.Length != 1 || matches[0].Value.ValueKind != JsonValueKind.String) return false;
+        value = matches[0].Value.GetString() ?? string.Empty;
+        return value.Length > 0;
+    }
+
+    private static bool TrySingleBoolean(JsonElement root, string name, out bool value)
+    {
+        value = false;
+        var matches = root.EnumerateObject().Where(property => property.NameEquals(name)).ToArray();
+        if (matches.Length != 1 || matches[0].Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
+        value = matches[0].Value.GetBoolean();
+        return true;
+    }
+
+    private static bool TrySingleInt64(JsonElement root, string name, out long value)
+    {
+        value = 0;
+        var matches = root.EnumerateObject().Where(property => property.NameEquals(name)).ToArray();
+        return matches.Length == 1 && matches[0].Value.ValueKind == JsonValueKind.Number &&
+            matches[0].Value.TryGetInt64(out value);
+    }
+
+    private sealed record RuntimeReport(string Model, string Provider, byte[] Bytes);
+
     private static void ValidateOptions(ResearchExecutionOptions options)
     {
         if (string.IsNullOrWhiteSpace(options.HermesExecutable) || !Path.IsPathFullyQualified(options.HermesExecutable) ||
+            string.IsNullOrWhiteSpace(options.RuntimeAttestationDirectory) || !Path.IsPathFullyQualified(options.RuntimeAttestationDirectory) ||
             options.MaximumPromptBytes <= 0 ||
             options.MaximumOutputBytes <= 0 || options.MaximumErrorBytes <= 0 ||
             options.Timeout <= TimeSpan.Zero || options.DrainTimeout <= TimeSpan.Zero)

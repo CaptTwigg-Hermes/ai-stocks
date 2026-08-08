@@ -23,6 +23,19 @@ public sealed class DashboardApplicationTests : IClassFixture<DashboardApplicati
     }
 
     [Fact]
+    public async Task Global_ip_limiter_rejects_before_expensive_authentication()
+    {
+        await using var factory = new DashboardApplicationFactory();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add("Cf-Access-Jwt-Assertion", "malformed-token");
+        for (var index = 0; index < 100; index++)
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/dashboard")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.GetAsync("/api/dashboard")).StatusCode);
+        Assert.Equal(100, factory.Validator.Calls);
+    }
+
+    [Fact]
     public async Task Dashboard_renders_every_required_mobile_section_and_security_headers()
     {
         using var client = ViewerClient();
@@ -116,6 +129,7 @@ public sealed class DashboardApplicationTests : IClassFixture<DashboardApplicati
 public sealed class DashboardApplicationFactory : WebApplicationFactory<Program>
 {
     public RecordingFacade Facade { get; } = new();
+    public TestAccessAssertionValidator Validator { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -123,19 +137,28 @@ public sealed class DashboardApplicationFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<IDashboardFacade>(Facade);
-            services.AddSingleton<IAccessAssertionValidator, TestAccessAssertionValidator>();
+            services.AddSingleton<IAccessAssertionValidator>(Validator);
         });
     }
 }
 
 public sealed class TestAccessAssertionValidator : IAccessAssertionValidator
 {
+    private int _calls;
+    public int Calls => Volatile.Read(ref _calls);
+
     public Task<AccessIdentity> ValidateAsync(string assertion, CancellationToken cancellationToken) => assertion switch
     {
-        "owner-token" => Task.FromResult(new AccessIdentity("owner@example.com", "owner")),
-        "viewer-token" => Task.FromResult(new AccessIdentity("viewer@example.com", "viewer")),
-        _ => Task.FromException<AccessIdentity>(new AuthenticationFailureException("invalid"))
+        "owner-token" => Count(Task.FromResult(new AccessIdentity("owner@example.com", "owner"))),
+        "viewer-token" => Count(Task.FromResult(new AccessIdentity("viewer@example.com", "viewer"))),
+        _ => Count(Task.FromException<AccessIdentity>(new AuthenticationFailureException("invalid")))
     };
+
+    private Task<AccessIdentity> Count(Task<AccessIdentity> result)
+    {
+        Interlocked.Increment(ref _calls);
+        return result;
+    }
 }
 
 public sealed class RecordingFacade : IDashboardFacade

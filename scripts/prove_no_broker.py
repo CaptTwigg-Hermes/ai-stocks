@@ -37,16 +37,20 @@ URL = re.compile(r'https?://[^\s"\'<>]+', re.IGNORECASE)
 ENVIRONMENT = re.compile(
     r'Environment\.GetEnvironmentVariable\(\s*"([A-Za-z0-9_]+)"',
 )
+GROUP = re.compile(r'\bvar\s+(?P<name>[A-Za-z_]\w*)\s*=\s*\w+\.MapGroup\s*\(\s*"(?P<prefix>/[^"?]*)"')
 ROUTE = re.compile(
-    r'\.Map(?P<method>Get|Post|Put|Patch|Delete)\s*\(\s*"(?P<path>/[^"?]*)"',
+    r'\b(?P<receiver>[A-Za-z_]\w*)\.Map(?P<method>Get|Post|Put|Patch|Delete)\s*\(\s*"(?P<path>/[^"?]*)"',
+)
+ROUTE_HELPER = re.compile(
+    r'\bMapControl\s*\(\s*(?P<receiver>[A-Za-z_]\w*)\s*,\s*"(?P<path>/[^"?]*)"',
 )
 PROCESS = re.compile(r"\bProcessStartInfo\b|\bProcess\.Start\s*\(")
 ALLOWED_PROCESS_PROJECTS = {"AiStocks.Research", "AiStocks.Operations"}
 ALLOWED_MUTATIONS = {
-    "/owner/contest/start",
-    "/owner/contest/pause",
-    "/owner/contest/resume",
-    "/owner/contest/reset",
+    "/admin/start",
+    "/admin/pause",
+    "/admin/resume",
+    "/admin/pre-start-reset",
 }
 
 
@@ -83,6 +87,7 @@ def inventory() -> dict[str, object]:
         text = path.read_text(encoding="utf-8")
         rel = relative(path)
         project = path.relative_to(SOURCE).parts[0]
+        groups = {match.group("name"): match.group("prefix").rstrip("/") for match in GROUP.finditer(text)}
 
         for match in URL.finditer(text):
             value = match.group(0).rstrip(".,);]")
@@ -107,11 +112,18 @@ def inventory() -> dict[str, object]:
 
         for match in ROUTE.finditer(text):
             method = match.group("method").upper()
-            route_path = match.group("path")
+            route_path = groups.get(match.group("receiver"), "") + match.group("path")
             line = text.count("\n", 0, match.start()) + 1
-            routes.append({"file": rel, "line": line, "method": method, "path": route_path})
+            routes.append({"method": method, "path": route_path})
             if method != "GET" and route_path not in ALLOWED_MUTATIONS:
                 findings.append(f"unapproved HTTP mutation route at {rel}:{line}: {method} {route_path}")
+
+        for match in ROUTE_HELPER.finditer(text):
+            route_path = groups.get(match.group("receiver"), "") + match.group("path")
+            line = text.count("\n", 0, match.start()) + 1
+            routes.append({"method": "POST", "path": route_path})
+            if route_path not in ALLOWED_MUTATIONS:
+                findings.append(f"unapproved HTTP mutation route at {rel}:{line}: POST {route_path}")
 
     return {
         "ok": not findings,
@@ -120,7 +132,10 @@ def inventory() -> dict[str, object]:
         "url_constants": sorted(urls, key=lambda item: (str(item["file"]), str(item["line"]))),
         "environment_reads": sorted(environment, key=lambda item: (str(item["file"]), str(item["line"]))),
         "process_calls": sorted(processes, key=lambda item: (str(item["file"]), str(item["line"]))),
-        "routes": sorted(routes, key=lambda item: (str(item["path"]), str(item["method"]))),
+        "routes": [
+            {"method": method, "path": path}
+            for path, method in sorted({(str(item["path"]), str(item["method"])) for item in routes})
+        ],
     }
 
 

@@ -73,11 +73,22 @@ public sealed class PersistenceContractTests
     [Fact]
     public void MigrationChecksumIsStableAndSha256()
     {
-        Assert.Equal(2, MigrationCatalog.All.Count);
+        Assert.Equal(3, MigrationCatalog.All.Count);
         foreach (var migration in MigrationCatalog.All)
         {
             Assert.Matches("^[0-9a-f]{64}$", migration.Sha256);
             Assert.Equal(migration.Sha256, MigrationCatalog.ComputeSha256(migration.Sql));
         }
+    }
+
+    [Fact]
+    public void ResearchAttestationMigrationIsImmutableHashedAndTransactionallyPersistable()
+    {
+        var sql = MigrationCatalog.All.Single(migration => migration.Id == "003_research_attestations").Sql;
+        Assert.Contains("CREATE TABLE research_attestations", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("runtime_report_hash", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("requested_model_id = actual_model_id", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("reject_audit_mutation", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("persist_research_attestation", sql, StringComparison.OrdinalIgnoreCase);
     }
 }

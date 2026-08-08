@@ -31,7 +31,7 @@ public sealed class PostgresIntegrationTests
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
         Assert.Equal(4L, await ScalarLong(connection, "SELECT count(*) FROM agents"));
         Assert.Equal(120000m, await ScalarDecimal(connection, "SELECT sum(cash) FROM account_balances"));
-        Assert.Equal(1L, await ScalarLong(connection, "SELECT count(*) FROM schema_migrations WHERE length(sha256)=64"));
+        Assert.Equal(2L, await ScalarLong(connection, "SELECT count(*) FROM schema_migrations WHERE length(sha256)=64"));
 
         var immutable = await Assert.ThrowsAsync<PostgresException>(() => Execute(connection,
             "UPDATE ledger_events SET occurred_at=clock_timestamp() WHERE event_type='INITIAL_FUNDING'"));

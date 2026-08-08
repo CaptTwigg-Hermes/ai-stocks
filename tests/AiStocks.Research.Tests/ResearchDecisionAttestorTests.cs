@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using AiStocks.Research.Decisions;
 using AiStocks.Research.Evidence;
 using AiStocks.Research.Execution;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace AiStocks.Research.Tests;
 
@@ -42,21 +44,29 @@ public sealed class ResearchDecisionAttestorTests
         Assert.Equal(0, evidence.Calls);
     }
 
-    private static InvocationProvenance Provenance(string promptHash) => new()
+    private static InvocationProvenance Provenance(string promptHash)
     {
-        AgentId = AgentId,
-        ModelId = "gpt-5.6-sol",
-        Provider = "copilot",
-        Executable = "hermes",
-        Arguments = ImmutableArray.Create("--provider", "copilot"),
-        EnvironmentVariableNames = ImmutableArray<string>.Empty,
-        PromptSha256 = promptHash,
-        StartedAt = DateTimeOffset.Parse("2026-08-08T09:59:00Z"),
-        CompletedAt = DateTimeOffset.Parse("2026-08-08T10:01:00Z"),
-        ExitCode = 0,
-        StandardOutputSha256 = new string('c', 64),
-        StandardErrorSha256 = new string('d', 64)
-    };
+        var report = Encoding.UTF8.GetBytes("{\"model\":\"gpt-5.6-sol\",\"provider\":\"copilot\",\"api_calls\":1,\"completed\":true,\"failed\":false}");
+        return new()
+        {
+            AgentId = AgentId,
+            RequestedModelId = "gpt-5.6-sol",
+            RequestedProvider = "copilot",
+            ModelId = "gpt-5.6-sol",
+            Provider = "copilot",
+            RuntimeReport = report.ToImmutableArray(),
+            RuntimeReportSha256 = Convert.ToHexStringLower(SHA256.HashData(report)),
+            Executable = "hermes",
+            Arguments = ImmutableArray.Create("--provider", "copilot"),
+            EnvironmentVariableNames = ImmutableArray<string>.Empty,
+            PromptSha256 = promptHash,
+            StartedAt = DateTimeOffset.Parse("2026-08-08T09:59:00Z"),
+            CompletedAt = DateTimeOffset.Parse("2026-08-08T10:01:00Z"),
+            ExitCode = 0,
+            StandardOutputSha256 = new string('c', 64),
+            StandardErrorSha256 = new string('d', 64)
+        };
+    }
 
     private static string Json(string hash) => $$"""
     {"decisionId":"decision-1","agentId":"{{AgentId}}","modelId":"gpt-5.6-sol","action":"buy",

@@ -2,6 +2,19 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "AngleSharp": {
+        "type": "Transitive",
+        "resolved": "1.7.1",
+        "contentHash": "QBblGpRB3SYD66Mls7fHyl1mWkP93n7ErWDWHc1vd9sPHhdlTkmUoY3CjgfjcWNxGF9m7xjNyztRfErXqoBKOA=="
+      },
+      "AngleSharp.Css": {
+        "type": "Transitive",
+        "resolved": "1.0.1",
+        "contentHash": "6S13xNHH+SUGPZd6EO1MhkuDbpEnFroUM6A8DZpLJHQnLRTvtBJb3Ydu65s618E4gWF9FSWmM5jhKk4RIfwT2A==",
+        "dependencies": {
+          "AngleSharp": "[1.5.0, 2.0.0)"
+        }
+      },
       "Npgsql": {
         "type": "Transitive",
         "resolved": "10.0.0",
@@ -29,7 +42,9 @@
       "aistocks.research": {
         "type": "Project",
         "dependencies": {
-          "AiStocks.Core": "[1.0.0, )"
+          "AiStocks.Core": "[1.0.0, )",
+          "AngleSharp": "[1.7.1, )",
+          "AngleSharp.Css": "[1.0.1, )"
         }
       },
       "aistocks.trading": {

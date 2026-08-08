@@ -38,8 +38,13 @@ public sealed class HermesResearchRunnerTests
         Assert.True(launcher.StartInfo.RedirectStandardError);
         Assert.Equal(new[]
         {
-            "-m", "gpt-5.6-sol", "--provider", "copilot", "-t", "web", "--safe-mode", "-z", "bounded prompt"
-        }, launcher.StartInfo.ArgumentList);
+            "-m", "gpt-5.6-sol", "--provider", "copilot", "-t", "web", "--safe-mode", "--usage-file"
+        }, launcher.StartInfo.ArgumentList.Take(8));
+        Assert.EndsWith(".json", launcher.StartInfo.ArgumentList[8], StringComparison.Ordinal);
+        Assert.Equal(new[]
+        {
+            "-z", "bounded prompt"
+        }, launcher.StartInfo.ArgumentList.Skip(9));
         Assert.Equal("/agent", launcher.StartInfo.Environment["HOME"]);
         Assert.Equal("/trusted/bin", launcher.StartInfo.Environment["PATH"]);
         Assert.Equal("secret", launcher.StartInfo.Environment["COPILOT_TOKEN"]);
@@ -47,6 +52,9 @@ public sealed class HermesResearchRunnerTests
         Assert.Equal(AgentId, result.Provenance.AgentId);
         Assert.Equal("gpt-5.6-sol", result.Provenance.ModelId);
         Assert.Equal("copilot", result.Provenance.Provider);
+        Assert.Equal("gpt-5.6-sol", result.Provenance.RequestedModelId);
+        Assert.Equal("copilot", result.Provenance.RequestedProvider);
+        Assert.Equal(64, result.Provenance.RuntimeReportSha256.Length);
         Assert.Equal(64, result.Provenance.PromptSha256.Length);
         Assert.Equal(result.Provenance.Arguments, result.Provenance.Arguments.ToImmutableArray());
     }
@@ -121,6 +129,33 @@ public sealed class HermesResearchRunnerTests
         Assert.True(process.KillTreeCalled);
     }
 
+    [Fact]
+    public async Task RunAsync_KillsTreeWhenLeaderExitedButDescendantKeepsPipesOpen()
+    {
+        var process = new ExitedLeaderOpenPipesProcess();
+        var runner = new HermesResearchRunner(new CapturingLauncher(process),
+            TestOptions() with { Timeout = TimeSpan.FromMilliseconds(30), DrainTimeout = TimeSpan.FromMilliseconds(100) });
+
+        await Assert.ThrowsAsync<ResearchExecutionException>(() =>
+            runner.RunAsync(AgentId, "gpt-5.6-sol", "prompt", CancellationToken.None));
+
+        Assert.True(process.KillTreeCalled);
+    }
+
+    [Fact]
+    public async Task RunAsync_FailsClosedWhenHermesRuntimeReportIsMissingOrMismatched()
+    {
+        var missing = new HermesResearchRunner(
+            new CapturingLauncher(new FakeProcess("{}", "", 0), writeRuntimeReport: false), TestOptions());
+        await Assert.ThrowsAsync<ResearchExecutionException>(() =>
+            missing.RunAsync(AgentId, "gpt-5.6-sol", "prompt", CancellationToken.None));
+
+        var mismatched = new HermesResearchRunner(
+            new CapturingLauncher(new FakeProcess("{}", "", 0), reportedModel: "fallback-model"), TestOptions());
+        await Assert.ThrowsAsync<ResearchExecutionException>(() =>
+            mismatched.RunAsync(AgentId, "gpt-5.6-sol", "prompt", CancellationToken.None));
+    }
+
     private static ResearchExecutionOptions TestOptions() => new()
     {
         Timeout = TimeSpan.FromSeconds(2),
@@ -128,12 +163,31 @@ public sealed class HermesResearchRunnerTests
         Environment = new Dictionary<string, string> { ["HOME"] = "/tmp", ["PATH"] = "/bin" }
     };
 
-    private sealed class CapturingLauncher(IResearchProcess process) : IResearchProcessLauncher
+    private sealed class CapturingLauncher(
+        IResearchProcess process,
+        bool writeRuntimeReport = true,
+        string? reportedModel = null) : IResearchProcessLauncher
     {
         public ProcessStartInfo? StartInfo { get; private set; }
         public IResearchProcess Start(ProcessStartInfo startInfo)
         {
             StartInfo = startInfo;
+            if (writeRuntimeReport)
+            {
+                var arguments = startInfo.ArgumentList.ToArray();
+                var usageIndex = Array.IndexOf(arguments, "--usage-file");
+                var modelIndex = Array.IndexOf(arguments, "-m");
+                Assert.True(usageIndex >= 0);
+                File.WriteAllText(arguments[usageIndex + 1],
+                    System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        model = reportedModel ?? arguments[modelIndex + 1],
+                        provider = "copilot",
+                        api_calls = 1,
+                        completed = true,
+                        failed = false
+                    }));
+            }
             return process;
         }
     }
@@ -164,6 +218,42 @@ public sealed class HermesResearchRunnerTests
             StandardOutput.Dispose();
             StandardError.Dispose();
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class ExitedLeaderOpenPipesProcess : IResearchProcess
+    {
+        public Stream StandardOutput { get; } = new NeverEndingStream();
+        public Stream StandardError { get; } = new NeverEndingStream();
+        public bool HasExited => true;
+        public int ExitCode => 0;
+        public bool KillTreeCalled { get; private set; }
+        public Task WaitForExitAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public void Kill(bool entireProcessTree) => KillTreeCalled = entireProcessTree;
+        public ValueTask DisposeAsync()
+        {
+            StandardOutput.Dispose();
+            StandardError.Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class NeverEndingStream : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
         }
     }
 

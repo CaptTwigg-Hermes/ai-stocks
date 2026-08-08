@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using System.Net;
+
 namespace AiStocks.Core;
 
 public static class ContestContract
@@ -65,12 +68,30 @@ public enum FeeTier { Starter, Mini }
 public enum RunStatus { Scheduled, Running, Succeeded, Missed, Failed }
 public enum OrderStatus { Queued, Filled, Rejected, Cancelled, Replaced }
 
+public sealed record EvidenceRetrievalHop(
+    Uri RequestedUrl,
+    ImmutableArray<IPAddress> ResolvedAddresses,
+    IPAddress PinnedAddress,
+    int StatusCode,
+    Uri? RedirectTarget,
+    ImmutableDictionary<string, string> ResponseHeaders,
+    DateTimeOffset ResponseReceivedAt);
+
 public sealed record VerifiedEvidence(
     Uri FinalUrl,
     DateTimeOffset PublishedAt,
     DateTimeOffset RetrievedAt,
     string ContentSha256,
-    string ExactExcerpt);
+    string ExactExcerpt)
+{
+    public Uri OriginalUrl { get; init; } = FinalUrl;
+    public DateTimeOffset VerificationStartedAt { get; init; } = RetrievedAt;
+    public ImmutableArray<EvidenceRetrievalHop> Hops { get; init; } = [];
+    public ImmutableDictionary<string, string> ResponseHeaders { get; init; } =
+        ImmutableDictionary<string, string>.Empty.WithComparers(StringComparer.OrdinalIgnoreCase);
+    public string ContentType { get; init; } = string.Empty;
+    public ImmutableArray<byte> ImmutableContent { get; init; } = [];
+}
 
 public sealed record VerifiedMarketObservation(
     InstrumentId Instrument,

@@ -36,6 +36,23 @@ public sealed class EvidenceVerifierTests
         await Assert.ThrowsAsync<EvidenceVerificationException>(() => verifier.VerifyAsync(claim, CancellationToken.None));
     }
 
+    [Theory]
+    [InlineData("<p hidden>Exact catalyst text</p>")]
+    [InlineData("<p aria-hidden=\"true\">Exact catalyst text</p>")]
+    [InlineData("<p style=\"display:none\">Exact catalyst text</p>")]
+    [InlineData("<p style=\"visibility: hidden\">Exact catalyst text</p>")]
+    [InlineData("<style>.concealed { display: none }</style><p class=\"concealed\">Exact catalyst text</p>")]
+    [InlineData("<template><p>Exact catalyst text</p></template>")]
+    [InlineData("<p hidden><b>Exact catalyst text</p><p>Other text</b>")]
+    public async Task VerifyAsync_RejectsHiddenAndMalformedDomClaims(string body)
+    {
+        var html = ValidHtml.Replace("Exact catalyst text", body);
+        var verifier = Verifier(Response(HttpStatusCode.OK, html));
+
+        await Assert.ThrowsAsync<EvidenceVerificationException>(() =>
+            verifier.VerifyAsync(Claim("https://example.com", "Exact catalyst text"), CancellationToken.None));
+    }
+
     [Fact]
     public async Task VerifyAsync_RejectsExcerptSpanningSeparateVisibleBlocks()
     {
@@ -68,6 +85,22 @@ public sealed class EvidenceVerifierTests
     [InlineData("::1")]
     [InlineData("fc00::1")]
     [InlineData("fe80::1")]
+    [InlineData("0.1.2.3")]
+    [InlineData("192.0.0.9")]
+    [InlineData("192.88.99.1")]
+    [InlineData("192.31.196.1")]
+    [InlineData("192.52.193.1")]
+    [InlineData("192.175.48.1")]
+    [InlineData("198.51.100.1")]
+    [InlineData("240.0.0.1")]
+    [InlineData("::2")]
+    [InlineData("64:ff9b:1::1")]
+    [InlineData("100::1")]
+    [InlineData("2001::1")]
+    [InlineData("2001:2::1")]
+    [InlineData("2001:10::1")]
+    [InlineData("2001:db8::1")]
+    [InlineData("3fff::1")]
     public async Task VerifyAsync_RejectsNonPublicDnsAnswers(string address)
     {
         var transport = new FakeTransport(Response(HttpStatusCode.OK, ValidHtml));
@@ -104,6 +137,13 @@ public sealed class EvidenceVerifierTests
 
         Assert.Equal("cdn.example.org", result.FinalUrl.Host);
         Assert.Equal(new[] { "example.com", "cdn.example.org" }, transport.Requests.Select(x => x.Uri.Host));
+        Assert.Equal("https://example.com/start", result.OriginalUrl.AbsoluteUri);
+        Assert.Equal(2, result.Hops.Length);
+        Assert.Equal("93.184.216.34", result.Hops[0].PinnedAddress.ToString());
+        Assert.Equal("1.1.1.1", result.Hops[1].PinnedAddress.ToString());
+        Assert.Equal("https://cdn.example.org/item", result.Hops[0].RedirectTarget?.AbsoluteUri);
+        Assert.Equal(Encoding.UTF8.GetBytes(ValidHtml), result.ImmutableContent);
+        Assert.Contains(result.ResponseHeaders.Keys, key => key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
