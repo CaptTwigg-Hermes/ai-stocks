@@ -54,6 +54,21 @@ public sealed class EvidenceVerifierTests
     }
 
     [Fact]
+    public async Task VerifyAsync_RejectsHtmlWhoseVisibilityDependsOnExternalCss()
+    {
+        var html = ValidHtml.Replace("<head>", "<head><link rel=\"stylesheet\" href=\"/hidden.css\">")
+            .Replace("Exact catalyst text", "<p class=\"concealed\">Exact catalyst text</p>");
+        var transport = new FakeTransport(Response(HttpStatusCode.OK, html));
+        var verifier = new EvidenceVerifier(new FakeDns(IPAddress.Parse("93.184.216.34")), transport, TestOptions());
+
+        var exception = await Assert.ThrowsAsync<EvidenceVerificationException>(() =>
+            verifier.VerifyAsync(Claim("https://example.com/news", "Exact catalyst text"), CancellationToken.None));
+
+        Assert.Contains("external stylesheet", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(transport.Requests);
+    }
+
+    [Fact]
     public async Task VerifyAsync_RejectsExcerptSpanningSeparateVisibleBlocks()
     {
         var html = ValidHtml.Replace("Exact catalyst text", "<p>Exact catalyst</p><p>text</p>");

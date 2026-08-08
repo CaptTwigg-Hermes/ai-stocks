@@ -1,10 +1,15 @@
 using AiStocks.Core;
 using AiStocks.Operations;
 using AiStocks.Persistence;
+using AiStocks.Research.Decisions;
+using AiStocks.Research.Execution;
 using AiStocks.Web;
 using AiStocks.Worker;
 using AiStocks.Worker.Orchestration;
 using Npgsql;
+using System.Collections.Immutable;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace AiStocks.Persistence.Tests;
 
@@ -51,8 +56,6 @@ public sealed class RuntimeIntegrationTests
         var worker = new PostgresWorkerState(source);
         Assert.Equal(24, await worker.EnsureAtomicallyAsync(RunSchedule.Create(session), default));
         var claimed = Assert.IsType<ClaimedRun>(await worker.ClaimNextAsync(session.OpenAt.AddHours(-1), default));
-        await worker.CompleteAsync(new RunCompletion(claimed.Run, claimed.ClaimToken, RunAttemptOutcome.Succeeded,
-            session.OpenAt.AddHours(-1).AddMinutes(1), null, null, AgentRunResult.Success("{\"action\":\"hold\"}")), default);
 
         var delivery = new PostgresDeliveryAuditPort(source);
         Assert.Equal(ReservationState.Acquired, (await delivery.ReserveAsync("daily:2026-08-10", new string('a', 64), default)).State);
@@ -95,7 +98,46 @@ public sealed class RuntimeIntegrationTests
              "evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-09T10:00:00+00:00","exactExcerpt":"news"}],
              "canonicalRequestSha256":"{{new string('a', 64)}}"}
             """;
-        Assert.True(await worker.TryAcceptWhileRunningAsync(claimed.Run, AgentRunResult.Success(decision), default));
+        var parsed = new StrictDecisionJsonParser().Parse(decision, claimed.Run.AgentId, claimed.Run.ModelId);
+        var verifiedEvidence = parsed.Evidence.Select(claim => new VerifiedEvidence(
+            claim.Url, claim.PublishedAt, claimed.Run.ScheduledAt, new string('e', 64), claim.ExactExcerpt)
+        {
+            VerificationStartedAt = claimed.Run.ScheduledAt,
+            Hops = [],
+            ResponseHeaders = ImmutableDictionary<string, string>.Empty,
+            ContentType = "text/plain",
+            ImmutableContent = Encoding.UTF8.GetBytes(claim.ExactExcerpt).ToImmutableArray()
+        }).ToArray();
+        var orderDecision = new OrderDecision(parsed.DecisionId, parsed.AgentId, parsed.ModelId, parsed.Action,
+            parsed.Instrument, parsed.Quantity, parsed.DecisionAt, parsed.ObservedPrice, parsed.Reason,
+            parsed.Catalyst, parsed.Risks, parsed.Confidence, verifiedEvidence, parsed.CanonicalRequestSha256);
+        var runtimeReport = Encoding.UTF8.GetBytes($$"""
+            {"model":"{{claimed.Run.ModelId}}","provider":"copilot","completed":true,"failed":false,"api_calls":1}
+            """);
+        var provenance = new InvocationProvenance
+        {
+            AgentId = claimed.Run.AgentId,
+            RequestedModelId = claimed.Run.ModelId,
+            RequestedProvider = "copilot",
+            ModelId = claimed.Run.ModelId,
+            Provider = "copilot",
+            RuntimeReport = runtimeReport.ToImmutableArray(),
+            RuntimeReportSha256 = Convert.ToHexStringLower(SHA256.HashData(runtimeReport)),
+            Executable = "hermes",
+            Arguments = ImmutableArray.Create("--provider", "copilot", "--model", claimed.Run.ModelId),
+            EnvironmentVariableNames = ImmutableArray<string>.Empty,
+            PromptSha256 = parsed.CanonicalRequestSha256,
+            StartedAt = claimed.Run.ScheduledAt.AddMinutes(-1),
+            CompletedAt = claimed.Run.ScheduledAt,
+            ExitCode = 0,
+            StandardOutputSha256 = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(decision))),
+            StandardErrorSha256 = Convert.ToHexStringLower(SHA256.HashData([]))
+        };
+        var attestation = new AttestedResearchDecision(orderDecision, provenance);
+        var attestedResult = AgentRunResult.Success(decision, attestation);
+        Assert.True(await worker.TryAcceptWhileRunningAsync(claimed.Run, attestedResult, default));
+        await worker.CompleteAsync(new RunCompletion(claimed.Run, claimed.ClaimToken, RunAttemptOutcome.Succeeded,
+            session.OpenAt.AddHours(-1).AddMinutes(1), null, null, attestedResult), default);
         var paused = await dashboard.ControlAsync(new(ContestControlAction.Pause, "owner@example.com", "pause-1"), default);
         Assert.True(paused.Paused);
 

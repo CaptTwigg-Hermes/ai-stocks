@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using AiStocks.Web;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,15 +27,39 @@ public sealed class DashboardApplicationTests : IClassFixture<DashboardApplicati
     [Fact]
     public async Task Global_ip_limiter_rejects_before_expensive_authentication()
     {
-        await using var factory = new DashboardApplicationFactory();
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        client.DefaultRequestHeaders.Add("Cf-Access-Jwt-Assertion", "malformed-token");
+        await using var factory = new DashboardApplicationFactory("192.0.2.1");
         for (var index = 0; index < 100; index++)
-            Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/dashboard")).StatusCode);
+        {
+            var context = await SendFromLoopback(factory, $"198.51.100.{index + 1}");
+            Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+        }
 
-        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.GetAsync("/api/dashboard")).StatusCode);
+        var rejected = await SendFromLoopback(factory, "198.51.100.254");
+        Assert.Equal(StatusCodes.Status429TooManyRequests, rejected.Response.StatusCode);
         Assert.Equal(100, factory.Validator.Calls);
     }
+
+    [Fact]
+    public async Task Global_limiter_uses_forwarded_client_only_from_configured_tunnel_proxy()
+    {
+        await using var factory = new DashboardApplicationFactory("127.0.0.1");
+        for (var index = 0; index < 100; index++)
+        {
+            var context = await SendFromLoopback(factory, $"203.0.113.{index + 1}");
+            Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+        }
+        Assert.Equal(100, factory.Validator.Calls);
+    }
+
+    private static Task<HttpContext> SendFromLoopback(DashboardApplicationFactory factory, string forwardedFor) =>
+        factory.Server.SendAsync(context =>
+        {
+            context.Connection.RemoteIpAddress = IPAddress.Loopback;
+            context.Request.Method = HttpMethod.Get.Method;
+            context.Request.Path = "/api/dashboard";
+            context.Request.Headers["X-Forwarded-For"] = forwardedFor;
+            context.Request.Headers["Cf-Access-Jwt-Assertion"] = "malformed-token";
+        });
 
     [Fact]
     public async Task Dashboard_renders_every_required_mobile_section_and_security_headers()
@@ -128,14 +154,25 @@ public sealed class DashboardApplicationTests : IClassFixture<DashboardApplicati
 
 public sealed class DashboardApplicationFactory : WebApplicationFactory<Program>
 {
+    private readonly string? trustedProxy;
+    public DashboardApplicationFactory() { }
+    internal DashboardApplicationFactory(string trustedProxy) => this.trustedProxy = trustedProxy;
     public RecordingFacade Facade { get; } = new();
     public TestAccessAssertionValidator Validator { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        if (trustedProxy is not null) builder.UseSetting("TRUSTED_PROXY_IPS", trustedProxy);
         builder.ConfigureTestServices(services =>
         {
+            if (trustedProxy is not null)
+                services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+                {
+                    options.KnownIPNetworks.Clear();
+                    options.KnownProxies.Clear();
+                    options.KnownProxies.Add(IPAddress.Parse(trustedProxy));
+                });
             services.AddSingleton<IDashboardFacade>(Facade);
             services.AddSingleton<IAccessAssertionValidator>(Validator);
         });

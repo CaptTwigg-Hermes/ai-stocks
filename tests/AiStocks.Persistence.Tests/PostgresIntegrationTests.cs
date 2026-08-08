@@ -337,11 +337,14 @@ public sealed class PostgresIntegrationTests
 
     [Fact]
     public async Task RealPostgresCollectorPersistsStrictManifestBoundAuthorityAndFailsReadinessClosed()
+    public async Task RealPostgresRejectsSplitResearchAttestationReplayIdentity()
+
     {
         if (ConnectionString is not { } connectionString) return;
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ResetDatabase(dataSource);
         await new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None);
+<<<<<<< HEAD
         var root = Path.Combine(Path.GetTempPath(), $"aistocks-collector-pg-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         try
@@ -379,6 +382,52 @@ public sealed class PostgresIntegrationTests
             Assert.Contains(readiness.Failures, failure => failure.Contains("20 complete", StringComparison.Ordinal));
         }
         finally { Directory.Delete(root, true); }
+=======
+        await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
+        var agent = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var scheduled = Guid.NewGuid(); var run = Guid.NewGuid(); var orderA = Guid.NewGuid();
+        var orderB = Guid.NewGuid(); var instrument = Guid.NewGuid();
+        await Execute(connection, """
+            INSERT INTO scheduled_agent_runs(id,run_key,agent_id,model_id,scheduled_at,deadline_at,next_attempt_at)
+            VALUES($1,'attestation-run',$2,'gpt-5.6-sol','2026-08-08T09:00:00Z','2026-08-08T09:15:00Z','2026-08-08T09:00:00Z')
+            """, scheduled, agent);
+        await Execute(connection, """
+            INSERT INTO agent_runs VALUES($1,$2,1,$3,'gpt-5.6-sol','00000000-0000-0000-0000-000000000001','2026-08-08T09:00:00Z','2026-08-08T09:01:00Z','SUCCEEDED','{}',canonical_jsonb_sha256('{}'))
+            """, run, scheduled, agent);
+        await Execute(connection, """
+            INSERT INTO instruments(id,isin,issuer_id,order_book_id,mic,symbol,cfi,active_from,source_json,source_hash)
+            VALUES($1,'SE0000000099','ATTESTISSUER00000001','attest-book','XSTO','ATT','ESVUFR','2026-01-01','{}',canonical_jsonb_sha256('{}'))
+            """, instrument);
+        await Execute(connection, """
+            INSERT INTO orders(id,agent_id,decision_id,idempotency_key,side,instrument_id,quantity,decision_at,observed_price,request_json,request_hash)
+            VALUES($1,$2,'a','a','BUY',$3,1,'2026-08-08T09:00:00Z',100,'{}',canonical_jsonb_sha256('{}')),($4,$2,'b','b','BUY',$3,1,'2026-08-08T09:00:00Z',100,'{}',canonical_jsonb_sha256('{}'))
+            """, orderA, agent, instrument, orderB);
+        var report = System.Text.Encoding.UTF8.GetBytes("{\"model\":\"gpt-5.6-sol\",\"provider\":\"copilot\",\"completed\":true,\"failed\":false,\"api_calls\":1}");
+        var reportHash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(report));
+        var invocation = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["agent_id"] = agent.ToString(),
+            ["requested_model_id"] = "gpt-5.6-sol",
+            ["requested_provider"] = "copilot",
+            ["model_id"] = "gpt-5.6-sol",
+            ["provider"] = "copilot",
+            ["runtime_report_sha256"] = reportHash
+        });
+        using var invocationDocument = JsonDocument.Parse(invocation);
+        var canonicalInvocation = CanonicalJson.Serialize(invocationDocument.RootElement);
+        var invocationHash = CanonicalJson.Sha256(invocationDocument.RootElement);
+        const string evidence = "[]";
+        using var evidenceDocument = JsonDocument.Parse(evidence);
+        var evidenceHash = CanonicalJson.Sha256(evidenceDocument.RootElement);
+        var attestation = Guid.NewGuid();
+        Assert.Equal(attestation, await ScalarGuid(connection, """
+            SELECT persist_research_attestation($1,$2,$3,$4,'gpt-5.6-sol','copilot','gpt-5.6-sol','copilot',$5::jsonb,$6::sha256_hex,$7,$8::sha256_hex,$9::jsonb,$10::sha256_hex,'2026-08-08T09:01:00Z')
+            """, attestation, run, orderA, agent, canonicalInvocation, invocationHash, report, reportHash, evidence, evidenceHash));
+        var split = await Assert.ThrowsAsync<PostgresException>(() => ScalarGuid(connection, """
+            SELECT persist_research_attestation(gen_random_uuid(),$1,$2,$3,'gpt-5.6-sol','copilot','gpt-5.6-sol','copilot',$4::jsonb,$5::sha256_hex,$6,$7::sha256_hex,$8::jsonb,$9::sha256_hex,'2026-08-08T09:01:00Z')
+            """, run, orderB, agent, canonicalInvocation, invocationHash, report, reportHash, evidence, evidenceHash));
+        Assert.Contains("split", split.MessageText, StringComparison.OrdinalIgnoreCase);
+>>>>>>> 1791f12 (fix: harden research security boundaries)
     }
 
     private static async Task ResetDatabase(NpgsqlDataSource source)

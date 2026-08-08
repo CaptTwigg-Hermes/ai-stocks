@@ -1,9 +1,11 @@
+using System.Net;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using AiStocks.Persistence;
 using AiStocks.Web;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -45,6 +47,22 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     options.Cookie.SameSite = SameSiteMode.Strict;
 });
+var trustedProxyText = builder.Configuration["TRUSTED_PROXY_IPS"];
+if (!builder.Environment.IsEnvironment("Testing") && string.IsNullOrWhiteSpace(trustedProxyText))
+    throw new InvalidOperationException("TRUSTED_PROXY_IPS is required behind Cloudflare Tunnel.");
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+    options.ForwardLimit = 1;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+    foreach (var value in (trustedProxyText ?? string.Empty).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+    {
+        if (!IPAddress.TryParse(value, out var address))
+            throw new InvalidOperationException("TRUSTED_PROXY_IPS must contain only exact IP addresses.");
+        options.KnownProxies.Add(address);
+    }
+});
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -78,6 +96,7 @@ app.Use(async (context, next) =>
     await next(context);
 });
 app.UseStaticFiles();
+app.UseForwardedHeaders();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -123,6 +142,11 @@ MapControl(admin, "/pause", ContestControlAction.Pause);
 MapControl(admin, "/resume", ContestControlAction.Resume);
 MapControl(admin, "/pre-start-reset", ContestControlAction.PreStartReset);
 
+if (args.Contains("--print-endpoints", StringComparer.Ordinal))
+{
+    PrintEndpoints(app);
+    return;
+}
 app.Run();
 
 static Delegate Query(Func<DashboardSnapshot, object> select) => async (IDashboardFacade facade, CancellationToken cancellationToken) =>
@@ -164,6 +188,15 @@ static void MapControl(RouteGroupBuilder group, string pattern, ContestControlAc
         }
         catch (ContestControlRejectedException exception) { return Results.Conflict(new { error = exception.Message }); }
     });
+}
+
+static void PrintEndpoints(WebApplication app)
+{
+    var endpoints = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>()
+        .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? ["ANY"])
+            .Select(method => new { method, path = "/" + (endpoint.RoutePattern.RawText ?? string.Empty).TrimStart('/') }))
+        .OrderBy(endpoint => endpoint.path, StringComparer.Ordinal).ThenBy(endpoint => endpoint.method, StringComparer.Ordinal);
+    Console.WriteLine("AISTOCKS_ENDPOINTS=" + System.Text.Json.JsonSerializer.Serialize(endpoints));
 }
 
 public partial class Program;

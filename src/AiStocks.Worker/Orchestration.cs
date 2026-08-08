@@ -78,9 +78,10 @@ public interface IRunStore
 
 public sealed record AgentContext(Guid AgentId);
 public sealed record AgentRunRequest(Guid AgentId, string ModelId, string RunKey, DateTimeOffset DecisionAt, AgentContext Context);
-public sealed record AgentRunResult(bool Ok, string? Decision, string? Error)
+public sealed record AgentRunResult(bool Ok, string? Decision, string? Error, AiStocks.Research.Decisions.AttestedResearchDecision? Attestation = null)
 {
     public static AgentRunResult Success(string decision) => new(true, decision, null);
+    public static AgentRunResult Success(string decision, AiStocks.Research.Decisions.AttestedResearchDecision attestation) => new(true, decision, null, attestation);
     public static AgentRunResult Failure(string error) => new(false, null, error);
 }
 

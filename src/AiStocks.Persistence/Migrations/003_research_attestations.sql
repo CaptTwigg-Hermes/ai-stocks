@@ -52,10 +52,14 @@ BEGIN
     IF p_requested_model <> p_actual_model OR p_requested_provider <> 'copilot' OR p_actual_provider <> 'copilot' THEN
         RAISE EXCEPTION 'runtime model/provider attestation mismatch';
     END IF;
-    IF p_invocation_hash <> canonical_jsonb_sha256(p_invocation)
-       OR p_runtime_report_hash <> encode(digest(p_runtime_report, 'sha256'), 'hex')::sha256_hex
-       OR p_evidence_hash <> canonical_jsonb_sha256(p_evidence) THEN
-        RAISE EXCEPTION 'attestation hash mismatch';
+    IF p_invocation_hash <> canonical_jsonb_sha256(p_invocation) THEN
+        RAISE EXCEPTION 'attestation invocation hash mismatch';
+    END IF;
+    IF p_runtime_report_hash <> encode(digest(p_runtime_report, 'sha256'), 'hex')::sha256_hex THEN
+        RAISE EXCEPTION 'attestation runtime report hash mismatch';
+    END IF;
+    IF p_evidence_hash <> canonical_jsonb_sha256(p_evidence) THEN
+        RAISE EXCEPTION 'attestation evidence hash mismatch';
     END IF;
     IF p_agent_run_id IS NOT NULL THEN
         PERFORM 1 FROM agent_runs WHERE id=p_agent_run_id AND agent_id=p_agent_id AND model_id=p_actual_model FOR KEY SHARE;
@@ -74,8 +78,14 @@ BEGIN
         SELECT * INTO STRICT existing FROM research_attestations
           WHERE (p_agent_run_id IS NOT NULL AND agent_run_id=p_agent_run_id)
              OR (p_order_id IS NOT NULL AND order_id=p_order_id) FOR KEY SHARE;
-        IF existing.invocation_hash=p_invocation_hash AND existing.runtime_report_hash=p_runtime_report_hash
+        IF existing.agent_run_id IS NOT DISTINCT FROM p_agent_run_id
+           AND existing.order_id IS NOT DISTINCT FROM p_order_id
+           AND existing.agent_id=p_agent_id
+           AND existing.invocation_hash=p_invocation_hash AND existing.runtime_report_hash=p_runtime_report_hash
            AND existing.evidence_hash=p_evidence_hash THEN RETURN existing.id; END IF;
+        IF existing.agent_run_id IS DISTINCT FROM p_agent_run_id OR existing.order_id IS DISTINCT FROM p_order_id THEN
+            RAISE EXCEPTION 'split immutable research attestation identity';
+        END IF;
         RAISE EXCEPTION 'conflicting immutable research attestation';
     END IF;
     INSERT INTO research_attestations VALUES (

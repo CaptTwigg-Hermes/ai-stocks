@@ -74,6 +74,12 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
             attempt = reader.GetInt32(1);
         }
 
+        var runId = Guid.NewGuid();
+        var attested = completion.Result?.Attestation;
+        var decision = attested?.Decision;
+        if (attested is not null && (decision!.AgentId != completion.Run.AgentId ||
+            !StringComparer.Ordinal.Equals(decision.ExactModelId, completion.Run.ModelId) || decision.DecisionAt != completion.Run.ScheduledAt))
+            throw new DecisionValidationException("Attested decision identity does not match the immutable run.");
         using var auditDocument = JsonDocument.Parse(JsonSerializer.Serialize(new
         {
             completion.Run.RunKey,
@@ -82,7 +88,8 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
             outcome = completion.Outcome.ToString(),
             completion.Reason,
             decision = completion.Result?.Decision,
-            ok = completion.Result?.Ok
+            ok = completion.Result?.Ok,
+            attestation = attested is null ? null : new { attested.Provenance.RuntimeReportSha256, evidence_count = decision!.Evidence.Count }
         }));
         var auditJson = CanonicalJson.Serialize(auditDocument.RootElement);
         await using (var insert = new NpgsqlCommand("""
@@ -90,25 +97,42 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::run_status,$10::jsonb,canonical_jsonb_sha256($10::jsonb))
             """, connection, transaction))
         {
-            insert.Parameters.AddWithValue(Guid.NewGuid());
-            insert.Parameters.AddWithValue(scheduledId);
-            insert.Parameters.AddWithValue(attempt);
-            insert.Parameters.AddWithValue(completion.Run.AgentId);
-            insert.Parameters.AddWithValue(completion.Run.ModelId);
-            insert.Parameters.AddWithValue(PromptId);
-            insert.Parameters.AddWithValue(completion.Run.ScheduledAt);
-            insert.Parameters.AddWithValue(completion.CompletedAt);
-            insert.Parameters.AddWithValue(Status(completion.Outcome));
+            insert.Parameters.AddWithValue(runId); insert.Parameters.AddWithValue(scheduledId); insert.Parameters.AddWithValue(attempt);
+            insert.Parameters.AddWithValue(completion.Run.AgentId); insert.Parameters.AddWithValue(completion.Run.ModelId);
+            insert.Parameters.AddWithValue(PromptId); insert.Parameters.AddWithValue(completion.Run.ScheduledAt);
+            insert.Parameters.AddWithValue(completion.CompletedAt); insert.Parameters.AddWithValue(Status(completion.Outcome));
             insert.Parameters.AddWithValue(auditJson);
             await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
+
+        Guid? orderId = null;
+        if (completion.Outcome == RunAttemptOutcome.Succeeded && decision is not null && decision.Action != DecisionAction.Hold)
+        {
+            if (decision.Action == DecisionAction.CancelPending)
+                throw new DecisionValidationException("cancelPending requires an explicit persisted order identity and is unavailable in this response contract.");
+            await using (var state = new NpgsqlCommand("SELECT status::text FROM contest_state WHERE singleton FOR SHARE", connection, transaction))
+                if (!StringComparer.Ordinal.Equals((string?)await state.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), "RUNNING"))
+                    throw new DecisionValidationException("Contest paused before the decision transaction committed.");
+            await using var instrument = new NpgsqlCommand("SELECT id FROM instruments WHERE isin=$1 AND order_book_id=$2 AND mic='XSTO'", connection, transaction);
+            instrument.Parameters.AddWithValue(decision.Instrument!.Isin); instrument.Parameters.AddWithValue(decision.Instrument.OrderBookId);
+            var instrumentId = await instrument.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as Guid? ??
+                throw new DecisionValidationException("Decision instrument is not in the reviewed universe.");
+            using var requestDocument = JsonDocument.Parse(completion.Result!.Decision!);
+            var requestJson = CanonicalJson.Serialize(requestDocument.RootElement);
+            await using var submit = new NpgsqlCommand("SELECT submit_order($1,$2,$3,$4,$5::order_side,$6,$7,$8,$9::jsonb,canonical_jsonb_sha256($9::jsonb))", connection, transaction);
+            submit.Parameters.AddWithValue(Guid.NewGuid()); submit.Parameters.AddWithValue(completion.Run.AgentId);
+            submit.Parameters.AddWithValue(decision.DecisionId); submit.Parameters.AddWithValue($"run:{completion.Run.RunKey}:{decision.DecisionId}");
+            submit.Parameters.AddWithValue(decision.Action == DecisionAction.Buy ? "BUY" : "SELL"); submit.Parameters.AddWithValue(instrumentId);
+            submit.Parameters.AddWithValue(decision.Quantity); submit.Parameters.AddWithValue(decision.DecisionAt);
+            submit.Parameters.AddWithValue(requestJson);
+            orderId = (Guid)(await submit.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("Order was not persisted."));
+        }
+        if (attested is not null)
+            await new ResearchAttestationStore().PersistAsync(connection, transaction, CreatePersistableAttestation(attested, runId, orderId), cancellationToken).ConfigureAwait(false);
         await using (var finish = new NpgsqlCommand("SELECT complete_scheduled_run($1,$2,$3::run_status,$4,$5,$6)", connection, transaction))
         {
-            finish.Parameters.AddWithValue(scheduledId);
-            finish.Parameters.AddWithValue(token);
-            finish.Parameters.AddWithValue(Status(completion.Outcome));
-            finish.Parameters.AddWithValue(completion.CompletedAt);
-            AddNullable(finish, completion.Reason, NpgsqlDbType.Text);
+            finish.Parameters.AddWithValue(scheduledId); finish.Parameters.AddWithValue(token); finish.Parameters.AddWithValue(Status(completion.Outcome));
+            finish.Parameters.AddWithValue(completion.CompletedAt); AddNullable(finish, completion.Reason, NpgsqlDbType.Text);
             AddNullable(finish, completion.RetryAt, NpgsqlDbType.TimestampTz);
             await finish.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -134,38 +158,21 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
 
     public async Task<bool> TryAcceptWhileRunningAsync(RunWindow run, AgentRunResult result, CancellationToken cancellationToken)
     {
-        if (result.Decision is null) throw new DecisionValidationException("Runner output did not contain a validated decision.");
-        var decision = new StrictDecisionJsonParser().Parse(result.Decision, run.AgentId, run.ModelId);
-        if (decision.DecisionAt != run.ScheduledAt) throw new DecisionValidationException("Decision timestamp must equal the immutable run timestamp.");
+        if (result.Decision is null || result.Attestation is null)
+            throw new DecisionValidationException("Runner output did not contain an attested decision.");
+        var decision = result.Attestation.Decision;
+        if (decision.AgentId != run.AgentId || !StringComparer.Ordinal.Equals(decision.ExactModelId, run.ModelId) || decision.DecisionAt != run.ScheduledAt)
+            throw new DecisionValidationException("Decision identity must equal the immutable run identity.");
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-        await using (var state = new NpgsqlCommand("SELECT status::text FROM contest_state WHERE singleton FOR SHARE", connection, transaction))
+        await using (var state = new NpgsqlCommand("SELECT status::text FROM contest_state WHERE singleton", connection))
             if (!StringComparer.Ordinal.Equals((string?)await state.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), "RUNNING")) return false;
-        if (decision.Action == DecisionAction.Hold)
-        {
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            return true;
-        }
-        if (decision.Action == DecisionAction.CancelPending) throw new DecisionValidationException("cancelPending requires an explicit persisted order identity and is unavailable in this response contract.");
-        await using var instrument = new NpgsqlCommand("SELECT id FROM instruments WHERE isin=$1 AND order_book_id=$2 AND mic='XSTO'", connection, transaction);
-        instrument.Parameters.AddWithValue(decision.Instrument!.Isin);
-        instrument.Parameters.AddWithValue(decision.Instrument.OrderBookId);
-        var instrumentId = await instrument.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as Guid? ??
+        if (decision.Action == DecisionAction.Hold) return true;
+        if (decision.Action == DecisionAction.CancelPending)
+            throw new DecisionValidationException("cancelPending requires an explicit persisted order identity and is unavailable in this response contract.");
+        await using var instrument = new NpgsqlCommand("SELECT id FROM instruments WHERE isin=$1 AND order_book_id=$2 AND mic='XSTO'", connection);
+        instrument.Parameters.AddWithValue(decision.Instrument!.Isin); instrument.Parameters.AddWithValue(decision.Instrument.OrderBookId);
+        _ = await instrument.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as Guid? ??
             throw new DecisionValidationException("Decision instrument is not in the reviewed universe.");
-        using var requestDocument = JsonDocument.Parse(result.Decision);
-        var requestJson = CanonicalJson.Serialize(requestDocument.RootElement);
-        await using var submit = new NpgsqlCommand("SELECT submit_order($1,$2,$3,$4,$5::order_side,$6,$7,$8,$9::jsonb,canonical_jsonb_sha256($9::jsonb))", connection, transaction);
-        submit.Parameters.AddWithValue(Guid.NewGuid());
-        submit.Parameters.AddWithValue(run.AgentId);
-        submit.Parameters.AddWithValue(decision.DecisionId);
-        submit.Parameters.AddWithValue($"run:{run.RunKey}:{decision.DecisionId}");
-        submit.Parameters.AddWithValue(decision.Action == DecisionAction.Buy ? "BUY" : "SELL");
-        submit.Parameters.AddWithValue(instrumentId);
-        submit.Parameters.AddWithValue(decision.Quantity);
-        submit.Parameters.AddWithValue(decision.DecisionAt);
-        submit.Parameters.AddWithValue(requestJson);
-        await submit.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return true;
     }
 
@@ -204,6 +211,70 @@ public sealed class PostgresWorkerState(NpgsqlDataSource dataSource) :
     }
     private static void AddNullable(NpgsqlCommand command, object? value, NpgsqlDbType type) =>
         command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = type, Value = value ?? DBNull.Value });
+
+    private static PersistableResearchAttestation CreatePersistableAttestation(AttestedResearchDecision value, Guid runId, Guid? orderId)
+    {
+        var provenance = value.Provenance;
+        var invocation = Canonicalize(JsonSerializer.Serialize(new
+        {
+            agent_id = provenance.AgentId,
+            requested_model_id = provenance.RequestedModelId,
+            requested_provider = provenance.RequestedProvider,
+            model_id = provenance.ModelId,
+            provider = provenance.Provider,
+            runtime_report_sha256 = provenance.RuntimeReportSha256,
+            provenance.Executable,
+            arguments = provenance.Arguments,
+            environment_variable_names = provenance.EnvironmentVariableNames,
+            prompt_sha256 = provenance.PromptSha256,
+            started_at = provenance.StartedAt,
+            completed_at = provenance.CompletedAt,
+            exit_code = provenance.ExitCode,
+            standard_output_sha256 = provenance.StandardOutputSha256,
+            standard_error_sha256 = provenance.StandardErrorSha256
+        }));
+        var evidence = Canonicalize(JsonSerializer.Serialize(value.Decision.Evidence.Select(item => new
+        {
+            original_url = item.OriginalUrl,
+            final_url = item.FinalUrl,
+            published_at = item.PublishedAt,
+            retrieved_at = item.RetrievedAt,
+            verification_started_at = item.VerificationStartedAt,
+            content_sha256 = item.ContentSha256,
+            exact_excerpt = item.ExactExcerpt,
+            content_type = item.ContentType,
+            response_headers = item.ResponseHeaders,
+            immutable_content = Convert.ToBase64String(item.ImmutableContent.AsSpan()),
+            hops = item.Hops
+        })));
+        return new PersistableResearchAttestation
+        {
+            Id = Guid.NewGuid(),
+            AgentRunId = runId,
+            OrderId = orderId,
+            AgentId = provenance.AgentId,
+            RequestedModelId = provenance.RequestedModelId,
+            RequestedProvider = provenance.RequestedProvider,
+            ActualModelId = provenance.ModelId,
+            ActualProvider = provenance.Provider,
+            InvocationJson = invocation,
+            InvocationSha256 = Sha256(invocation),
+            RuntimeReport = provenance.RuntimeReport,
+            RuntimeReportSha256 = provenance.RuntimeReportSha256,
+            EvidenceJson = evidence,
+            EvidenceSha256 = Sha256(evidence),
+            AttestedAt = provenance.CompletedAt
+        };
+    }
+
+    private static string Canonicalize(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return CanonicalJson.Serialize(document.RootElement);
+    }
+
+    private static string Sha256(string canonicalJson) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalJson)));
 }
 
 public sealed class HermesAgentRunner(HermesResearchRunner runner, ResearchDecisionAttestor attestor) : IAgentRunner
@@ -218,8 +289,8 @@ public sealed class HermesAgentRunner(HermesResearchRunner runner, ResearchDecis
             """;
         var result = await runner.RunAsync(request.AgentId, request.ModelId, prompt, cancellationToken).ConfigureAwait(false);
         var draft = new StrictDecisionJsonParser().Parse(result.StandardOutput, request.AgentId, request.ModelId);
-        _ = await attestor.AttestAsync(draft, result.Provenance, cancellationToken).ConfigureAwait(false);
-        return AgentRunResult.Success(result.StandardOutput);
+        var attested = await attestor.AttestAsync(draft, result.Provenance, cancellationToken).ConfigureAwait(false);
+        return AgentRunResult.Success(result.StandardOutput, attested);
     }
 }
 

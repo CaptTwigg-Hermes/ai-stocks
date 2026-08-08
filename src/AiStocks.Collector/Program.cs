@@ -43,6 +43,15 @@ app.MapGet("/readyz", async (PostgresCollectorReadiness readiness, CancellationT
     var result = await readiness.EvaluateAsync(DateTimeOffset.UtcNow, cancellationToken);
     return result.Ready ? Results.Ok(new { status = "ready" }) : Results.Json(new { status = "not-ready", failures = result.Failures }, statusCode: StatusCodes.Status503ServiceUnavailable);
 });
+if (args.Contains("--print-endpoints", StringComparer.Ordinal))
+{
+    var endpoints = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>()
+        .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? ["ANY"])
+            .Select(method => new { method, path = "/" + (endpoint.RoutePattern.RawText ?? string.Empty).TrimStart('/') }))
+        .OrderBy(endpoint => endpoint.path, StringComparer.Ordinal).ThenBy(endpoint => endpoint.method, StringComparer.Ordinal);
+    Console.WriteLine("AISTOCKS_ENDPOINTS=" + System.Text.Json.JsonSerializer.Serialize(endpoints));
+    return;
+}
 app.Run();
 
 public partial class Program;

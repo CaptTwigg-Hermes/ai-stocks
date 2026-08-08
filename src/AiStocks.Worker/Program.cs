@@ -39,6 +39,15 @@ app.MapGet("/healthz", async (PostgresWorkerState state, CancellationToken cance
     await state.ReadyAsync(cancellationToken).ConfigureAwait(false)
         ? Results.Ok(new { status = "ready" })
         : Results.Json(new { status = "not-ready" }, statusCode: StatusCodes.Status503ServiceUnavailable));
+if (args.Contains("--print-endpoints", StringComparer.Ordinal))
+{
+    var endpoints = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>()
+        .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? ["ANY"])
+            .Select(method => new { method, path = "/" + (endpoint.RoutePattern.RawText ?? string.Empty).TrimStart('/') }))
+        .OrderBy(endpoint => endpoint.path, StringComparer.Ordinal).ThenBy(endpoint => endpoint.method, StringComparer.Ordinal);
+    Console.WriteLine("AISTOCKS_ENDPOINTS=" + System.Text.Json.JsonSerializer.Serialize(endpoints));
+    return;
+}
 app.Run();
 
 public sealed class SystemClock(TimeProvider timeProvider) : IClock

@@ -18,6 +18,12 @@ def test_executable_negative_capability_inventory_passes():
     proof = json.loads(result.stdout)
     assert proof["ok"] is True
     assert proof["findings"] == []
+    assert proof["resolved_lock_packages"]
+    assert proof["configuration_reads"]
+    assert proof["order_path_denial_probe"]["ok"] is True
+    assert {table["executable"] for table in proof["endpoint_tables"]} == {
+        "AiStocks.Collector", "AiStocks.Web", "AiStocks.Worker"
+    }
     assert proof["routes"] == [
         {"method": "GET", "path": "/"},
         {"method": "POST", "path": "/admin/pause"},

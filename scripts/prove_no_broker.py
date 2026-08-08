@@ -1,70 +1,94 @@
 #!/usr/bin/env python3
-"""Fail-closed .NET negative-capability inventory for paper trading."""
-
+"""Fail-closed negative-capability inventory for every shipped .NET executable."""
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import re
+import shutil
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
+from typing import Any, cast
 from urllib.parse import urlparse
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src"
-
-FORBIDDEN_PACKAGES = {
-    "alpaca.markets",
-    "alpaca.markets.extensions",
-    "ibapi",
-    "interactivebrokers.client",
-    "robinhood.net",
-    "tinkoff.investapi",
-    "ccxt.net",
-}
-FORBIDDEN_HOSTS = {
-    "api.alpaca.markets",
-    "api.ibkr.com",
-    "api.nordnet.se",
-    "api.avanza.se",
-    "api.robinhood.com",
-}
-FORBIDDEN_CREDENTIAL = re.compile(
-    r"(?:broker|alpaca|ibkr|interactive_?brokers|nordnet|avanza).*(?:api_?key|secret|token|password)",
-    re.IGNORECASE,
-)
-URL = re.compile(r'https?://[^\s"\'<>]+', re.IGNORECASE)
-ENVIRONMENT = re.compile(
-    r'Environment\.GetEnvironmentVariable\(\s*"([A-Za-z0-9_]+)"',
-)
+FORBIDDEN_PACKAGES = {"alpaca.markets", "alpaca.markets.extensions", "ibapi", "interactivebrokers.client", "robinhood.net", "tinkoff.investapi", "ccxt.net"}
+FORBIDDEN_HOSTS = {"api.alpaca.markets", "api.ibkr.com", "api.nordnet.se", "api.avanza.se", "api.robinhood.com"}
+FORBIDDEN_CREDENTIAL = re.compile(r"(?:broker|alpaca|ibkr|interactive_?brokers|nordnet|avanza).*(?:api_?key|secret|token|password)", re.I)
+URL = re.compile(r'https?://[^\s"\'<>]+', re.I)
+ENVIRONMENT = re.compile(r'Environment\.GetEnvironmentVariable\(\s*"([A-Za-z0-9_]+)"')
+CONFIGURATION = re.compile(r'(?:Configuration\s*\[\s*"(?P<index>[A-Za-z0-9_:.-]+)"\s*\]|Configuration\.(?:GetValue|GetSection)\s*\(\s*"(?P<method>[A-Za-z0-9_:.-]+)"|PostgresConfiguration\.Require\s*\([^,]+,\s*"(?P<require>[A-Za-z0-9_:.-]+)")')
 GROUP = re.compile(r'\bvar\s+(?P<name>[A-Za-z_]\w*)\s*=\s*\w+\.MapGroup\s*\(\s*"(?P<prefix>/[^"?]*)"')
-ROUTE = re.compile(
-    r'\b(?P<receiver>[A-Za-z_]\w*)\.Map(?P<method>Get|Post|Put|Patch|Delete)\s*\(\s*"(?P<path>/[^"?]*)"',
-)
-ROUTE_HELPER = re.compile(
-    r'\bMapControl\s*\(\s*(?P<receiver>[A-Za-z_]\w*)\s*,\s*"(?P<path>/[^"?]*)"',
-)
+ROUTE = re.compile(r'\b(?P<receiver>[A-Za-z_]\w*)\.Map(?P<method>Get|Post|Put|Patch|Delete)\s*\(\s*"(?P<path>/[^"?]*)"')
+ROUTE_HELPER = re.compile(r'\bMapControl\s*\(\s*(?P<receiver>[A-Za-z_]\w*)\s*,\s*"(?P<path>/[^"?]*)"')
 PROCESS = re.compile(r"\bProcessStartInfo\b|\bProcess\.Start\s*\(")
+NETWORK_API = re.compile(r"\b(?:Socket|HttpClient|HttpRequestMessage|WebRequest|TcpClient)\b")
 ALLOWED_PROCESS_PROJECTS = {"AiStocks.Research", "AiStocks.Operations"}
-ALLOWED_MUTATIONS = {
-    "/admin/start",
-    "/admin/pause",
-    "/admin/resume",
-    "/admin/pre-start-reset",
-}
+ALLOWED_MUTATIONS = {"/admin/start", "/admin/pause", "/admin/resume", "/admin/pre-start-reset"}
+SHIPPED_EXECUTABLES = {"AiStocks.Collector", "AiStocks.Web", "AiStocks.Worker"}
 
 
 def relative(path: pathlib.Path) -> str:
     return path.relative_to(ROOT).as_posix()
 
 
+def runtime_endpoint_table(executable: str, findings: list[str]) -> dict[str, object]:
+    dll = SOURCE / executable / "bin" / "Debug" / "net10.0" / f"{executable}.dll"
+    dotnet = shutil.which("dotnet") or ("/opt/data/dotnet/dotnet" if pathlib.Path("/opt/data/dotnet/dotnet").is_file() else None)
+    if dotnet is None or not dll.is_file():
+        findings.append(f"runtime endpoint inventory unavailable for {executable}; build the shipped executables first")
+        return {"executable": executable, "routes": []}
+    environment = os.environ.copy()
+    environment.update({"DOTNET_ENVIRONMENT": "Testing", "DATABASE_URL": "Host=127.0.0.1;Database=aistocks_endpoint_inventory;Username=denied;Password=denied", "ArtifactRoot": str(ROOT)})
+    try:
+        result = subprocess.run([dotnet, str(dll), "--print-endpoints"], cwd=ROOT, env=environment,
+                                text=True, capture_output=True, check=False, timeout=10)  # noqa: S603
+    except (OSError, subprocess.TimeoutExpired) as error:
+        findings.append(f"runtime endpoint inventory failed for {executable}: {error}")
+        return {"executable": executable, "routes": []}
+    marker = next((line.removeprefix("AISTOCKS_ENDPOINTS=") for line in result.stdout.splitlines()
+                   if line.startswith("AISTOCKS_ENDPOINTS=")), None)
+    if result.returncode != 0 or marker is None:
+        findings.append(f"runtime endpoint inventory failed for {executable}: exit {result.returncode}")
+        return {"executable": executable, "routes": []}
+    try:
+        values = json.loads(marker)
+        routes = sorted(({"method": str(item["method"]).upper(), "path": str(item["path"])} for item in values),
+                        key=lambda item: (item["path"], item["method"]))
+        if not routes:
+            findings.append(f"runtime endpoint inventory was empty for {executable}")
+    except (json.JSONDecodeError, KeyError, TypeError) as error:
+        findings.append(f"runtime endpoint inventory malformed for {executable}: {error}")
+        routes = []
+    return {"executable": executable, "routes": routes}
+
+
 def inventory() -> dict[str, object]:
     findings: list[str] = []
     packages: list[dict[str, str]] = []
+    resolved: list[dict[str, str]] = []
     urls: list[dict[str, object]] = []
     environment: list[dict[str, object]] = []
+    configuration: list[dict[str, object]] = []
     processes: list[dict[str, object]] = []
     routes: list[dict[str, object]] = []
+
+    for lock in sorted(ROOT.glob("**/packages.lock.json")):
+        if any(part in {"bin", "obj"} for part in lock.parts):
+            continue
+        try:
+            graph = json.loads(lock.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            findings.append(f"invalid lock graph: {relative(lock)}: {error}")
+            continue
+        for framework, nodes in graph.get("dependencies", {}).items():
+            for name, node in nodes.items():
+                resolved.append({"file": relative(lock), "framework": framework, "name": name, "version": str(node.get("resolved", ""))})
+                if name.casefold() in FORBIDDEN_PACKAGES:
+                    findings.append(f"forbidden resolved broker package: {name} in {relative(lock)}")
 
     for project in sorted(SOURCE.glob("*/**/*.csproj")):
         try:
@@ -74,12 +98,10 @@ def inventory() -> dict[str, object]:
             continue
         for package in root.findall(".//PackageReference"):
             name = (package.get("Include") or package.get("Update") or "").strip()
-            if not name:
-                continue
-            entry = {"file": relative(project), "name": name}
-            packages.append(entry)
-            if name.casefold() in FORBIDDEN_PACKAGES:
-                findings.append(f"forbidden broker package: {name} in {relative(project)}")
+            if name:
+                packages.append({"file": relative(project), "name": name})
+                if name.casefold() in FORBIDDEN_PACKAGES:
+                    findings.append(f"forbidden broker package: {name} in {relative(project)}")
 
     for path in sorted(SOURCE.glob("*/**/*.cs")):
         if any(part in {"bin", "obj"} for part in path.parts):
@@ -87,8 +109,7 @@ def inventory() -> dict[str, object]:
         text = path.read_text(encoding="utf-8")
         rel = relative(path)
         project = path.relative_to(SOURCE).parts[0]
-        groups = {match.group("name"): match.group("prefix").rstrip("/") for match in GROUP.finditer(text)}
-
+        groups = {m.group("name"): m.group("prefix").rstrip("/") for m in GROUP.finditer(text)}
         for match in URL.finditer(text):
             value = match.group(0).rstrip(".,);]")
             host = (urlparse(value).hostname or "").casefold()
@@ -96,47 +117,53 @@ def inventory() -> dict[str, object]:
             urls.append({"file": rel, "line": line, "value": value})
             if host in FORBIDDEN_HOSTS or any(host.endswith("." + item) for item in FORBIDDEN_HOSTS):
                 findings.append(f"forbidden broker host at {rel}:{line}: {host}")
-
         for match in ENVIRONMENT.finditer(text):
-            name = match.group(1)
-            line = text.count("\n", 0, match.start()) + 1
+            name = match.group(1); line = text.count("\n", 0, match.start()) + 1
             environment.append({"file": rel, "line": line, "name": name})
-            if FORBIDDEN_CREDENTIAL.search(name):
-                findings.append(f"forbidden broker credential read at {rel}:{line}: {name}")
-
+            if FORBIDDEN_CREDENTIAL.search(name): findings.append(f"forbidden broker credential read at {rel}:{line}: {name}")
+        for match in CONFIGURATION.finditer(text):
+            name = next(value for value in match.groupdict().values() if value is not None)
+            line = text.count("\n", 0, match.start()) + 1
+            configuration.append({"file": rel, "line": line, "name": name})
+            if FORBIDDEN_CREDENTIAL.search(name): findings.append(f"forbidden broker configuration read at {rel}:{line}: {name}")
         for match in PROCESS.finditer(text):
             line = text.count("\n", 0, match.start()) + 1
             processes.append({"file": rel, "line": line})
-            if project not in ALLOWED_PROCESS_PROJECTS:
-                findings.append(f"unexpected process capability at {rel}:{line}")
-
+            if project not in ALLOWED_PROCESS_PROJECTS: findings.append(f"unexpected process capability at {rel}:{line}")
         for match in ROUTE.finditer(text):
-            method = match.group("method").upper()
-            route_path = groups.get(match.group("receiver"), "") + match.group("path")
+            method = match.group("method").upper(); route_path = groups.get(match.group("receiver"), "") + match.group("path")
             line = text.count("\n", 0, match.start()) + 1
-            routes.append({"method": method, "path": route_path})
-            if method != "GET" and route_path not in ALLOWED_MUTATIONS:
-                findings.append(f"unapproved HTTP mutation route at {rel}:{line}: {method} {route_path}")
-
+            routes.append({"executable": project, "method": method, "path": route_path})
+            if method != "GET" and route_path not in ALLOWED_MUTATIONS: findings.append(f"unapproved HTTP mutation route at {rel}:{line}: {method} {route_path}")
         for match in ROUTE_HELPER.finditer(text):
             route_path = groups.get(match.group("receiver"), "") + match.group("path")
             line = text.count("\n", 0, match.start()) + 1
-            routes.append({"method": "POST", "path": route_path})
-            if route_path not in ALLOWED_MUTATIONS:
-                findings.append(f"unapproved HTTP mutation route at {rel}:{line}: POST {route_path}")
+            routes.append({"executable": project, "method": "POST", "path": route_path})
+            if route_path not in ALLOWED_MUTATIONS: findings.append(f"unapproved HTTP mutation route at {rel}:{line}: POST {route_path}")
 
-    return {
-        "ok": not findings,
-        "findings": sorted(findings),
-        "packages": sorted(packages, key=lambda item: (item["name"], item["file"])),
-        "url_constants": sorted(urls, key=lambda item: (str(item["file"]), str(item["line"]))),
-        "environment_reads": sorted(environment, key=lambda item: (str(item["file"]), str(item["line"]))),
-        "process_calls": sorted(processes, key=lambda item: (str(item["file"]), str(item["line"]))),
-        "routes": [
-            {"method": method, "path": path}
-            for path, method in sorted({(str(item["path"]), str(item["method"])) for item in routes})
-        ],
-    }
+    endpoint_tables = [runtime_endpoint_table(executable, findings) for executable in sorted(SHIPPED_EXECUTABLES)]
+    worker_path = SOURCE / "AiStocks.Worker" / "PostgresWorkerRuntime.cs"
+    worker_text = worker_path.read_text(encoding="utf-8")
+    network_tokens = sorted(set(NETWORK_API.findall(worker_text)))
+    worker_packages = {item["name"].casefold() for item in resolved if item["file"] == "src/AiStocks.Worker/packages.lock.json"}
+    order_findings = network_tokens + sorted(worker_packages & FORBIDDEN_PACKAGES)
+    if "submit_order(" not in worker_text: order_findings.append("paper submit_order path missing")
+    if order_findings: findings.append("order-path socket/provider denial probe failed: " + ", ".join(order_findings))
+
+    flat_routes = [{"method": method, "path": path} for path, method in sorted({
+        (str(route["path"]), str(route["method"])) for table in endpoint_tables
+        for route in cast(list[dict[str, Any]], table["routes"])})]
+    return {"ok": not findings, "findings": sorted(findings),
+            "packages": sorted(packages, key=lambda i: (i["name"], i["file"])),
+            "resolved_lock_packages": sorted(resolved, key=lambda i: (i["name"], i["file"], i["framework"])),
+            "url_constants": sorted(urls, key=lambda i: (str(i["file"]), str(i["line"]))),
+            "environment_reads": sorted(environment, key=lambda i: (str(i["file"]), str(i["line"]))),
+            "configuration_reads": sorted(configuration, key=lambda i: (str(i["file"]), str(i["line"]))),
+            "process_calls": sorted(processes, key=lambda i: (str(i["file"]), str(i["line"]))),
+            "endpoint_tables": endpoint_tables,
+            "order_path_denial_probe": {"ok": not order_findings, "network_api_tokens": network_tokens,
+                                         "forbidden_provider_packages": sorted(worker_packages & FORBIDDEN_PACKAGES)},
+            "routes": flat_routes}
 
 
 def main() -> int:
