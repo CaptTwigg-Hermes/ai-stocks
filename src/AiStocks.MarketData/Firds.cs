@@ -3,7 +3,7 @@ using System.Xml.Linq;
 
 namespace AiStocks.MarketData;
 
-public sealed record FirdsInstrument(string Isin, string Name, string Cfi, string Currency, string Venue,
+public sealed record FirdsInstrument(string Isin, string IssuerId, string Name, string Cfi, string Currency, string Venue,
     DateOnly? FirstTradeDate, DateOnly? TerminationDate);
 
 public sealed class FirdsUniverseParser
@@ -55,14 +55,16 @@ public sealed class FirdsUniverseParser
         var venueAttributes = record.Descendants().FirstOrDefault(x => x.Name.LocalName == "TradgVnRltdAttrbts")
             ?? throw new MarketDataException("FIRDS venue attributes are missing");
         var venue = venueAttributes.Elements().FirstOrDefault(x => x.Name.LocalName == "Id")?.Value.Trim() ?? string.Empty;
-        var item = new FirdsInstrument(General("Id"), General("FullNm"), General("ClssfctnTp"), General("NtnlCcy"), venue,
+        var item = new FirdsInstrument(General("Id"), Value("Issr"), General("FullNm"), General("ClssfctnTp"), General("NtnlCcy"), venue,
             Date("FrstTradDt"), Date("TermntnDt"));
-        if (item.Isin.Length != 12 || item.Cfi.Length != 6 || item.Venue.Length != 4) throw new MarketDataException("FIRDS identity is malformed");
+        if (item.Isin.Length != 12 || item.Cfi.Length != 6 || item.Venue.Length != 4)
+            throw new MarketDataException("FIRDS identity is malformed");
         return item;
     }
 
     private static bool IsEligible(FirdsInstrument item, DateOnly at) =>
-        item.Venue == "XSTO" && item.Currency == "SEK" && item.Cfi.StartsWith("ES", StringComparison.Ordinal) &&
+        item.IssuerId.Length == 20 && item.Venue == "XSTO" && item.Currency == "SEK" &&
+        item.Cfi.StartsWith("ES", StringComparison.Ordinal) &&
         (item.FirstTradeDate is null || item.FirstTradeDate <= at) && (item.TerminationDate is null || item.TerminationDate > at);
 
     private enum Operation { Upsert, Delete }

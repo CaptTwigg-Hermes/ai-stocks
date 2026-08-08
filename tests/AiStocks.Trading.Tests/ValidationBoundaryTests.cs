@@ -69,6 +69,17 @@ public sealed class ValidationBoundaryTests
     }
 
     [Fact]
+    public void Trading_rejects_an_instrument_without_stable_issuer_identity()
+    {
+        var engine = PaperTradingEngine.CreateContest();
+        var unidentified = new InstrumentId("SE0000000001", "BOOK", "XSTO", null);
+        var error = Assert.Throws<TradingException>(() => engine.Submit(
+            TestData.Decision(instrument: unidentified), TestData.Quote(instrument: unidentified),
+            TestData.Session, TestData.Marks()));
+        Assert.Equal("instrument", error.Code);
+    }
+
+    [Fact]
     public void Decision_and_lifecycle_idempotency_are_payload_bound()
     {
         var engine = PaperTradingEngine.CreateContest();

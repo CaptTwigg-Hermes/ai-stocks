@@ -86,4 +86,33 @@ public sealed class FinalLiquidationTests
         Assert.Equal(FeeTier.Mini, engine.Portfolio(TestData.Agent.Id).FeeTier);
         Assert.Equal(49_996.48m, agent.NetLiquidationValue);
     }
+
+    [Fact]
+    public void Final_liquidation_recomputes_fee_tier_before_trade_501()
+    {
+        var engine = PaperTradingEngine.CreateContest();
+        engine.ApplyCorrection(TestData.Agent.Id, "first-position", 0m, TestData.Volvo, 1, 100m,
+            TestData.Open, "verified position", 499);
+        engine.ApplyCorrection(TestData.Agent.Id, "second-position", 0m, TestData.Atlas, 1, 100m,
+            TestData.Open, "verified position");
+        var finalSession = new TradingSession("final",
+            new DateTimeOffset(2026, 12, 30, 8, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 12, 30, 16, 30, 0, TimeSpan.Zero));
+        var close = TestData.Quote(price: 100m, tradedAt: finalSession.CloseAt) with
+        {
+            SessionId = finalSession.Id,
+            RetrievedAt = finalSession.CloseAt.AddMinutes(15)
+        };
+        var atlasClose = close with { Instrument = TestData.Atlas };
+
+        var standing = engine.FinalLiquidation(
+            new Dictionary<InstrumentId, VerifiedMarketObservation>
+            {
+                [TestData.Volvo] = close,
+                [TestData.Atlas] = atlasClose
+            }, finalSession, close.RetrievedAt, "trade-501").Single(x => x.AgentId == TestData.Agent.Id);
+
+        Assert.Equal([0m, 1m], standing.Liquidations.Select(x => x.Fee).Order().ToArray());
+        Assert.Equal(FeeTier.Mini, engine.Portfolio(TestData.Agent.Id).FeeTier);
+    }
 }

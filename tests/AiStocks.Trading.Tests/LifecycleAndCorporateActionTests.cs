@@ -14,15 +14,30 @@ public sealed class LifecycleAndCorporateActionTests
         Assert.Equal(OrderStatus.Queued, queued.Status);
 
         engine.Pause(TestData.Open, "feed incident");
-        Assert.Throws<TradingException>(() => engine.ExecuteQueued(order.Id, TestData.Quote(),
+        Assert.Throws<TradingException>(() => engine.ExecuteQueued(order.Id, [TestData.Quote()],
             TestData.Session, TestData.Marks()));
         engine.Resume(TestData.Open.AddMinutes(30), "feed verified");
         var pausedQuote = TestData.Quote(tradedAt: TestData.Open.AddMinutes(15));
-        Assert.Equal("paused-quote", engine.ExecuteQueued(order.Id, pausedQuote, TestData.Session,
+        Assert.Equal("no-eligible-quote", engine.ExecuteQueued(order.Id, [pausedQuote], TestData.Session,
             TestData.Marks()).Code);
         var postResume = TestData.Quote(tradedAt: TestData.Open.AddMinutes(31));
-        var filled = engine.ExecuteQueued(order.Id, postResume, TestData.Session, TestData.Marks());
+        var filled = engine.ExecuteQueued(order.Id, [postResume], TestData.Session, TestData.Marks());
         Assert.Equal(OrderStatus.Filled, filled.Status);
+    }
+
+    [Fact]
+    public void Queued_execution_atomically_selects_the_first_eligible_observation()
+    {
+        var engine = PaperTradingEngine.CreateContest();
+        engine.Submit(TestData.Decision(at: TestData.Open.AddHours(-1)), null, null, TestData.Marks());
+        var order = Assert.Single(engine.Orders);
+        var first = TestData.Quote(price: 100m, tradedAt: TestData.Open.AddMinutes(1));
+        var later = TestData.Quote(price: 150m, tradedAt: TestData.Open.AddMinutes(2));
+
+        var filled = engine.ExecuteQueued(order.Id, [later, first], TestData.Session, TestData.Marks());
+
+        Assert.Equal(100.1006m, filled.FillPrice);
+        Assert.Equal(first.TradedAt, filled.FilledAt);
     }
 
     [Fact]
@@ -37,7 +52,7 @@ public sealed class LifecycleAndCorporateActionTests
         var replay = engine.Cancel(TestData.Agent.Id, order.Id, "thesis changed", "cancel-1", TestData.Open);
         Assert.Equal(first, replay);
         Assert.Equal(OrderStatus.Cancelled, first.Status);
-        Assert.Throws<TradingException>(() => engine.ExecuteQueued(order.Id, TestData.Quote(),
+        Assert.Throws<TradingException>(() => engine.ExecuteQueued(order.Id, [TestData.Quote()],
             TestData.Session, TestData.Marks()));
         Assert.Equal("idempotency", Assert.Throws<TradingException>(() => engine.Cancel(
             TestData.Agent.Id, order.Id, "different", "cancel-1", TestData.Open)).Code);
@@ -119,6 +134,26 @@ public sealed class LifecycleAndCorporateActionTests
             TestData.Open.AddDays(2), "cash-merger");
         Assert.Empty(engine.Portfolio(TestData.Agent.Id).Positions);
         Assert.Equal(30_248.98m, engine.Portfolio(TestData.Agent.Id).Cash);
+    }
+
+    [Fact]
+    public void Fractional_stock_merger_allocates_cost_between_whole_and_frozen_entitlements()
+    {
+        var engine = PaperTradingEngine.CreateContest();
+        engine.ApplyCorrection(TestData.Agent.Id, "old", 0m, TestData.Volvo, 3, 100m,
+            TestData.Open, "verified old shares");
+        engine.ApplyCorrection(TestData.Agent.Id, "target", 0m, TestData.Atlas, 1, 100m,
+            TestData.Open, "verified target share");
+
+        engine.ApplyStockMerger(TestData.Agent.Id, TestData.Volvo, TestData.Atlas, 1, 2,
+            TestData.Open.AddDays(1), "fractional-merger");
+
+        var position = Assert.Single(engine.Portfolio(TestData.Agent.Id).Positions);
+        Assert.Equal(2, position.Quantity);
+        Assert.Equal(150m, position.AverageCost);
+        var frozen = Assert.Single(engine.FrozenEntitlements);
+        Assert.Equal(0.5m, frozen.FractionalQuantity);
+        Assert.Equal(200m, frozen.AverageCost);
     }
 
     [Fact]

@@ -44,7 +44,8 @@ public sealed class PersistenceContractTests
             "FOREIGN KEY (ledger_event_id, order_id, agent_id)",
             "corporate_action_id", "pg_advisory_xact_lock", "pg_try_advisory_xact_lock",
             "FOR UPDATE SKIP LOCKED", "same idempotency key has conflicting canonical hash",
-            "contest may only finish once", "dense_rank() OVER"
+            "contest may only finish once", "rank() OVER", "apply_corporate_action",
+            "observation is not the first eligible quote", "issuer_id", "is_official_pats"
         ];
         foreach (var fragment in required)
             Assert.Contains(fragment, Sql, StringComparison.OrdinalIgnoreCase);

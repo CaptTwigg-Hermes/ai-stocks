@@ -86,6 +86,7 @@ public sealed class MarketDataTests
         var full = parser.ParseFull(File.OpenRead(Fixture("firds-full.xml")), FullDay);
         Assert.Single(full);
         Assert.Equal("SE0000108656", full[0].Isin);
+        Assert.Equal("5493001KJTIIGC8Y1R12", full[0].IssuerId);
         var updated = parser.ApplyDelta(full, File.OpenRead(Fixture("firds-delta.xml")), FullDay);
         Assert.Empty(updated);
     }

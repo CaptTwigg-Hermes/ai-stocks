@@ -24,7 +24,7 @@ public sealed record PaperOrder(
     Guid? ReplacedBy = null, string? LifecycleReason = null, OrderOutcome? Outcome = null);
 
 public sealed record FrozenEntitlement(
-    Guid AgentId, InstrumentId Instrument, decimal FractionalQuantity, string Reference);
+    Guid AgentId, InstrumentId Instrument, decimal FractionalQuantity, decimal AverageCost, string Reference);
 
 public sealed record FinalStanding(
     Guid AgentId, string ModelId, int Rank, decimal NetLiquidationValue,
@@ -135,18 +135,31 @@ public sealed class PaperTradingEngine
 
     public OrderOutcome ExecuteQueued(
         Guid orderId,
-        VerifiedMarketObservation quote,
+        IReadOnlyCollection<VerifiedMarketObservation> observations,
         TradingSession session,
         IReadOnlyDictionary<InstrumentId, decimal> marks)
     {
         EnsureRunning();
         var order = GetQueuedOrder(orderId);
-        if (IsDuringPause(quote.TradedAt))
+        foreach (var quote in observations.OrderBy(item => item.TradedAt).ThenBy(item => item.RawSha256,
+                     StringComparer.Ordinal))
         {
-            return Outcome(order, OrderStatus.Queued, "paused-quote", "Quote from paused interval is ineligible.");
+            if (IsDuringPause(quote.TradedAt)) continue;
+            try
+            {
+                ValidateQuote(order.Decision, quote, session);
+            }
+            catch (TradingException)
+            {
+                continue;
+            }
+            var raw = quote.Price * order.Decision.Quantity;
+            if (order.Decision.Action == DecisionAction.Buy &&
+                (quote.CompleteHistorySessions < ContestContract.RequiredHistorySessions ||
+                 raw > quote.AverageDailyValue20 * ContestContract.MaximumAdvParticipation)) continue;
+            return Fill(orderId, quote, session, marks);
         }
-
-        return Fill(orderId, quote, session, marks);
+        return Outcome(order, OrderStatus.Queued, "no-eligible-quote", "Awaiting first eligible quote.");
     }
 
     public OrderOutcome Cancel(Guid agentId, Guid orderId, string reason, string idempotencyKey,
@@ -278,7 +291,8 @@ public sealed class PaperTradingEngine
         else account.Positions[instrument] = new Position(instrument, whole,
             decimal.Round(totalCost / exact, 4, MidpointRounding.AwayFromZero));
         if (fraction > 0m)
-            frozenEntitlements.Add(new FrozenEntitlement(agentId, instrument, fraction, reference));
+            frozenEntitlements.Add(new FrozenEntitlement(agentId, instrument, fraction,
+                decimal.Round(totalCost / exact, 4, MidpointRounding.AwayFromZero), reference));
         AddAudit(agentId, "SPLIT", at, reference, instrument: instrument,
             quantityDelta: whole - position.Quantity,
             averageCostAfter: whole == 0 ? 0m : account.Positions[instrument].AverageCost);
@@ -298,17 +312,20 @@ public sealed class PaperTradingEngine
         var whole = decimal.ToInt32(decimal.Floor(exact));
         var fraction = exact - whole;
         var totalCost = old.AverageCost * old.Quantity;
+        var convertedAverageCost = decimal.Round(totalCost / exact, 4, MidpointRounding.AwayFromZero);
+        var wholeCost = convertedAverageCost * whole;
         account.Positions.Remove(oldInstrument);
         if (whole > 0)
         {
             var existing = account.Positions.GetValueOrDefault(newInstrument);
             var combinedQuantity = whole + (existing?.Quantity ?? 0);
-            var combinedCost = totalCost + (existing?.AverageCost ?? 0m) * (existing?.Quantity ?? 0);
+            var combinedCost = wholeCost + (existing?.AverageCost ?? 0m) * (existing?.Quantity ?? 0);
             account.Positions[newInstrument] = new Position(newInstrument, combinedQuantity,
                 decimal.Round(combinedCost / combinedQuantity, 4, MidpointRounding.AwayFromZero));
         }
         if (fraction > 0m)
-            frozenEntitlements.Add(new FrozenEntitlement(agentId, newInstrument, fraction, reference));
+            frozenEntitlements.Add(new FrozenEntitlement(agentId, newInstrument, fraction,
+                convertedAverageCost, reference));
         AddAudit(agentId, "STOCK_MERGER_REMOVE", at, reference, instrument: oldInstrument,
             quantityDelta: -old.Quantity);
         AddAudit(agentId, "STOCK_MERGER_ADD", at, reference, instrument: newInstrument,
@@ -405,6 +422,8 @@ public sealed class PaperTradingEngine
                         instrument: position.Instrument, detail: "pending reliable settlement");
                     continue;
                 }
+                if (account.FeeTier == FeeTier.Starter && account.CompletedTradeCount >= 500)
+                    account.FeeTier = FeeTier.Mini;
                 var quote = closingQuotes[position.Instrument];
                 var raw = quote.Price * position.Quantity;
                 var execution = ExecutionMath.ExecutionPrice(OrderSide.Sell, quote, raw);
@@ -559,7 +578,8 @@ public sealed class PaperTradingEngine
         if (decision.Action is not (DecisionAction.Buy or DecisionAction.Sell))
             throw new TradingException("action", "Only market buy and sell create orders.");
         if (decision.Instrument is null || decision.Instrument.Mic != "XSTO" ||
-            string.IsNullOrWhiteSpace(decision.Instrument.Isin) || string.IsNullOrWhiteSpace(decision.Instrument.OrderBookId))
+            string.IsNullOrWhiteSpace(decision.Instrument.Isin) || string.IsNullOrWhiteSpace(decision.Instrument.OrderBookId) ||
+            string.IsNullOrWhiteSpace(decision.Instrument.IssuerId))
             throw new TradingException("instrument", "Only identified XSTO instruments are eligible.");
         if (decision.Quantity <= 0) throw new TradingException("quantity", "Quantity must be positive whole shares.");
         if (decision.ObservedPrice is null || decision.ObservedPrice <= 0m)

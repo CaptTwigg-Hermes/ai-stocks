@@ -6,8 +6,8 @@ internal static class TestData
 {
     internal static readonly AgentDefinition Agent = ContestContract.Agents[0];
     internal static readonly AgentDefinition OtherAgent = ContestContract.Agents[1];
-    internal static readonly InstrumentId Volvo = new("SE0000115446", "VOLV-B", "XSTO");
-    internal static readonly InstrumentId Atlas = new("SE0017486889", "ATCO-A", "XSTO");
+    internal static readonly InstrumentId Volvo = new("SE0000115446", "VOLV-B", "XSTO", "5493000MZ1MZ8VFG8Q07");
+    internal static readonly InstrumentId Atlas = new("SE0017486889", "ATCO-A", "XSTO", "52990049PG7M6F96UC53");
     internal static readonly DateTimeOffset Open = new(2026, 8, 6, 7, 0, 0, TimeSpan.Zero);
     internal static readonly DateTimeOffset Close = new(2026, 8, 6, 15, 30, 0, TimeSpan.Zero);
     internal static readonly TradingSession Session = new("XSTO-2026-08-06", Open, Close);
