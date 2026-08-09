@@ -725,8 +725,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/UnitTest1.cs": {
-    "mtime": 1786280963.7071798,
-    "ast_hash": "0c27afa3b5804a7fbdb6185e493b52a4",
+    "mtime": 1786283866.0868323,
+    "ast_hash": "682ca59bd47f94b7b8caac2c7546cb21",
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/packages.lock.json": {
@@ -840,8 +840,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Collector/PostgresCollectorPersistence.cs": {
-    "mtime": 1786280850.7209606,
-    "ast_hash": "3f7944ef874ddfa5fcc6a2327f2b8675",
+    "mtime": 1786283717.1119053,
+    "ast_hash": "631f23fa3e5b5310ecb5043135f8ffec",
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/004_market_runtime.sql": {

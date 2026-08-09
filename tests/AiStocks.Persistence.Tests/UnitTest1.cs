@@ -157,6 +157,17 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
+    public void CollectorNormalizesDatabaseTimestampsToUtcMicroseconds()
+    {
+        var source = new DateTimeOffset(2026, 8, 9, 13, 53, 30, TimeSpan.FromHours(2)).AddTicks(1_654_245);
+        var expected = new DateTimeOffset(2026, 8, 9, 11, 53, 30, TimeSpan.Zero).AddTicks(1_654_240);
+        Assert.Equal(expected, AiStocks.Collector.PostgresCollectorPersistence.NormalizeDatabaseTimestamp(source));
+
+        var aligned = new DateTimeOffset(2026, 8, 9, 11, 53, 30, TimeSpan.Zero).AddTicks(1_654_240);
+        Assert.Equal(aligned, AiStocks.Collector.PostgresCollectorPersistence.NormalizeDatabaseTimestamp(aligned));
+    }
+
+    [Fact]
     public void StrictTradeTimingCleanupHandlesGeneratedConstraintNames()
     {
         var sql = MigrationCatalog.All.Single(migration => migration.Id == "015_strict_trade_timing_constraint_cleanup").Sql;

@@ -61,6 +61,7 @@ public sealed class PostgresCollectorPersistence(
     {
         foreach (var version in snapshot.Versions)
         {
+            var appliedAt = NormalizeDatabaseTimestamp(version.AppliedAt);
             await using var artifact = new NpgsqlCommand("""
                 INSERT INTO market_firds_artifacts(cursor,version,is_full,source_url,payload,payload_hash,applied_at)
                 VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (cursor) DO NOTHING
@@ -68,13 +69,13 @@ public sealed class PostgresCollectorPersistence(
             artifact.Parameters.AddWithValue(version.Cursor); artifact.Parameters.AddWithValue(version.Version);
             artifact.Parameters.AddWithValue(version.IsFull); artifact.Parameters.AddWithValue(version.SourceUrl.AbsoluteUri);
             artifact.Parameters.AddWithValue(File.ReadAllBytes(version.RawPath)); artifact.Parameters.AddWithValue(version.Sha256);
-            artifact.Parameters.AddWithValue(version.AppliedAt);
+            artifact.Parameters.AddWithValue(appliedAt);
             await artifact.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             await RequireMatchAsync(connection, transaction, """
-                SELECT version=$2 AND is_full=$3 AND source_url=$4 AND payload_hash=$5 AND applied_at=$6
+                SELECT version=$2 AND is_full=$3 AND source_url=$4 AND payload_hash=$5
                 FROM market_firds_artifacts WHERE cursor=$1
                 """, "PostgreSQL FIRDS artifact identity conflict", cancellationToken, version.Cursor, version.Version,
-                version.IsFull, version.SourceUrl.AbsoluteUri, version.Sha256, version.AppliedAt).ConfigureAwait(false);
+                version.IsFull, version.SourceUrl.AbsoluteUri, version.Sha256).ConfigureAwait(false);
         }
         foreach (var item in snapshot.Instruments)
         {
@@ -230,32 +231,34 @@ public sealed class PostgresCollectorPersistence(
         {
             var report = archive.Verify(reportEntry.Report);
             var id = StableGuid("report:" + report.Report + ":" + report.Sha256);
+            var retrievedAt = NormalizeDatabaseTimestamp(report.FetchedAt);
             var metadata = JsonSerializer.Serialize(new { report.Report, report.Sha256, report.Bytes, sourceUrl = report.SourceUrl.AbsoluteUri, report.FetchedAt });
             await using var raw = new NpgsqlCommand("""
                 INSERT INTO raw_market_reports(id,report_name,source_url,retrieved_at,payload,payload_hash,metadata_json,metadata_hash)
                 VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,canonical_jsonb_sha256($7::jsonb)) ON CONFLICT (report_name) DO NOTHING
                 """, connection, transaction);
             raw.Parameters.AddWithValue(id); raw.Parameters.AddWithValue(report.Report); raw.Parameters.AddWithValue(report.SourceUrl.AbsoluteUri);
-            raw.Parameters.AddWithValue(report.FetchedAt.ToUniversalTime()); raw.Parameters.AddWithValue(File.ReadAllBytes(report.CsvPath)); raw.Parameters.AddWithValue(report.Sha256);
+            raw.Parameters.AddWithValue(retrievedAt); raw.Parameters.AddWithValue(File.ReadAllBytes(report.CsvPath)); raw.Parameters.AddWithValue(report.Sha256);
             raw.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = metadata });
             await raw.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             await using var lookup = new NpgsqlCommand("SELECT id,payload_hash::text,source_url,retrieved_at=$3,metadata_json=$2::jsonb FROM raw_market_reports WHERE report_name=$1", connection, transaction);
             lookup.Parameters.AddWithValue(report.Report);
             lookup.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = metadata });
-            lookup.Parameters.AddWithValue(report.FetchedAt.ToUniversalTime());
+            lookup.Parameters.AddWithValue(retrievedAt);
             await using var reader = await lookup.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || reader.GetGuid(0) != id || reader.GetString(1) != report.Sha256 ||
                 reader.GetString(2) != report.SourceUrl.AbsoluteUri || !reader.GetBoolean(3) || !reader.GetBoolean(4))
                 throw new MarketDataException("PostgreSQL raw report identity conflict");
             rawIds[report.Report] = reader.GetGuid(0);
         }
+        var finalizedAt = NormalizeDatabaseTimestamp(verifiedManifest.Manifest.FinalizedAt);
         await using (var manifest = new NpgsqlCommand("""
             INSERT INTO market_session_manifests(session_id,manifest_hash,finalized_at,source_listing_url,report_count,complete)
             VALUES($1,$2,$3,$4,$5,true) ON CONFLICT DO NOTHING
             """, connection, transaction))
         {
             manifest.Parameters.AddWithValue(verifiedManifest.Manifest.SessionId); manifest.Parameters.AddWithValue(verifiedManifest.Sha256);
-            manifest.Parameters.AddWithValue(verifiedManifest.Manifest.FinalizedAt.ToUniversalTime()); manifest.Parameters.AddWithValue(verifiedManifest.Manifest.SourceListingUrl);
+            manifest.Parameters.AddWithValue(finalizedAt); manifest.Parameters.AddWithValue(verifiedManifest.Manifest.SourceListingUrl);
             manifest.Parameters.AddWithValue(verifiedManifest.Manifest.Reports.Count);
             await manifest.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -263,7 +266,7 @@ public sealed class PostgresCollectorPersistence(
             SELECT manifest_hash=$2 AND finalized_at=$3 AND source_listing_url=$4 AND report_count=$5 AND complete
             FROM market_session_manifests WHERE session_id=$1
             """, "PostgreSQL session manifest identity conflict", cancellationToken, verifiedManifest.Manifest.SessionId,
-            verifiedManifest.Sha256, verifiedManifest.Manifest.FinalizedAt.ToUniversalTime(),
+            verifiedManifest.Sha256, finalizedAt,
             verifiedManifest.Manifest.SourceListingUrl, verifiedManifest.Manifest.Reports.Count).ConfigureAwait(false);
         var instrumentIds = await LoadInstrumentIdsAsync(connection, transaction, instruments, cancellationToken).ConfigureAwait(false);
         var totals = instruments.ToDictionary(x => (x.Isin, x.OrderBookId), _ => (Value: 0m, Count: 0));
@@ -294,6 +297,9 @@ public sealed class PostgresCollectorPersistence(
                 var key = (instrument.Isin, instrument.OrderBookId);
                 totals[key] = (totals[key].Value + trade.Price * trade.Quantity, totals[key].Count + 1);
                 var strictId = StableGuid($"trade:{entry.Report}:{entry.Sha256}:{instrument.OrderBookId}:{trade.TransactionId}");
+                var tradedAt = NormalizeDatabaseTimestamp(trade.ExecutedAt);
+                var publishedAt = NormalizeDatabaseTimestamp(trade.PublishedAt);
+                var retrievedAt = NormalizeDatabaseTimestamp(trade.FetchedAt);
                 await using var row = new NpgsqlCommand("""
                     INSERT INTO market_strict_trade_rows(id,session_id,raw_market_report_id,instrument_id,transaction_id,traded_at,published_at,retrieved_at,price,quantity,flags)
                     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING
@@ -301,7 +307,7 @@ public sealed class PostgresCollectorPersistence(
                 row.Parameters.AddWithValue(strictId);
                 row.Parameters.AddWithValue(verifiedManifest.Manifest.SessionId); row.Parameters.AddWithValue(rawIds[entry.Report]);
                 row.Parameters.AddWithValue(instrumentIds[key]); row.Parameters.AddWithValue(trade.TransactionId);
-                row.Parameters.AddWithValue(trade.ExecutedAt.ToUniversalTime()); row.Parameters.AddWithValue(trade.PublishedAt.ToUniversalTime()); row.Parameters.AddWithValue(trade.FetchedAt.ToUniversalTime());
+                row.Parameters.AddWithValue(tradedAt); row.Parameters.AddWithValue(publishedAt); row.Parameters.AddWithValue(retrievedAt);
                 row.Parameters.AddWithValue(trade.Price); row.Parameters.AddWithValue(trade.Quantity); row.Parameters.AddWithValue(trade.Flags);
                 await row.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
                 await RequireMatchAsync(connection, transaction, """
@@ -310,7 +316,7 @@ public sealed class PostgresCollectorPersistence(
                     FROM market_strict_trade_rows WHERE id=$1
                     """, "PostgreSQL strict trade identity conflict", cancellationToken, strictId,
                     verifiedManifest.Manifest.SessionId, rawIds[entry.Report], instrumentIds[key], trade.TransactionId,
-                    trade.ExecutedAt.ToUniversalTime(), trade.PublishedAt.ToUniversalTime(), trade.FetchedAt.ToUniversalTime(),
+                    tradedAt, publishedAt, retrievedAt,
                     trade.Price, trade.Quantity, trade.Flags).ConfigureAwait(false);
                 projectedTrades.Add((trade, instrument, strictId, rawIds[entry.Report]));
             }
@@ -354,6 +360,8 @@ public sealed class PostgresCollectorPersistence(
                 transactionId = item.Trade.TransactionId
             });
             var observationId = StableGuid("observation:" + item.StrictId);
+            var tradedAt = NormalizeDatabaseTimestamp(item.Trade.ExecutedAt);
+            var retrievedAt = NormalizeDatabaseTimestamp(item.Trade.FetchedAt);
             await using var observation = new NpgsqlCommand("""
                 INSERT INTO market_observations(id,instrument_id,raw_market_report_id,traded_at,retrieved_at,price,quantity,
                   average_daily_value_20,complete_history_sessions,session_id,is_official_pats,warning,suspended,verified,source_json,source_hash)
@@ -361,7 +369,7 @@ public sealed class PostgresCollectorPersistence(
                 ON CONFLICT DO NOTHING
                 """, connection, transaction);
             observation.Parameters.AddWithValue(observationId); observation.Parameters.AddWithValue(instrumentId); observation.Parameters.AddWithValue(item.RawId);
-            observation.Parameters.AddWithValue(item.Trade.ExecutedAt.ToUniversalTime()); observation.Parameters.AddWithValue(item.Trade.FetchedAt.ToUniversalTime());
+            observation.Parameters.AddWithValue(tradedAt); observation.Parameters.AddWithValue(retrievedAt);
             observation.Parameters.AddWithValue(item.Trade.Price); observation.Parameters.AddWithValue(item.Trade.Quantity); observation.Parameters.AddWithValue(averageDailyValue);
             observation.Parameters.AddWithValue(checked((int)completeSessions)); observation.Parameters.AddWithValue(verifiedManifest.Manifest.SessionId);
             observation.Parameters.AddWithValue(item.Trade.Flags.Split(',', ' ', ';').Contains("PATS", StringComparer.Ordinal));
@@ -375,7 +383,7 @@ public sealed class PostgresCollectorPersistence(
                    AND warning=$12 AND suspended=$13 AND verified=$14 AND source_json=$15::jsonb
                 FROM market_observations WHERE id=$1
                 """, "PostgreSQL market observation identity conflict", cancellationToken, observationId, instrumentId, item.RawId,
-                item.Trade.ExecutedAt.ToUniversalTime(), item.Trade.FetchedAt.ToUniversalTime(), item.Trade.Price, item.Trade.Quantity,
+                tradedAt, retrievedAt, item.Trade.Price, item.Trade.Quantity,
                 averageDailyValue, checked((int)completeSessions), verifiedManifest.Manifest.SessionId,
                 item.Trade.Flags.Split(',', ' ', ';').Contains("PATS", StringComparer.Ordinal),
                 state is InstrumentTradingState.Warning or InstrumentTradingState.Observation,
@@ -418,6 +426,9 @@ public sealed class PostgresCollectorPersistence(
 
     internal static decimal NormalizeDatabaseMoney(decimal value) =>
         decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+
+    internal static DateTimeOffset NormalizeDatabaseTimestamp(DateTimeOffset value) =>
+        value.ToUniversalTime().AddTicks(-(value.ToUniversalTime().Ticks % TimeSpan.TicksPerMicrosecond));
 
     private static Guid StableGuid(string value)
     {
