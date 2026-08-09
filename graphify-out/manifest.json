@@ -284,11 +284,6 @@
     "ast_hash": "29291ec0e9af64e1777c1a58f90f38c3",
     "semantic_hash": ""
   },
-  "tests/test_release_artifacts.py": {
-    "mtime": 1786261367.4006643,
-    "ast_hash": "acb7d7f274a3e8c221fc386d7ab8f2aa",
-    "semantic_hash": ""
-  },
   "tests/test_worker.py": {
     "mtime": 1786197555.439492,
     "ast_hash": "80988a58db792bb564b67539a47db97d",
@@ -505,8 +500,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/001_production_schema.sql": {
-    "mtime": 1786205626.562874,
-    "ast_hash": "b3b32a064ed860d293ee76c071663cc3",
+    "mtime": 1786269526.6877127,
+    "ast_hash": "b1071f43ac4761d07bf4b9f9fe8a93ea",
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/002_runtime_integration.sql": {
@@ -730,8 +725,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/UnitTest1.cs": {
-    "mtime": 1786208062.2831059,
-    "ast_hash": "44b550943ce9c3ce9647353c09ea4c47",
+    "mtime": 1786269513.5554578,
+    "ast_hash": "36f3ff185424583b3c82f388fba0b3fc",
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/packages.lock.json": {

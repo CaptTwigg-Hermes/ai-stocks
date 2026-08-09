@@ -180,7 +180,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_app",
-      "community": 70,
+      "community": 89,
       "norm_label": "app.py"
     },
     {
@@ -190,7 +190,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "ai_stocks_app_create_app",
-      "community": 2,
+      "community": 89,
       "norm_label": "create_app()"
     },
     {
@@ -240,7 +240,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "exception",
-      "community": 20,
+      "community": 28,
       "norm_label": "exception"
     },
     {
@@ -260,7 +260,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "ai_stocks_auth_accessconfig",
-      "community": 2,
+      "community": 67,
       "norm_label": "accessconfig"
     },
     {
@@ -280,7 +280,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "ai_stocks_auth_accessconfig_from_env",
-      "community": 2,
+      "community": 67,
       "norm_label": ".from_env()"
     },
     {
@@ -290,7 +290,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "ai_stocks_auth_accessconfig_issuer",
-      "community": 2,
+      "community": 67,
       "norm_label": ".issuer()"
     },
     {
@@ -300,7 +300,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "ai_stocks_auth_accessconfig_jwks_url",
-      "community": 2,
+      "community": 67,
       "norm_label": ".jwks_url()"
     },
     {
@@ -350,7 +350,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "ai_stocks_auth_accessjwtvalidator_init",
-      "community": 2,
+      "community": 67,
       "norm_label": ".__init__()"
     },
     {
@@ -360,7 +360,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "timedelta",
-      "community": 113,
+      "community": 89,
       "norm_label": "timedelta"
     },
     {
@@ -440,7 +440,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_bootstrap",
-      "community": 70,
+      "community": 89,
       "norm_label": "bootstrap.py"
     },
     {
@@ -450,7 +450,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "ai_stocks_bootstrap_bootstraperror",
-      "community": 70,
+      "community": 89,
       "norm_label": "bootstraperror"
     },
     {
@@ -470,7 +470,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "ai_stocks_bootstrap_bootstrap",
-      "community": 70,
+      "community": 89,
       "norm_label": "bootstrap()"
     },
     {
@@ -480,7 +480,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "session",
-      "community": 105,
+      "community": 89,
       "norm_label": "session"
     },
     {
@@ -490,7 +490,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "ai_stocks_bootstrap_is_complete",
-      "community": 70,
+      "community": 89,
       "norm_label": "_is_complete()"
     },
     {
@@ -500,7 +500,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "ai_stocks_bootstrap_main",
-      "community": 70,
+      "community": 89,
       "norm_label": "main()"
     },
     {
@@ -510,7 +510,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_bootstrap_rationale_1",
-      "community": 70,
+      "community": 89,
       "norm_label": "one-time, idempotent initialization of the immutable contest state."
     },
     {
@@ -550,7 +550,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "ai_stocks_calendar_tradingsession",
-      "community": 54,
+      "community": 68,
       "norm_label": "tradingsession"
     },
     {
@@ -580,7 +580,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "date",
-      "community": 47,
+      "community": 68,
       "norm_label": "date"
     },
     {
@@ -630,7 +630,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_collector",
-      "community": 134,
+      "community": 68,
       "norm_label": "collector.py"
     },
     {
@@ -640,7 +640,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "ai_stocks_collector_collectionresult",
-      "community": 134,
+      "community": 68,
       "norm_label": "collectionresult"
     },
     {
@@ -650,7 +650,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "ai_stocks_collector_report_timestamp",
-      "community": 134,
+      "community": 68,
       "norm_label": "report_timestamp()"
     },
     {
@@ -660,7 +660,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "ai_stocks_collector_expected_reports",
-      "community": 134,
+      "community": 68,
       "norm_label": "expected_reports()"
     },
     {
@@ -670,7 +670,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "ai_stocks_collector_reports_due",
-      "community": 134,
+      "community": 68,
       "norm_label": "reports_due()"
     },
     {
@@ -680,7 +680,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "ai_stocks_collector_collect_once",
-      "community": 134,
+      "community": 68,
       "norm_label": "collect_once()"
     },
     {
@@ -690,7 +690,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nasdaqposttradeclient",
-      "community": 134,
+      "community": 68,
       "norm_label": "nasdaqposttradeclient"
     },
     {
@@ -700,7 +700,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "ai_stocks_collector_main",
-      "community": 134,
+      "community": 68,
       "norm_label": "main()"
     },
     {
@@ -710,7 +710,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_collector_rationale_1",
-      "community": 134,
+      "community": 68,
       "norm_label": "continuous official nasdaq delayed-report collector."
     },
     {
@@ -740,7 +740,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_db",
-      "community": 70,
+      "community": 89,
       "norm_label": "db.py"
     },
     {
@@ -750,7 +750,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "ai_stocks_db_base",
-      "community": 70,
+      "community": 89,
       "norm_label": "base"
     },
     {
@@ -760,7 +760,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "declarativebase",
-      "community": 70,
+      "community": 89,
       "norm_label": "declarativebase"
     },
     {
@@ -950,7 +950,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_market",
-      "community": 17,
+      "community": 89,
       "norm_label": "market.py"
     },
     {
@@ -980,7 +980,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "ai_stocks_market_quote",
-      "community": 17,
+      "community": 89,
       "norm_label": "quote"
     },
     {
@@ -990,7 +990,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "ai_stocks_market_marketprovider",
-      "community": 105,
+      "community": 89,
       "norm_label": "marketprovider"
     },
     {
@@ -1000,7 +1000,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "protocol",
-      "community": 105,
+      "community": 89,
       "norm_label": "protocol"
     },
     {
@@ -1030,7 +1030,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "ai_stocks_market_marketprovider_first_quote_at_or_after",
-      "community": 17,
+      "community": 89,
       "norm_label": ".first_quote_at_or_after()"
     },
     {
@@ -1040,7 +1040,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "ai_stocks_market_marketprovider_latest_quote_at_or_before",
-      "community": 17,
+      "community": 89,
       "norm_label": ".latest_quote_at_or_before()"
     },
     {
@@ -1050,7 +1050,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "ai_stocks_market_fakemarket",
-      "community": 17,
+      "community": 89,
       "norm_label": "fakemarket"
     },
     {
@@ -1060,7 +1060,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "ai_stocks_market_fakemarket_init",
-      "community": 17,
+      "community": 89,
       "norm_label": ".__init__()"
     },
     {
@@ -1070,7 +1070,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "ai_stocks_market_fakemarket_add",
-      "community": 17,
+      "community": 89,
       "norm_label": ".add()"
     },
     {
@@ -1090,7 +1090,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "ai_stocks_market_fakemarket_next_session",
-      "community": 17,
+      "community": 89,
       "norm_label": ".next_session()"
     },
     {
@@ -1100,7 +1100,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "ai_stocks_market_fakemarket_first_quote_at_or_after",
-      "community": 17,
+      "community": 89,
       "norm_label": ".first_quote_at_or_after()"
     },
     {
@@ -1110,7 +1110,7 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "ai_stocks_market_fakemarket_latest_quote_at_or_before",
-      "community": 17,
+      "community": 89,
       "norm_label": ".latest_quote_at_or_before()"
     },
     {
@@ -1120,7 +1120,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_models",
-      "community": 70,
+      "community": 89,
       "norm_label": "models.py"
     },
     {
@@ -1140,7 +1140,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "ai_stocks_models_agent",
-      "community": 70,
+      "community": 89,
       "norm_label": "agent"
     },
     {
@@ -1150,7 +1150,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "ai_stocks_models_ledgerevent",
-      "community": 70,
+      "community": 89,
       "norm_label": "ledgerevent"
     },
     {
@@ -1160,7 +1160,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "ai_stocks_models_order",
-      "community": 105,
+      "community": 89,
       "norm_label": "order"
     },
     {
@@ -1170,7 +1170,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "ai_stocks_models_fill",
-      "community": 105,
+      "community": 89,
       "norm_label": "fill"
     },
     {
@@ -1180,7 +1180,7 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "ai_stocks_models_orderrejection",
-      "community": 105,
+      "community": 89,
       "norm_label": "orderrejection"
     },
     {
@@ -1190,7 +1190,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "ai_stocks_models_orderlifecycleevent",
-      "community": 105,
+      "community": 89,
       "norm_label": "orderlifecycleevent"
     },
     {
@@ -1200,7 +1200,7 @@
       "source_location": "L140",
       "_origin": "ast",
       "id": "ai_stocks_models_corporateaction",
-      "community": 105,
+      "community": 89,
       "norm_label": "corporateaction"
     },
     {
@@ -1210,7 +1210,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "ai_stocks_models_finalranking",
-      "community": 105,
+      "community": 89,
       "norm_label": "finalranking"
     },
     {
@@ -1220,7 +1220,7 @@
       "source_location": "L177",
       "_origin": "ast",
       "id": "ai_stocks_models_agentrun",
-      "community": 70,
+      "community": 89,
       "norm_label": "agentrun"
     },
     {
@@ -1240,7 +1240,7 @@
       "source_location": "L237",
       "_origin": "ast",
       "id": "ai_stocks_models_systemstate",
-      "community": 70,
+      "community": 89,
       "norm_label": "systemstate"
     },
     {
@@ -1290,7 +1290,7 @@
       "source_location": "L347",
       "_origin": "ast",
       "id": "ai_stocks_models_reject_audit_mutation",
-      "community": 70,
+      "community": 89,
       "norm_label": "_reject_audit_mutation()"
     },
     {
@@ -1300,7 +1300,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_nasdaq_acquisition",
-      "community": 18,
+      "community": 68,
       "norm_label": "nasdaq_acquisition.py"
     },
     {
@@ -1320,7 +1320,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "ai_stocks_nasdaq_acquisition_archivedreport",
-      "community": 18,
+      "community": 54,
       "norm_label": "archivedreport"
     },
     {
@@ -1340,7 +1340,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "ai_stocks_nasdaq_acquisition_nasdaqposttradeclient_init",
-      "community": 1,
+      "community": 18,
       "norm_label": ".__init__()"
     },
     {
@@ -1350,7 +1350,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "client",
-      "community": 1,
+      "community": 18,
       "norm_label": "client"
     },
     {
@@ -1410,7 +1410,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_nasdaq_acquisition_rationale_1",
-      "community": 18,
+      "community": 68,
       "norm_label": "acquisition and immutable archival for nasdaq's delayed post-trade csv feed."
     },
     {
@@ -1530,7 +1530,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "ai_stocks_nasdaq_market_instrumentstatus",
-      "community": 47,
+      "community": 1,
       "norm_label": "instrumentstatus"
     },
     {
@@ -1730,7 +1730,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "decimal",
-      "community": 215,
+      "community": 89,
       "norm_label": "decimal"
     },
     {
@@ -1780,7 +1780,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "ai_stocks_nasdaq_market_rationale_40",
-      "community": 47,
+      "community": 1,
       "norm_label": "separately verified unresolved-warning and suspension state."
     },
     {
@@ -2080,7 +2080,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_orchestration",
-      "community": 3,
+      "community": 98,
       "norm_label": "orchestration.py"
     },
     {
@@ -2230,7 +2230,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_orchestration_rationale_1",
-      "community": 3,
+      "community": 98,
       "norm_label": "database-backed scheduler-to-runner-to-trading orchestration."
     },
     {
@@ -2250,7 +2250,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_preflight",
-      "community": 2,
+      "community": 67,
       "norm_label": "preflight.py"
     },
     {
@@ -2260,7 +2260,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "ai_stocks_preflight_validate_production_environment",
-      "community": 2,
+      "community": 67,
       "norm_label": "validate_production_environment()"
     },
     {
@@ -2270,7 +2270,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "ai_stocks_preflight_main",
-      "community": 2,
+      "community": 67,
       "norm_label": "main()"
     },
     {
@@ -2280,7 +2280,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_preflight_rationale_1",
-      "community": 2,
+      "community": 67,
       "norm_label": "fail-closed production configuration validation with no database side effects."
     },
     {
@@ -2570,7 +2570,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "ai_stocks_runner_agentcontext",
-      "community": 17,
+      "community": 98,
       "norm_label": "agentcontext"
     },
     {
@@ -2600,7 +2600,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "ai_stocks_runner_decision",
-      "community": 17,
+      "community": 89,
       "norm_label": "decision"
     },
     {
@@ -2860,7 +2860,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "ai_stocks_runner_rationale_57",
-      "community": 17,
+      "community": 98,
       "norm_label": "state for exactly one competitor; callers must create one context per agent."
     },
     {
@@ -2930,7 +2930,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "ai_stocks_schedule_runwindow",
-      "community": 73,
+      "community": 98,
       "norm_label": "runwindow"
     },
     {
@@ -2940,7 +2940,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "ai_stocks_schedule_runwindow_state_at",
-      "community": 68,
+      "community": 3,
       "norm_label": ".state_at()"
     },
     {
@@ -2970,7 +2970,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_trading",
-      "community": 105,
+      "community": 89,
       "norm_label": "trading.py"
     },
     {
@@ -3000,7 +3000,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "ai_stocks_trading_source",
-      "community": 105,
+      "community": 89,
       "norm_label": "source"
     },
     {
@@ -3010,7 +3010,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "basemodel",
-      "community": 105,
+      "community": 89,
       "norm_label": "basemodel"
     },
     {
@@ -3020,7 +3020,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "ai_stocks_trading_evidence",
-      "community": 105,
+      "community": 89,
       "norm_label": "evidence"
     },
     {
@@ -3040,7 +3040,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "ai_stocks_trading_orderrequest",
-      "community": 113,
+      "community": 89,
       "norm_label": "orderrequest"
     },
     {
@@ -3050,7 +3050,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "ai_stocks_trading_portfolio",
-      "community": 105,
+      "community": 89,
       "norm_label": "portfolio"
     },
     {
@@ -3060,7 +3060,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "ai_stocks_trading_orderresult",
-      "community": 105,
+      "community": 89,
       "norm_label": "orderresult"
     },
     {
@@ -3070,7 +3070,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "ai_stocks_trading_fillvalues",
-      "community": 105,
+      "community": 89,
       "norm_label": "_fillvalues"
     },
     {
@@ -3090,7 +3090,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "ai_stocks_trading_tradingservice_init",
-      "community": 105,
+      "community": 89,
       "norm_label": ".__init__()"
     },
     {
@@ -3520,7 +3520,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_worker",
-      "community": 17,
+      "community": 89,
       "norm_label": "worker.py"
     },
     {
@@ -3530,7 +3530,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "ai_stocks_worker_workerruntime",
-      "community": 17,
+      "community": 89,
       "norm_label": "workerruntime"
     },
     {
@@ -3540,7 +3540,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "ai_stocks_worker_workerruntime_init",
-      "community": 105,
+      "community": 89,
       "norm_label": ".__init__()"
     },
     {
@@ -3550,7 +3550,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "ai_stocks_worker_workerruntime_tick",
-      "community": 68,
+      "community": 3,
       "norm_label": ".tick()"
     },
     {
@@ -3560,7 +3560,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "ai_stocks_worker_workerruntime_context_for",
-      "community": 17,
+      "community": 89,
       "norm_label": ".context_for()"
     },
     {
@@ -3570,7 +3570,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "ai_stocks_worker_workerruntime_handle_decision",
-      "community": 17,
+      "community": 89,
       "norm_label": ".handle_decision()"
     },
     {
@@ -3580,7 +3580,7 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "ai_stocks_worker_workerruntime_observed_quote",
-      "community": 17,
+      "community": 89,
       "norm_label": "._observed_quote()"
     },
     {
@@ -3590,7 +3590,7 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "ai_stocks_worker_require_verified_research",
-      "community": 17,
+      "community": 89,
       "norm_label": "_require_verified_research()"
     },
     {
@@ -3600,7 +3600,7 @@
       "source_location": "L206",
       "_origin": "ast",
       "id": "ai_stocks_worker_portfolio_json",
-      "community": 17,
+      "community": 89,
       "norm_label": "_portfolio_json()"
     },
     {
@@ -3610,7 +3610,7 @@
       "source_location": "L210",
       "_origin": "ast",
       "id": "ai_stocks_worker_iso",
-      "community": 17,
+      "community": 89,
       "norm_label": "_iso()"
     },
     {
@@ -3620,7 +3620,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ai_stocks_worker_rationale_1",
-      "community": 17,
+      "community": 89,
       "norm_label": "production-shaped scheduler \u2192 hermes \u2192 paper-trading worker runtime."
     },
     {
@@ -3630,7 +3630,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "ai_stocks_worker_rationale_24",
-      "community": 17,
+      "community": 89,
       "norm_label": "run one durable orchestration claim at a time without an http mutation surface."
     },
     {
@@ -3720,7 +3720,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "alembic_env",
-      "community": 70,
+      "community": 89,
       "norm_label": "env.py"
     },
     {
@@ -3730,7 +3730,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "alembic_env_offline",
-      "community": 70,
+      "community": 89,
       "norm_label": "offline()"
     },
     {
@@ -3740,7 +3740,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "alembic_env_online",
-      "community": 70,
+      "community": 89,
       "norm_label": "online()"
     },
     {
@@ -4219,7 +4219,7 @@
       },
       "_origin": "ast",
       "id": "scripts_verify_release",
-      "community": 1,
+      "community": 113,
       "norm_label": "verify-release.sh"
     },
     {
@@ -4233,7 +4233,7 @@
       },
       "_origin": "ast",
       "id": "opt_data_ai_stocks_build_coordinator_scripts_verify_release_sh__entry",
-      "community": 1,
+      "community": 113,
       "norm_label": "verify-release.sh script"
     },
     {
@@ -4261,7 +4261,7 @@
       },
       "_origin": "ast",
       "id": "scripts_verify_release_ld_library_path",
-      "community": 1,
+      "community": 113,
       "norm_label": "ld_library_path"
     },
     {
@@ -4275,7 +4275,7 @@
       },
       "_origin": "ast",
       "id": "scripts_verify_release_dotnet_cli_telemetry_optout",
-      "community": 1,
+      "community": 113,
       "norm_label": "dotnet_cli_telemetry_optout"
     },
     {
@@ -4289,7 +4289,7 @@
       },
       "_origin": "ast",
       "id": "scripts_verify_release_dotnet_nologo",
-      "community": 1,
+      "community": 113,
       "norm_label": "dotnet_nologo"
     },
     {
@@ -4389,7 +4389,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_collector_corporateactioningestion",
-      "community": 103,
+      "community": 46,
       "norm_label": "corporateactioningestion.cs"
     },
     {
@@ -4399,7 +4399,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "aistocks_collector_corporateactioningestion_postgrescorporateactioningestion",
-      "community": 103,
+      "community": 46,
       "norm_label": "postgrescorporateactioningestion"
     },
     {
@@ -4409,7 +4409,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "int",
-      "community": 46,
+      "community": 42,
       "norm_label": "int"
     },
     {
@@ -4429,7 +4429,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "aistocks_collector_corporateactioningestion_postgrescorporateactioningestion_ingestasync",
-      "community": 103,
+      "community": 46,
       "norm_label": ".ingestasync()"
     },
     {
@@ -4439,7 +4439,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "readonlymemory",
-      "community": 103,
+      "community": 46,
       "norm_label": "readonlymemory"
     },
     {
@@ -4459,7 +4459,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "aistocks_collector_corporateactioningestion_postgrescorporateactioningestion_ingestdirectoryasync",
-      "community": 103,
+      "community": 46,
       "norm_label": ".ingestdirectoryasync()"
     },
     {
@@ -4469,7 +4469,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "aistocks_collector_corporateactioningestion_postgrescorporateactioningestion_rejectduplicateproperties",
-      "community": 103,
+      "community": 46,
       "norm_label": ".rejectduplicateproperties()"
     },
     {
@@ -4609,7 +4609,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "firdsinstrument",
-      "community": 124,
+      "community": 16,
       "norm_label": "firdsinstrument"
     },
     {
@@ -4639,7 +4639,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "dictionary",
-      "community": 60,
+      "community": 70,
       "norm_label": "dictionary"
     },
     {
@@ -4739,7 +4739,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "dateonly",
-      "community": 124,
+      "community": 16,
       "norm_label": "dateonly"
     },
     {
@@ -5619,7 +5619,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_marketdata_collector",
-      "community": 60,
+      "community": 70,
       "norm_label": "collector.cs"
     },
     {
@@ -5629,7 +5629,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "aistocks_marketdata_collector_nasdaqposttradeclient",
-      "community": 0,
+      "community": 70,
       "norm_label": "nasdaqposttradeclient"
     },
     {
@@ -5639,7 +5639,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "aistocks_marketdata_collector_nasdaqposttradeclient_listreportsasync",
-      "community": 0,
+      "community": 70,
       "norm_label": ".listreportsasync()"
     },
     {
@@ -5649,7 +5649,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "aistocks_marketdata_collector_nasdaqposttradeclient_downloadasync",
-      "community": 0,
+      "community": 70,
       "norm_label": ".downloadasync()"
     },
     {
@@ -5659,7 +5659,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "aistocks_marketdata_collector_nasdaqposttradeclient_readreportasync",
-      "community": 0,
+      "community": 70,
       "norm_label": ".readreportasync()"
     },
     {
@@ -5679,7 +5679,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "aistocks_marketdata_collector_nasdaqcollector",
-      "community": 60,
+      "community": 70,
       "norm_label": "nasdaqcollector"
     },
     {
@@ -5689,7 +5689,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "collectordownloadpolicy",
-      "community": 60,
+      "community": 70,
       "norm_label": "collectordownloadpolicy"
     },
     {
@@ -5699,7 +5699,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "aistocks_marketdata_collector_nasdaqcollector_collectonceasync",
-      "community": 0,
+      "community": 70,
       "norm_label": ".collectonceasync()"
     },
     {
@@ -5719,7 +5719,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "timespan",
-      "community": 42,
+      "community": 20,
       "norm_label": "timespan"
     },
     {
@@ -5729,7 +5729,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "object",
-      "community": 17,
+      "community": 89,
       "norm_label": "object"
     },
     {
@@ -5769,7 +5769,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_marketdata_firds",
-      "community": 124,
+      "community": 16,
       "norm_label": "firds.cs"
     },
     {
@@ -5779,7 +5779,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "aistocks_marketdata_firds_firdsuniverseparser",
-      "community": 124,
+      "community": 16,
       "norm_label": "firdsuniverseparser"
     },
     {
@@ -5789,7 +5789,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "aistocks_marketdata_firds_firdsuniverseparser_parsefull",
-      "community": 124,
+      "community": 16,
       "norm_label": ".parsefull()"
     },
     {
@@ -5799,7 +5799,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "aistocks_marketdata_firds_firdsuniverseparser_applydelta",
-      "community": 124,
+      "community": 16,
       "norm_label": ".applydelta()"
     },
     {
@@ -5809,7 +5809,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "aistocks_marketdata_firds_firdsuniverseparser_read",
-      "community": 124,
+      "community": 16,
       "norm_label": ".read()"
     },
     {
@@ -5819,7 +5819,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "change",
-      "community": 124,
+      "community": 16,
       "norm_label": "change"
     },
     {
@@ -5829,7 +5829,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "aistocks_marketdata_firds_firdsuniverseparser_parse",
-      "community": 124,
+      "community": 16,
       "norm_label": ".parse()"
     },
     {
@@ -5849,7 +5849,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "aistocks_marketdata_firds_firdsuniverseparser_iseligible",
-      "community": 124,
+      "community": 16,
       "norm_label": ".iseligible()"
     },
     {
@@ -5859,7 +5859,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "aistocks_marketdata_firds_firdsuniverseparser_iscommonordinaryshare",
-      "community": 124,
+      "community": 16,
       "norm_label": ".iscommonordinaryshare()"
     },
     {
@@ -6179,7 +6179,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "aistocks_marketdata_nasdaqstatus_nasdaqstatusmachine_isfreshat",
-      "community": 42,
+      "community": 20,
       "norm_label": ".isfreshat()"
     },
     {
@@ -6389,7 +6389,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_marketdata_readiness",
-      "community": 78,
+      "community": 16,
       "norm_label": "readiness.cs"
     },
     {
@@ -6469,7 +6469,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "aistocks_marketdata_readiness_marketdatareadinessgate",
-      "community": 78,
+      "community": 16,
       "norm_label": "marketdatareadinessgate"
     },
     {
@@ -6479,7 +6479,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "aistocks_marketdata_readiness_marketdatareadinessgate_evaluate",
-      "community": 78,
+      "community": 16,
       "norm_label": ".evaluate()"
     },
     {
@@ -6489,7 +6489,7 @@
       "source_location": "L140",
       "_origin": "ast",
       "id": "aistocks_marketdata_readiness_marketdatareadinessgate_expectedsessions",
-      "community": 78,
+      "community": 16,
       "norm_label": ".expectedsessions()"
     },
     {
@@ -6499,7 +6499,7 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "aistocks_marketdata_readiness_configuredmarketdatareadiness",
-      "community": 78,
+      "community": 16,
       "norm_label": "configuredmarketdatareadiness"
     },
     {
@@ -6509,7 +6509,7 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "aistocks_marketdata_readiness_configuredmarketdatareadiness_evaluate",
-      "community": 78,
+      "community": 16,
       "norm_label": ".evaluate()"
     },
     {
@@ -6589,7 +6589,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_marketdata_sessions",
-      "community": 25,
+      "community": 17,
       "norm_label": "sessions.cs"
     },
     {
@@ -6599,7 +6599,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "aistocks_marketdata_sessions_nasdaqreportname",
-      "community": 69,
+      "community": 17,
       "norm_label": "nasdaqreportname"
     },
     {
@@ -6609,7 +6609,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "aistocks_marketdata_sessions_nasdaqreportname_pattern",
-      "community": 69,
+      "community": 17,
       "norm_label": ".pattern()"
     },
     {
@@ -6619,7 +6619,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "aistocks_marketdata_sessions_nasdaqreportname_parsetimestamp",
-      "community": 69,
+      "community": 17,
       "norm_label": ".parsetimestamp()"
     },
     {
@@ -6629,7 +6629,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "aistocks_marketdata_sessions_nasdaqreportname_validate",
-      "community": 69,
+      "community": 17,
       "norm_label": ".validate()"
     },
     {
@@ -6639,7 +6639,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "aistocks_marketdata_sessions_sessionmanifest",
-      "community": 54,
+      "community": 17,
       "norm_label": "sessionmanifest"
     },
     {
@@ -6649,7 +6649,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "aistocks_marketdata_sessions_sessionmanifest_expectedreports",
-      "community": 54,
+      "community": 17,
       "norm_label": ".expectedreports()"
     },
     {
@@ -6659,7 +6659,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "aistocks_marketdata_sessions_sessionmanifest_validatecomplete",
-      "community": 54,
+      "community": 17,
       "norm_label": ".validatecomplete()"
     },
     {
@@ -6679,7 +6679,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "aistocks_marketdata_sessions_averagedailyvalue",
-      "community": 25,
+      "community": 17,
       "norm_label": "averagedailyvalue"
     },
     {
@@ -6689,7 +6689,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "aistocks_marketdata_sessions_averagedailyvalue_calculate20",
-      "community": 25,
+      "community": 17,
       "norm_label": ".calculate20()"
     },
     {
@@ -6699,7 +6699,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "sessiontradedvalue",
-      "community": 25,
+      "community": 17,
       "norm_label": "sessiontradedvalue"
     },
     {
@@ -6799,7 +6799,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "aistocks_operations_operations_operationsexception",
-      "community": 20,
+      "community": 28,
       "norm_label": "operationsexception"
     },
     {
@@ -7089,7 +7089,7 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "aistocks_operations_operations_icontestbootstrapport",
-      "community": 40,
+      "community": 105,
       "norm_label": "icontestbootstrapport"
     },
     {
@@ -7099,7 +7099,7 @@
       "source_location": "L188",
       "_origin": "ast",
       "id": "aistocks_operations_operations_icontestbootstrapport_initializeatomicallyasync",
-      "community": 40,
+      "community": 105,
       "norm_label": ".initializeatomicallyasync()"
     },
     {
@@ -7109,7 +7109,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "initialagentstate",
-      "community": 40,
+      "community": 105,
       "norm_label": "initialagentstate"
     },
     {
@@ -7119,7 +7119,7 @@
       "source_location": "L191",
       "_origin": "ast",
       "id": "aistocks_operations_operations_contestbootstrapper",
-      "community": 40,
+      "community": 105,
       "norm_label": "contestbootstrapper"
     },
     {
@@ -7129,7 +7129,7 @@
       "source_location": "L193",
       "_origin": "ast",
       "id": "aistocks_operations_operations_contestbootstrapper_bootstrapasync",
-      "community": 40,
+      "community": 105,
       "norm_label": ".bootstrapasync()"
     },
     {
@@ -7139,7 +7139,7 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "aistocks_operations_operations_ireadinessport",
-      "community": 0,
+      "community": 86,
       "norm_label": "ireadinessport"
     },
     {
@@ -7149,7 +7149,7 @@
       "source_location": "L205",
       "_origin": "ast",
       "id": "aistocks_operations_operations_ireadinessport_databaseasync",
-      "community": 0,
+      "community": 86,
       "norm_label": ".databaseasync()"
     },
     {
@@ -7159,7 +7159,7 @@
       "source_location": "L206",
       "_origin": "ast",
       "id": "aistocks_operations_operations_ireadinessport_migrationsasync",
-      "community": 0,
+      "community": 86,
       "norm_label": ".migrationsasync()"
     },
     {
@@ -7169,7 +7169,7 @@
       "source_location": "L207",
       "_origin": "ast",
       "id": "aistocks_operations_operations_ireadinessport_marketdataasync",
-      "community": 0,
+      "community": 86,
       "norm_label": ".marketdataasync()"
     },
     {
@@ -7179,7 +7179,7 @@
       "source_location": "L208",
       "_origin": "ast",
       "id": "aistocks_operations_operations_ireadinessport_fouragentsasync",
-      "community": 0,
+      "community": 86,
       "norm_label": ".fouragentsasync()"
     },
     {
@@ -7189,7 +7189,7 @@
       "source_location": "L213",
       "_origin": "ast",
       "id": "aistocks_operations_operations_operationshealth",
-      "community": 0,
+      "community": 40,
       "norm_label": "operationshealth"
     },
     {
@@ -7199,7 +7199,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "aistocks_operations_operations_operationshealth_islive",
-      "community": 0,
+      "community": 40,
       "norm_label": ".islive()"
     },
     {
@@ -7209,7 +7209,7 @@
       "source_location": "L217",
       "_origin": "ast",
       "id": "aistocks_operations_operations_operationshealth_readinessasync",
-      "community": 0,
+      "community": 86,
       "norm_label": ".readinessasync()"
     },
     {
@@ -7609,7 +7609,7 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "aistocks_operations_productionruntime_postgresimmediatealertstore",
-      "community": 97,
+      "community": 46,
       "norm_label": "postgresimmediatealertstore"
     },
     {
@@ -8499,7 +8499,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_persistence_postgresmigrationrunner",
-      "community": 39,
+      "community": 0,
       "norm_label": "postgresmigrationrunner.cs"
     },
     {
@@ -8509,7 +8509,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "aistocks_persistence_postgresmigrationrunner_postgresmigrationrunner",
-      "community": 39,
+      "community": 0,
       "norm_label": "postgresmigrationrunner"
     },
     {
@@ -8519,7 +8519,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "aistocks_persistence_postgresmigrationrunner_postgresmigrationrunner_applyasync",
-      "community": 39,
+      "community": 0,
       "norm_label": ".applyasync()"
     },
     {
@@ -8529,7 +8529,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "aistocks_persistence_postgresmigrationrunner_postgresmigrationrunner_refuseunmanagedapplicationschemaasync",
-      "community": 39,
+      "community": 0,
       "norm_label": ".refuseunmanagedapplicationschemaasync()"
     },
     {
@@ -8599,7 +8599,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "readonlyspan",
-      "community": 51,
+      "community": 30,
       "norm_label": "readonlyspan"
     },
     {
@@ -9209,7 +9209,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "decisions_strictdecisionjsonparser",
-      "community": 45,
+      "community": 166,
       "norm_label": "strictdecisionjsonparser.cs"
     },
     {
@@ -9219,7 +9219,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "decisions_strictdecisionjsonparser_decisionvalidationexception",
-      "community": 45,
+      "community": 166,
       "norm_label": "decisionvalidationexception"
     },
     {
@@ -9309,7 +9309,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "evidenceclaim",
-      "community": 166,
+      "community": 0,
       "norm_label": "evidenceclaim"
     },
     {
@@ -9319,7 +9319,7 @@
       "source_location": "L199",
       "_origin": "ast",
       "id": "decisions_strictdecisionjsonparser_strictdecisionjsonparser_validateactionfields",
-      "community": 166,
+      "community": 20,
       "norm_label": ".validateactionfields()"
     },
     {
@@ -9329,7 +9329,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "decisionaction",
-      "community": 166,
+      "community": 20,
       "norm_label": "decisionaction"
     },
     {
@@ -9339,7 +9339,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ireadonlycollection",
-      "community": 166,
+      "community": 20,
       "norm_label": "ireadonlycollection"
     },
     {
@@ -9509,7 +9509,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "evidence_evidenceverifier_evidenceverificationexception",
-      "community": 42,
+      "community": 28,
       "norm_label": "evidenceverificationexception"
     },
     {
@@ -9669,7 +9669,7 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "evidence_evidenceverifier_ievidenceverifier",
-      "community": 166,
+      "community": 217,
       "norm_label": "ievidenceverifier"
     },
     {
@@ -9679,7 +9679,7 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "evidence_evidenceverifier_ievidenceverifier_verifyasync",
-      "community": 166,
+      "community": 0,
       "norm_label": ".verifyasync()"
     },
     {
@@ -9689,7 +9689,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "verifiedevidence",
-      "community": 166,
+      "community": 0,
       "norm_label": "verifiedevidence"
     },
     {
@@ -9759,7 +9759,7 @@
       "source_location": "L306",
       "_origin": "ast",
       "id": "evidence_evidenceverifier_evidenceverifier_inprefix",
-      "community": 51,
+      "community": 30,
       "norm_label": ".inprefix()"
     },
     {
@@ -10049,7 +10049,7 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "execution_hermesresearchrunner_systemresearchprocess",
-      "community": 212,
+      "community": 41,
       "norm_label": "systemresearchprocess"
     },
     {
@@ -10069,7 +10069,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "execution_hermesresearchrunner_systemresearchprocess_kill",
-      "community": 212,
+      "community": 41,
       "norm_label": ".kill()"
     },
     {
@@ -10079,7 +10079,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "execution_hermesresearchrunner_systemresearchprocess_disposeasync",
-      "community": 212,
+      "community": 41,
       "norm_label": ".disposeasync()"
     },
     {
@@ -10089,7 +10089,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "execution_hermesresearchrunner_systemresearchprocess_nativekill",
-      "community": 212,
+      "community": 41,
       "norm_label": ".nativekill()"
     },
     {
@@ -10099,7 +10099,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "dllimport",
-      "community": 212,
+      "community": 41,
       "norm_label": "dllimport"
     },
     {
@@ -10179,7 +10179,7 @@
       "source_location": "L263",
       "_origin": "ast",
       "id": "execution_hermesresearchrunner_hermesresearchrunner_buildstartinfo",
-      "community": 30,
+      "community": 162,
       "norm_label": ".buildstartinfo()"
     },
     {
@@ -10219,7 +10219,7 @@
       "source_location": "L356",
       "_origin": "ast",
       "id": "execution_hermesresearchrunner_hermesresearchrunner_readboundedasync",
-      "community": 30,
+      "community": 0,
       "norm_label": ".readboundedasync()"
     },
     {
@@ -11439,7 +11439,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_web_dashboardcontracts",
-      "community": 20,
+      "community": 28,
       "norm_label": "dashboardcontracts.cs"
     },
     {
@@ -11509,7 +11509,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "aistocks_web_dashboardcontracts_dashboardunavailableexception",
-      "community": 20,
+      "community": 28,
       "norm_label": "dashboardunavailableexception"
     },
     {
@@ -11519,7 +11519,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "aistocks_web_dashboardcontracts_contestcontrolrejectedexception",
-      "community": 20,
+      "community": 28,
       "norm_label": "contestcontrolrejectedexception"
     },
     {
@@ -11719,7 +11719,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "aistocks_web_postgresdashboardfacade_postgresdashboardfacade_controlasync",
-      "community": 39,
+      "community": 28,
       "norm_label": ".controlasync()"
     },
     {
@@ -12589,7 +12589,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "aistocks_worker_orchestration_runschedule",
-      "community": 73,
+      "community": 20,
       "norm_label": "runschedule"
     },
     {
@@ -12599,7 +12599,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "aistocks_worker_orchestration_runschedule_create",
-      "community": 73,
+      "community": 68,
       "norm_label": ".create()"
     },
     {
@@ -12609,7 +12609,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "aistocks_worker_orchestration_idurablerunscheduleport",
-      "community": 73,
+      "community": 29,
       "norm_label": "idurablerunscheduleport"
     },
     {
@@ -12619,7 +12619,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "aistocks_worker_orchestration_idurablerunscheduleport_ensureatomicallyasync",
-      "community": 73,
+      "community": 29,
       "norm_label": ".ensureatomicallyasync()"
     },
     {
@@ -12629,7 +12629,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "aistocks_worker_orchestration_durablescheduleregistrar",
-      "community": 73,
+      "community": 29,
       "norm_label": "durablescheduleregistrar"
     },
     {
@@ -12639,7 +12639,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "aistocks_worker_orchestration_durablescheduleregistrar_ensuresessionasync",
-      "community": 73,
+      "community": 29,
       "norm_label": ".ensuresessionasync()"
     },
     {
@@ -14239,7 +14239,7 @@
       "source_location": "L294",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakescheduleport",
-      "community": 73,
+      "community": 29,
       "norm_label": "fakescheduleport"
     },
     {
@@ -14249,7 +14249,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakescheduleport_ensureatomicallyasync",
-      "community": 73,
+      "community": 29,
       "norm_label": ".ensureatomicallyasync()"
     },
     {
@@ -14369,7 +14369,7 @@
       "source_location": "L352",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakediscord",
-      "community": 29,
+      "community": 40,
       "norm_label": "fakediscord"
     },
     {
@@ -14379,7 +14379,7 @@
       "source_location": "L355",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakediscord_sendasync",
-      "community": 29,
+      "community": 40,
       "norm_label": ".sendasync()"
     },
     {
@@ -14389,7 +14389,7 @@
       "source_location": "L358",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakebootstrapport",
-      "community": 40,
+      "community": 105,
       "norm_label": "fakebootstrapport"
     },
     {
@@ -14399,7 +14399,7 @@
       "source_location": "L361",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakebootstrapport_initializeatomicallyasync",
-      "community": 40,
+      "community": 105,
       "norm_label": ".initializeatomicallyasync()"
     },
     {
@@ -14409,7 +14409,7 @@
       "source_location": "L364",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakereadinessport",
-      "community": 0,
+      "community": 86,
       "norm_label": "fakereadinessport"
     },
     {
@@ -14419,7 +14419,7 @@
       "source_location": "L367",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakereadinessport_databaseasync",
-      "community": 0,
+      "community": 86,
       "norm_label": ".databaseasync()"
     },
     {
@@ -14429,7 +14429,7 @@
       "source_location": "L368",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakereadinessport_migrationsasync",
-      "community": 0,
+      "community": 86,
       "norm_label": ".migrationsasync()"
     },
     {
@@ -14439,7 +14439,7 @@
       "source_location": "L369",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakereadinessport_marketdataasync",
-      "community": 0,
+      "community": 86,
       "norm_label": ".marketdataasync()"
     },
     {
@@ -14449,7 +14449,7 @@
       "source_location": "L370",
       "_origin": "ast",
       "id": "aistocks_core_tests_orchestrationtests_fakereadinessport_fouragentsasync",
-      "community": 0,
+      "community": 86,
       "norm_label": ".fouragentsasync()"
     },
     {
@@ -15579,7 +15579,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "aistocks_core_tests_packages_lock_net10_0_aistocks_operations",
-      "community": 62,
+      "community": 53,
       "norm_label": "aistocks.operations"
     },
     {
@@ -15589,7 +15589,7 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "aistocks_core_tests_packages_lock_aistocks_operations_type",
-      "community": 62,
+      "community": 53,
       "norm_label": "type"
     },
     {
@@ -17039,7 +17039,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "aistocks_marketdata_tests_packages_lock_net10_0_xunit_analyzers",
-      "community": 218,
+      "community": 72,
       "norm_label": "xunit.analyzers"
     },
     {
@@ -17049,7 +17049,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "aistocks_marketdata_tests_packages_lock_xunit_analyzers_type",
-      "community": 218,
+      "community": 72,
       "norm_label": "type"
     },
     {
@@ -17059,7 +17059,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "aistocks_marketdata_tests_packages_lock_xunit_analyzers_resolved",
-      "community": 218,
+      "community": 72,
       "norm_label": "resolved"
     },
     {
@@ -17069,7 +17069,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "aistocks_marketdata_tests_packages_lock_xunit_analyzers_contenthash",
-      "community": 218,
+      "community": 72,
       "norm_label": "contenthash"
     },
     {
@@ -17739,7 +17739,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_productioncompositionintegrationtests",
-      "community": 86,
+      "community": 43,
       "norm_label": "productioncompositionintegrationtests.cs"
     },
     {
@@ -17799,7 +17799,7 @@
       "source_location": "L303",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_productioncompositionintegrationtests_recordingdiscord",
-      "community": 86,
+      "community": 40,
       "norm_label": "recordingdiscord"
     },
     {
@@ -17809,7 +17809,7 @@
       "source_location": "L306",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_productioncompositionintegrationtests_recordingdiscord_sendasync",
-      "community": 86,
+      "community": 40,
       "norm_label": ".sendasync()"
     },
     {
@@ -17819,7 +17819,7 @@
       "source_location": "L313",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_productioncompositionintegrationtests_fixedclock",
-      "community": 86,
+      "community": 43,
       "norm_label": "fixedclock"
     },
     {
@@ -18053,10 +18053,20 @@
       "norm_label": ".initialmigrationdefinesrolesandcompletepersistencesurface()"
     },
     {
-      "label": ".InitialMigrationSeedsExactlyFixedCompetitorsAndFunding()",
+      "label": ".InitialMigrationDoesNotSelfGrantWhenConnectedAsMigrator()",
       "file_type": "code",
       "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
       "source_location": "L27",
+      "_origin": "ast",
+      "id": "aistocks_persistence_tests_unittest1_persistencecontracttests_initialmigrationdoesnotselfgrantwhenconnectedasmigrator",
+      "community": 38,
+      "norm_label": ".initialmigrationdoesnotselfgrantwhenconnectedasmigrator()"
+    },
+    {
+      "label": ".InitialMigrationSeedsExactlyFixedCompetitorsAndFunding()",
+      "file_type": "code",
+      "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
+      "source_location": "L35",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_unittest1_persistencecontracttests_initialmigrationseedsexactlyfixedcompetitorsandfunding",
       "community": 38,
@@ -18066,7 +18076,7 @@
       "label": ".InitialMigrationHasDatabaseEnforcedAuditAndAccountingInvariants()",
       "file_type": "code",
       "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
-      "source_location": "L36",
+      "source_location": "L44",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_unittest1_persistencecontracttests_initialmigrationhasdatabaseenforcedauditandaccountinginvariants",
       "community": 38,
@@ -18076,7 +18086,7 @@
       "label": ".RuntimeCannotBypassFunctionsOrAuditGuards()",
       "file_type": "code",
       "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
-      "source_location": "L57",
+      "source_location": "L65",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_unittest1_persistencecontracttests_runtimecannotbypassfunctionsorauditguards",
       "community": 38,
@@ -18086,7 +18096,7 @@
       "label": ".CanonicalJsonIsStableAcrossPropertyOrder()",
       "file_type": "code",
       "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
-      "source_location": "L65",
+      "source_location": "L73",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_unittest1_persistencecontracttests_canonicaljsonisstableacrosspropertyorder",
       "community": 38,
@@ -18096,7 +18106,7 @@
       "label": ".MigrationChecksumIsStableAndSha256()",
       "file_type": "code",
       "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
-      "source_location": "L76",
+      "source_location": "L84",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_unittest1_persistencecontracttests_migrationchecksumisstableandsha256",
       "community": 38,
@@ -18106,7 +18116,7 @@
       "label": ".ResearchAttestationMigrationIsImmutableHashedAndTransactionallyPersistable()",
       "file_type": "code",
       "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
-      "source_location": "L87",
+      "source_location": "L95",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_unittest1_persistencecontracttests_researchattestationmigrationisimmutablehashedandtransactionallypersistable",
       "community": 38,
@@ -18116,7 +18126,7 @@
       "label": ".MarketRuntimeMigrationUsesDistinctLeastPrivilegeCollectorAuthority()",
       "file_type": "code",
       "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
-      "source_location": "L98",
+      "source_location": "L106",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_unittest1_persistencecontracttests_marketruntimemigrationusesdistinctleastprivilegecollectorauthority",
       "community": 38,
@@ -18126,7 +18136,7 @@
       "label": ".PostRunAcceptanceRejectsResultsCompletedAfterImmutableDeadline()",
       "file_type": "code",
       "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
-      "source_location": "L113",
+      "source_location": "L121",
       "_origin": "ast",
       "id": "aistocks_persistence_tests_unittest1_persistencecontracttests_postrunacceptancerejectsresultscompletedafterimmutabledeadline",
       "community": 38,
@@ -20159,7 +20169,7 @@
       "source_location": "L195",
       "_origin": "ast",
       "id": "aistocks_research_tests_hermesresearchrunnertests_fakeprocess",
-      "community": 46,
+      "community": 185,
       "norm_label": "fakeprocess"
     },
     {
@@ -20169,7 +20179,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "bool",
-      "community": 46,
+      "community": 185,
       "norm_label": "bool"
     },
     {
@@ -20189,7 +20199,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "aistocks_research_tests_hermesresearchrunnertests_fakeprocess_kill",
-      "community": 46,
+      "community": 185,
       "norm_label": ".kill()"
     },
     {
@@ -20349,7 +20359,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_research_tests_researchdecisionattestortests",
-      "community": 166,
+      "community": 217,
       "norm_label": "researchdecisionattestortests.cs"
     },
     {
@@ -20409,7 +20419,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "aistocks_research_tests_researchdecisionattestortests_stubverifier",
-      "community": 166,
+      "community": 217,
       "norm_label": "stubverifier"
     },
     {
@@ -20419,7 +20429,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "aistocks_research_tests_researchdecisionattestortests_stubverifier_verifyasync",
-      "community": 166,
+      "community": 0,
       "norm_label": ".verifyasync()"
     },
     {
@@ -21889,7 +21899,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_trading_tests_validationboundarytests",
-      "community": 38,
+      "community": 103,
       "norm_label": "validationboundarytests.cs"
     },
     {
@@ -21899,7 +21909,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "aistocks_trading_tests_validationboundarytests_validationboundarytests",
-      "community": 38,
+      "community": 103,
       "norm_label": "validationboundarytests"
     },
     {
@@ -21929,7 +21939,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "aistocks_trading_tests_validationboundarytests_validationboundarytests_sell_remains_allowed_below_history_and_above_buy_adv_gate",
-      "community": 38,
+      "community": 103,
       "norm_label": ".sell_remains_allowed_below_history_and_above_buy_adv_gate()"
     },
     {
@@ -21939,7 +21949,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "aistocks_trading_tests_validationboundarytests_validationboundarytests_same_issuer_share_classes_are_aggregated_for_concentration",
-      "community": 38,
+      "community": 103,
       "norm_label": ".same_issuer_share_classes_are_aggregated_for_concentration()"
     },
     {
@@ -21949,7 +21959,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "aistocks_trading_tests_validationboundarytests_validationboundarytests_trading_rejects_an_instrument_without_stable_issuer_identity",
-      "community": 38,
+      "community": 103,
       "norm_label": ".trading_rejects_an_instrument_without_stable_issuer_identity()"
     },
     {
@@ -21959,7 +21969,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "aistocks_trading_tests_validationboundarytests_validationboundarytests_decision_and_lifecycle_idempotency_are_payload_bound",
-      "community": 38,
+      "community": 103,
       "norm_label": ".decision_and_lifecycle_idempotency_are_payload_bound()"
     },
     {
@@ -21969,7 +21979,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "aistocks_trading_tests_validationboundarytests_validationboundarytests_future_or_unverified_evidence_is_rejected_before_order_creation",
-      "community": 38,
+      "community": 103,
       "norm_label": ".future_or_unverified_evidence_is_rejected_before_order_creation()"
     },
     {
@@ -21979,7 +21989,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "aistocks_trading_tests_validationboundarytests_validationboundarytests_syntacticrawhashwithoutofficialarchiveandmanifestidentityisrejected",
-      "community": 38,
+      "community": 103,
       "norm_label": ".syntacticrawhashwithoutofficialarchiveandmanifestidentityisrejected()"
     },
     {
@@ -22569,7 +22579,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "aistocks_trading_tests_packages_lock_net10_0_xunit_assert",
-      "community": 220,
+      "community": 76,
       "norm_label": "xunit.assert"
     },
     {
@@ -22579,7 +22589,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "aistocks_trading_tests_packages_lock_xunit_assert_type",
-      "community": 220,
+      "community": 76,
       "norm_label": "type"
     },
     {
@@ -22589,7 +22599,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "aistocks_trading_tests_packages_lock_xunit_assert_resolved",
-      "community": 220,
+      "community": 76,
       "norm_label": "resolved"
     },
     {
@@ -22599,7 +22609,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "aistocks_trading_tests_packages_lock_xunit_assert_contenthash",
-      "community": 220,
+      "community": 76,
       "norm_label": "contenthash"
     },
     {
@@ -23049,7 +23059,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "aistocks_web_tests_dashboardapplicationtests",
-      "community": 52,
+      "community": 28,
       "norm_label": "dashboardapplicationtests.cs"
     },
     {
@@ -23279,7 +23289,7 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "aistocks_web_tests_dashboardapplicationtests_testaccessassertionvalidator",
-      "community": 46,
+      "community": 28,
       "norm_label": "testaccessassertionvalidator"
     },
     {
@@ -23289,7 +23299,7 @@
       "source_location": "L187",
       "_origin": "ast",
       "id": "aistocks_web_tests_dashboardapplicationtests_testaccessassertionvalidator_validateasync",
-      "community": 46,
+      "community": 28,
       "norm_label": ".validateasync()"
     },
     {
@@ -23299,7 +23309,7 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "aistocks_web_tests_dashboardapplicationtests_testaccessassertionvalidator_count",
-      "community": 46,
+      "community": 28,
       "norm_label": ".count()"
     },
     {
@@ -24549,7 +24559,7 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_net10_0_microsoft_extensions_diagnostics",
-      "community": 195,
+      "community": 31,
       "norm_label": "microsoft.extensions.diagnostics"
     },
     {
@@ -24559,7 +24569,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_diagnostics_type",
-      "community": 195,
+      "community": 31,
       "norm_label": "type"
     },
     {
@@ -24569,7 +24579,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_diagnostics_resolved",
-      "community": 195,
+      "community": 31,
       "norm_label": "resolved"
     },
     {
@@ -24579,7 +24589,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_diagnostics_contenthash",
-      "community": 195,
+      "community": 31,
       "norm_label": "contenthash"
     },
     {
@@ -24589,7 +24599,7 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_diagnostics_dependencies",
-      "community": 195,
+      "community": 31,
       "norm_label": "dependencies"
     },
     {
@@ -24599,7 +24609,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_dependencies_microsoft_extensions_diagnostics_abstractions",
-      "community": 195,
+      "community": 31,
       "norm_label": "microsoft.extensions.diagnostics.abstractions"
     },
     {
@@ -25059,7 +25069,7 @@
       "source_location": "L243",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_hosting_abstractions_dependencies",
-      "community": 195,
+      "community": 31,
       "norm_label": "dependencies"
     },
     {
@@ -25269,7 +25279,7 @@
       "source_location": "L296",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_net10_0_microsoft_extensions_logging_debug",
-      "community": 32,
+      "community": 134,
       "norm_label": "microsoft.extensions.logging.debug"
     },
     {
@@ -25279,7 +25289,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_logging_debug_type",
-      "community": 32,
+      "community": 134,
       "norm_label": "type"
     },
     {
@@ -25289,7 +25299,7 @@
       "source_location": "L298",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_logging_debug_resolved",
-      "community": 32,
+      "community": 134,
       "norm_label": "resolved"
     },
     {
@@ -25299,7 +25309,7 @@
       "source_location": "L299",
       "_origin": "ast",
       "id": "aistocks_web_tests_packages_lock_microsoft_extensions_logging_debug_contenthash",
-      "community": 32,
+      "community": 134,
       "norm_label": "contenthash"
     },
     {
@@ -26349,7 +26359,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_app_and_day",
-      "community": 2,
+      "community": 67,
       "norm_label": "test_app_and_day.py"
     },
     {
@@ -26359,7 +26369,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "tests_test_app_and_day_client",
-      "community": 2,
+      "community": 67,
       "norm_label": "_client()"
     },
     {
@@ -26369,7 +26379,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "tests_test_app_and_day_headers",
-      "community": 2,
+      "community": 67,
       "norm_label": "_headers()"
     },
     {
@@ -26379,7 +26389,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "tests_test_app_and_day_close",
-      "community": 2,
+      "community": 67,
       "norm_label": "_close()"
     },
     {
@@ -26389,7 +26399,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "tests_test_app_and_day_test_healthz_queries_the_database",
-      "community": 2,
+      "community": 67,
       "norm_label": "test_healthz_queries_the_database()"
     },
     {
@@ -26399,7 +26409,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "tests_test_app_and_day_test_startup_fails_closed_without_access_configuration",
-      "community": 2,
+      "community": 67,
       "norm_label": "test_startup_fails_closed_without_access_configuration()"
     },
     {
@@ -26409,7 +26419,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "tests_test_app_and_day_test_production_preflight_requires_postgresql_and_access_before_database_use",
-      "community": 2,
+      "community": 67,
       "norm_label": "test_production_preflight_requires_postgresql_and_access_before_database_use()"
     },
     {
@@ -26419,7 +26429,7 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "tests_test_app_and_day_test_viewer_reads_all_and_spoofed_identity_header_fails",
-      "community": 2,
+      "community": 67,
       "norm_label": "test_viewer_reads_all_and_spoofed_identity_header_fails()"
     },
     {
@@ -26429,7 +26439,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "tests_test_app_and_day_test_owner_can_only_pause_reset_with_exact_origin_and_csrf",
-      "community": 2,
+      "community": 67,
       "norm_label": "test_owner_can_only_pause_reset_with_exact_origin_and_csrf()"
     },
     {
@@ -26439,7 +26449,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "tests_test_app_and_day_test_dashboard_rejects_unapproved_model_identity",
-      "community": 2,
+      "community": 67,
       "norm_label": "test_dashboard_rejects_unapproved_model_identity()"
     },
     {
@@ -26449,7 +26459,7 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "tests_test_app_and_day_test_full_day_all_four_models_is_deterministic",
-      "community": 2,
+      "community": 67,
       "norm_label": "test_full_day_all_four_models_is_deterministic()"
     },
     {
@@ -26569,7 +26579,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_bootstrap",
-      "community": 70,
+      "community": 89,
       "norm_label": "test_bootstrap.py"
     },
     {
@@ -26579,7 +26589,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "tests_test_bootstrap_test_bootstrap_is_complete_idempotent_and_refuses_partial_state",
-      "community": 70,
+      "community": 89,
       "norm_label": "test_bootstrap_is_complete_idempotent_and_refuses_partial_state()"
     },
     {
@@ -26629,7 +26639,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_collector",
-      "community": 134,
+      "community": 68,
       "norm_label": "test_collector.py"
     },
     {
@@ -26639,7 +26649,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "tests_test_collector_test_report_timestamp_is_timezone_aware_and_strict",
-      "community": 134,
+      "community": 68,
       "norm_label": "test_report_timestamp_is_timezone_aware_and_strict()"
     },
     {
@@ -26649,7 +26659,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "tests_test_collector_test_only_reports_retrieved_inside_fifteen_to_twenty_minute_window_are_due",
-      "community": 134,
+      "community": 68,
       "norm_label": "test_only_reports_retrieved_inside_fifteen_to_twenty_minute_window_are_due()"
     },
     {
@@ -26659,7 +26669,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "tests_test_collector_test_expected_reports_cover_every_publication_minute",
-      "community": 134,
+      "community": 68,
       "norm_label": "test_expected_reports_cover_every_publication_minute()"
     },
     {
@@ -26669,7 +26679,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_corporate_actions",
-      "community": 70,
+      "community": 89,
       "norm_label": "test_corporate_actions.py"
     },
     {
@@ -26679,7 +26689,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "tests_test_corporate_actions_test_dividend_and_split_are_per_agent_idempotent_reconciling_events",
-      "community": 70,
+      "community": 89,
       "norm_label": "test_dividend_and_split_are_per_agent_idempotent_reconciling_events()"
     },
     {
@@ -26769,7 +26779,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_lifecycle",
-      "community": 215,
+      "community": 89,
       "norm_label": "test_lifecycle.py"
     },
     {
@@ -26779,7 +26789,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "tests_test_lifecycle_quote",
-      "community": 215,
+      "community": 89,
       "norm_label": "quote()"
     },
     {
@@ -26789,7 +26799,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "tests_test_lifecycle_evidence",
-      "community": 215,
+      "community": 89,
       "norm_label": "evidence()"
     },
     {
@@ -26799,7 +26809,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "tests_test_lifecycle_session",
-      "community": 215,
+      "community": 89,
       "norm_label": "session()"
     },
     {
@@ -26809,7 +26819,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "tests_test_lifecycle_request",
-      "community": 215,
+      "community": 89,
       "norm_label": "request()"
     },
     {
@@ -26819,7 +26829,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "tests_test_lifecycle_test_cancel_is_immutable_idempotent_and_prevents_later_execution",
-      "community": 215,
+      "community": 89,
       "norm_label": "test_cancel_is_immutable_idempotent_and_prevents_later_execution()"
     },
     {
@@ -26829,7 +26839,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "tests_test_lifecycle_test_replace_cancels_original_and_is_idempotent_before_quote",
-      "community": 215,
+      "community": 89,
       "norm_label": "test_replace_cancels_original_and_is_idempotent_before_quote()"
     },
     {
@@ -26839,7 +26849,7 @@
       "source_location": "L153",
       "_origin": "ast",
       "id": "tests_test_lifecycle_test_all_corporate_actions_replay_deterministically_and_conflict_per_agent",
-      "community": 215,
+      "community": 89,
       "norm_label": "test_all_corporate_actions_replay_deterministically_and_conflict_per_agent()"
     },
     {
@@ -26849,7 +26859,7 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "tests_test_lifecycle_test_final_liquidation_uses_adverse_slippage_fees_and_freezes_ranking",
-      "community": 215,
+      "community": 89,
       "norm_label": "test_final_liquidation_uses_adverse_slippage_fees_and_freezes_ranking()"
     },
     {
@@ -27179,7 +27189,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_postgres_concurrency",
-      "community": 214,
+      "community": 89,
       "norm_label": "test_postgres_concurrency.py"
     },
     {
@@ -27189,7 +27199,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "tests_test_postgres_concurrency_quote",
-      "community": 214,
+      "community": 89,
       "norm_label": "_quote()"
     },
     {
@@ -27199,7 +27209,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "tests_test_postgres_concurrency_request",
-      "community": 214,
+      "community": 89,
       "norm_label": "_request()"
     },
     {
@@ -27209,7 +27219,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "tests_test_postgres_concurrency_race",
-      "community": 214,
+      "community": 89,
       "norm_label": "_race()"
     },
     {
@@ -27219,7 +27229,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "tests_test_postgres_concurrency_engine",
-      "community": 70,
+      "community": 89,
       "norm_label": "engine()"
     },
     {
@@ -27229,7 +27239,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "tests_test_postgres_concurrency_test_concurrent_orders_cannot_overspend_or_oversell",
-      "community": 214,
+      "community": 89,
       "norm_label": "test_concurrent_orders_cannot_overspend_or_oversell()"
     },
     {
@@ -27239,7 +27249,7 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "tests_test_postgres_concurrency_test_concurrent_idempotent_submission_creates_one_order",
-      "community": 214,
+      "community": 89,
       "norm_label": "test_concurrent_idempotent_submission_creates_one_order()"
     },
     {
@@ -27259,7 +27269,7 @@
       "source_location": "L254",
       "_origin": "ast",
       "id": "tests_test_postgres_concurrency_test_pause_serializes_before_concurrent_submission",
-      "community": 214,
+      "community": 89,
       "norm_label": "test_pause_serializes_before_concurrent_submission()"
     },
     {
@@ -27269,88 +27279,8 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "tests_test_postgres_concurrency_test_concurrent_queue_workers_create_each_fill_once",
-      "community": 214,
+      "community": 89,
       "norm_label": "test_concurrent_queue_workers_create_each_fill_once()"
-    },
-    {
-      "label": "test_release_artifacts.py",
-      "file_type": "code",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "tests_test_release_artifacts",
-      "community": 16,
-      "norm_label": "test_release_artifacts.py"
-    },
-    {
-      "label": "test_dockge_compose_separates_and_hardens_services()",
-      "file_type": "code",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L9",
-      "_origin": "ast",
-      "id": "tests_test_release_artifacts_test_dockge_compose_separates_and_hardens_services",
-      "community": 16,
-      "norm_label": "test_dockge_compose_separates_and_hardens_services()"
-    },
-    {
-      "label": "test_example_environment_renders_compose_with_fail_closed_proxy_configuration()",
-      "file_type": "code",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L61",
-      "_origin": "ast",
-      "id": "tests_test_release_artifacts_test_example_environment_renders_compose_with_fail_closed_proxy_configuration",
-      "community": 16,
-      "norm_label": "test_example_environment_renders_compose_with_fail_closed_proxy_configuration()"
-    },
-    {
-      "label": "test_backup_and_restore_handoff_exports_libpq_urls()",
-      "file_type": "code",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L72",
-      "_origin": "ast",
-      "id": "tests_test_release_artifacts_test_backup_and_restore_handoff_exports_libpq_urls",
-      "community": 16,
-      "norm_label": "test_backup_and_restore_handoff_exports_libpq_urls()"
-    },
-    {
-      "label": "test_image_build_pins_hermes_source_and_frozen_lock()",
-      "file_type": "code",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L83",
-      "_origin": "ast",
-      "id": "tests_test_release_artifacts_test_image_build_pins_hermes_source_and_frozen_lock",
-      "community": 16,
-      "norm_label": "test_image_build_pins_hermes_source_and_frozen_lock()"
-    },
-    {
-      "label": "test_github_publishes_every_dockge_image_target()",
-      "file_type": "code",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L99",
-      "_origin": "ast",
-      "id": "tests_test_release_artifacts_test_github_publishes_every_dockge_image_target",
-      "community": 16,
-      "norm_label": "test_github_publishes_every_dockge_image_target()"
-    },
-    {
-      "label": "test_release_gate_and_restore_fail_closed_with_scheduled_backup()",
-      "file_type": "code",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L110",
-      "_origin": "ast",
-      "id": "tests_test_release_artifacts_test_release_gate_and_restore_fail_closed_with_scheduled_backup",
-      "community": 16,
-      "norm_label": "test_release_gate_and_restore_fail_closed_with_scheduled_backup()"
-    },
-    {
-      "label": "test_clean_start_documents_composed_reference_acquisition_not_preseed_importer_magic()",
-      "file_type": "code",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L122",
-      "_origin": "ast",
-      "id": "tests_test_release_artifacts_test_clean_start_documents_composed_reference_acquisition_not_preseed_importer_magic",
-      "community": 16,
-      "norm_label": "test_clean_start_documents_composed_reference_acquisition_not_preseed_importer_magic()"
     },
     {
       "label": "test_research.py",
@@ -27539,7 +27469,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "tests_test_runner_context",
-      "community": 5,
+      "community": 98,
       "norm_label": "context()"
     },
     {
@@ -27569,7 +27499,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "tests_test_runner_test_preflight_failures_do_not_execute_and_context_is_bounded_finite_json",
-      "community": 5,
+      "community": 98,
       "norm_label": "test_preflight_failures_do_not_execute_and_context_is_bounded_finite_json()"
     },
     {
@@ -27699,7 +27629,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_trading",
-      "community": 113,
+      "community": 89,
       "norm_label": "test_trading.py"
     },
     {
@@ -27709,7 +27639,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "tests_test_trading_evidence",
-      "community": 113,
+      "community": 89,
       "norm_label": "evidence()"
     },
     {
@@ -27719,7 +27649,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "tests_test_trading_session",
-      "community": 113,
+      "community": 89,
       "norm_label": "session()"
     },
     {
@@ -27729,7 +27659,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "tests_test_trading_market",
-      "community": 113,
+      "community": 89,
       "norm_label": "market()"
     },
     {
@@ -27739,7 +27669,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "tests_test_trading_test_evidence_gated_idempotent_buy_creates_immutable_ledger",
-      "community": 113,
+      "community": 89,
       "norm_label": "test_evidence_gated_idempotent_buy_creates_immutable_ledger()"
     },
     {
@@ -27749,7 +27679,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "tests_test_trading_test_rejects_incomplete_evidence_without_order",
-      "community": 113,
+      "community": 89,
       "norm_label": "test_rejects_incomplete_evidence_without_order()"
     },
     {
@@ -27759,7 +27689,7 @@
       "source_location": "L138",
       "_origin": "ast",
       "id": "tests_test_trading_test_quote_before_decision_never_fills",
-      "community": 113,
+      "community": 89,
       "norm_label": "test_quote_before_decision_never_fills()"
     },
     {
@@ -27769,7 +27699,7 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "tests_test_trading_test_fees_slippage_cash_holdings_concentration_and_liquidity",
-      "community": 113,
+      "community": 89,
       "norm_label": "test_fees_slippage_cash_holdings_concentration_and_liquidity()"
     },
     {
@@ -27779,7 +27709,7 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "tests_test_trading_test_out_of_hours_order_queues_then_fills_at_next_open_quote",
-      "community": 113,
+      "community": 89,
       "norm_label": "test_out_of_hours_order_queues_then_fills_at_next_open_quote()"
     },
     {
@@ -27789,7 +27719,7 @@
       "source_location": "L229",
       "_origin": "ast",
       "id": "tests_test_trading_test_submit_cannot_consume_quote_before_it_is_observable",
-      "community": 113,
+      "community": 89,
       "norm_label": "test_submit_cannot_consume_quote_before_it_is_observable()"
     },
     {
@@ -27799,7 +27729,7 @@
       "source_location": "L243",
       "_origin": "ast",
       "id": "tests_test_trading_test_post_cost_concentration_and_terminal_queue_replay",
-      "community": 113,
+      "community": 89,
       "norm_label": "test_post_cost_concentration_and_terminal_queue_replay()"
     },
     {
@@ -27809,7 +27739,7 @@
       "source_location": "L279",
       "_origin": "ast",
       "id": "tests_test_trading_test_official_quote_delay_outside_window_rejects",
-      "community": 113,
+      "community": 89,
       "norm_label": "test_official_quote_delay_outside_window_rejects()"
     },
     {
@@ -27819,7 +27749,7 @@
       "source_location": "L294",
       "_origin": "ast",
       "id": "tests_test_trading_test_queue_no_work_return_releases_transaction",
-      "community": 113,
+      "community": 89,
       "norm_label": "test_queue_no_work_return_releases_transaction()"
     },
     {
@@ -27829,7 +27759,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_trading_migration",
-      "community": 214,
+      "community": 89,
       "norm_label": "test_trading_migration.py"
     },
     {
@@ -27839,7 +27769,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "tests_test_trading_migration_alembic_config",
-      "community": 214,
+      "community": 89,
       "norm_label": "alembic_config()"
     },
     {
@@ -27849,7 +27779,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "tests_test_trading_migration_test_sqlite_migration_upgrade_constraints_append_only_and_downgrade",
-      "community": 214,
+      "community": 89,
       "norm_label": "test_sqlite_migration_upgrade_constraints_append_only_and_downgrade()"
     },
     {
@@ -27859,7 +27789,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "tests_test_trading_migration_test_postgresql_schema_can_be_created_with_constraints_and_triggers",
-      "community": 214,
+      "community": 89,
       "norm_label": "test_postgresql_schema_can_be_created_with_constraints_and_triggers()"
     },
     {
@@ -27869,7 +27799,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_worker",
-      "community": 17,
+      "community": 89,
       "norm_label": "test_worker.py"
     },
     {
@@ -27879,7 +27809,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "tests_test_worker_runtime",
-      "community": 17,
+      "community": 89,
       "norm_label": "_runtime()"
     },
     {
@@ -27889,7 +27819,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "tests_test_worker_test_context_contains_only_requested_agent_history_and_state",
-      "community": 17,
+      "community": 89,
       "norm_label": "test_context_contains_only_requested_agent_history_and_state()"
     },
     {
@@ -27899,7 +27829,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "tests_test_worker_test_paused_worker_does_not_create_schedule_or_call_runner",
-      "community": 17,
+      "community": 89,
       "norm_label": "test_paused_worker_does_not_create_schedule_or_call_runner()"
     },
     {
@@ -27909,7 +27839,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "tests_test_worker_test_verified_research_provenance_survives_order_persistence",
-      "community": 17,
+      "community": 89,
       "norm_label": "test_verified_research_provenance_survives_order_persistence()"
     },
     {
@@ -75495,6 +75425,17 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
+      "source_location": "L27",
+      "weight": 1.0,
+      "context": "attribute",
+      "source": "aistocks_persistence_tests_unittest1_persistencecontracttests_initialmigrationdoesnotselfgrantwhenconnectedasmigrator",
+      "target": "fact",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
       "source_location": "L36",
       "weight": 1.0,
       "context": "attribute",
@@ -81657,6 +81598,16 @@
       "confidence_score": 1.0,
       "source": "aistocks_persistence_tests_unittest1_persistencecontracttests",
       "target": "aistocks_persistence_tests_unittest1_persistencecontracttests_initialmigrationdefinesrolesandcompletepersistencesurface"
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/AiStocks.Persistence.Tests/UnitTest1.cs",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "aistocks_persistence_tests_unittest1_persistencecontracttests",
+      "target": "aistocks_persistence_tests_unittest1_persistencecontracttests_initialmigrationdoesnotselfgrantwhenconnectedasmigrator",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -93209,76 +93160,6 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L50",
-      "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "tests_test_release_artifacts",
-      "target": "tests_test_release_artifacts_test_backup_and_restore_handoff_exports_libpq_urls"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L92",
-      "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "tests_test_release_artifacts",
-      "target": "tests_test_release_artifacts_test_clean_start_documents_composed_reference_acquisition_not_preseed_importer_magic"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L9",
-      "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "tests_test_release_artifacts",
-      "target": "tests_test_release_artifacts_test_dockge_compose_separates_and_hardens_services"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L50",
-      "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "tests_test_release_artifacts",
-      "target": "tests_test_release_artifacts_test_example_environment_renders_compose_with_fail_closed_proxy_configuration"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L92",
-      "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "tests_test_release_artifacts",
-      "target": "tests_test_release_artifacts_test_github_publishes_every_dockge_image_target"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L27",
-      "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "tests_test_release_artifacts",
-      "target": "tests_test_release_artifacts_test_image_build_pins_hermes_source_and_frozen_lock"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_release_artifacts.py",
-      "source_location": "L64",
-      "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "tests_test_release_artifacts",
-      "target": "tests_test_release_artifacts_test_release_gate_and_restore_fail_closed_with_scheduled_backup"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
       "source_file": "tests/test_research.py",
       "source_location": "L39",
       "weight": 1.0,
@@ -94512,5 +94393,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "4faf95df997a9c35504361a89289594c87f993fb"
+  "built_at_commit": "be8df33b004f2af0652c4322f656d70f0c461c97"
 }

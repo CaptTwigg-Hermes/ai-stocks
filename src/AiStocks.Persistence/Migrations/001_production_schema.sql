@@ -15,7 +15,13 @@ $roles$;
 
 GRANT USAGE, CREATE ON SCHEMA public TO ai_stocks_migrator;
 ALTER TABLE schema_migrations OWNER TO ai_stocks_migrator;
-GRANT ai_stocks_migrator TO CURRENT_USER;
+DO $grant_migrator$
+BEGIN
+    IF CURRENT_USER <> 'ai_stocks_migrator' THEN
+        EXECUTE format('GRANT ai_stocks_migrator TO %I', CURRENT_USER);
+    END IF;
+END
+$grant_migrator$;
 SET LOCAL ROLE ai_stocks_migrator;
 
 CREATE DOMAIN sha256_hex AS char(64)

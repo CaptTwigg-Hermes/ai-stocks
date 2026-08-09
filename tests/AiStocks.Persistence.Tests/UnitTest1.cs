@@ -25,6 +25,14 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
+    public void InitialMigrationDoesNotSelfGrantWhenConnectedAsMigrator()
+    {
+        var initial = MigrationCatalog.All.Single(migration => migration.Id == "001_production_schema").Sql;
+        Assert.DoesNotContain("GRANT ai_stocks_migrator TO CURRENT_USER;", initial, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CURRENT_USER <> 'ai_stocks_migrator'", initial, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void InitialMigrationSeedsExactlyFixedCompetitorsAndFunding()
     {
         foreach (var model in new[] { "gpt-5.6-sol", "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview" })
