@@ -169,7 +169,16 @@ static void MapControl(RouteGroupBuilder group, string pattern, ContestControlAc
     group.MapPost(pattern, async (HttpContext context, IDashboardFacade facade, IAntiforgery antiforgery, IOptions<AccessOptions> options, CancellationToken cancellationToken) =>
     {
         var expectedOrigin = options.Value.PublicOrigin.TrimEnd('/');
-        if (!context.Request.Headers.TryGetValue("Origin", out var origins) || origins.Count != 1 || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(origins.ToString()), System.Text.Encoding.UTF8.GetBytes(expectedOrigin)))
+        context.Request.Headers.TryGetValue("Origin", out var origins);
+        var suppliedOrigin = origins.ToString();
+        var exactOrigin = origins.Count == 1 && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.UTF8.GetBytes(suppliedOrigin), System.Text.Encoding.UTF8.GetBytes(expectedOrigin));
+        var opaqueSameOriginNavigation = origins.Count == 1 && suppliedOrigin == "null"
+            && context.Request.Headers["Sec-Fetch-Site"] == "same-origin"
+            && context.Request.Headers["Sec-Fetch-Mode"] == "navigate"
+            && context.Request.Headers["Sec-Fetch-Dest"] == "document"
+            && $"{context.Request.Scheme}://{context.Request.Host}" == expectedOrigin;
+        if (!exactOrigin && !opaqueSameOriginNavigation)
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Invalid origin");
         try { await antiforgery.ValidateRequestAsync(context); }
         catch (AntiforgeryValidationException) { return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Invalid antiforgery token"); }

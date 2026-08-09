@@ -605,8 +605,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Web/Program.cs": {
-    "mtime": 1786296710.41454,
-    "ast_hash": "128cbd7b9b6ddef4cb7caa7eb94aa0b6",
+    "mtime": 1786298138.8029187,
+    "ast_hash": "3c4f28c1c5dc165913ffaba28f725a74",
     "semantic_hash": ""
   },
   "src/AiStocks.Web/Properties/launchSettings.json": {
@@ -810,8 +810,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Web.Tests/DashboardApplicationTests.cs": {
-    "mtime": 1786296694.0262144,
-    "ast_hash": "19a55ab40765c9050a9f58a69999301b",
+    "mtime": 1786298173.939617,
+    "ast_hash": "7d6957395c03d8d4a6d6564ac38a4028",
     "semantic_hash": ""
   },
   "tests/AiStocks.Web.Tests/DashboardFixtures.cs": {

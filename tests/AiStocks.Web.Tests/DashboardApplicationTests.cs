@@ -132,6 +132,42 @@ public sealed class DashboardApplicationTests : IClassFixture<DashboardApplicati
     }
 
     [Fact]
+    public async Task Owner_control_accepts_opaque_origin_from_same_origin_navigation()
+    {
+        using var owner = OwnerClient();
+        var page = await owner.GetStringAsync("/");
+        var token = Extract(page, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"", "\"");
+        using var request = ControlRequest(token, "null", "opaque-same-origin");
+        request.Headers.Host = "stocks.example.com";
+        request.Headers.Add("Sec-Fetch-Site", "same-origin");
+        request.Headers.Add("Sec-Fetch-Mode", "navigate");
+        request.Headers.Add("Sec-Fetch-Dest", "document");
+
+        using var response = await owner.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        Assert.Contains(_factory.Facade.Commands, command => command.IdempotencyKey == "opaque-same-origin");
+    }
+
+    [Fact]
+    public async Task Owner_control_rejects_opaque_origin_from_cross_site_navigation()
+    {
+        using var owner = OwnerClient();
+        var page = await owner.GetStringAsync("/");
+        var token = Extract(page, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"", "\"");
+        using var request = ControlRequest(token, "null", "opaque-cross-site");
+        request.Headers.Host = "stocks.example.com";
+        request.Headers.Add("Sec-Fetch-Site", "cross-site");
+        request.Headers.Add("Sec-Fetch-Mode", "navigate");
+        request.Headers.Add("Sec-Fetch-Dest", "document");
+
+        using var response = await owner.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.DoesNotContain(_factory.Facade.Commands, command => command.IdempotencyKey == "opaque-cross-site");
+    }
+
+    [Fact]
     public async Task Facade_failure_is_fail_closed_not_a_partially_rendered_success()
     {
         _factory.Facade.ThrowOnQuery = true;
