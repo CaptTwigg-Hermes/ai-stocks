@@ -52,7 +52,7 @@ if (!builder.Environment.IsEnvironment("Testing") && string.IsNullOrWhiteSpace(t
     throw new InvalidOperationException("TRUSTED_PROXY_IPS is required behind Cloudflare Tunnel.");
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     options.ForwardLimit = 1;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();

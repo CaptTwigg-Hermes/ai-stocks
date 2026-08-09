@@ -62,6 +62,24 @@ public sealed class DashboardApplicationTests : IClassFixture<DashboardApplicati
         });
 
     [Fact]
+    public async Task Trusted_tunnel_proxy_restores_https_scheme_for_secure_antiforgery_cookie()
+    {
+        await using var factory = new DashboardApplicationFactory("127.0.0.1");
+        var context = await factory.Server.SendAsync(request =>
+        {
+            request.Connection.RemoteIpAddress = IPAddress.Loopback;
+            request.Request.Method = HttpMethod.Get.Method;
+            request.Request.Path = "/";
+            request.Request.Headers["X-Forwarded-For"] = "203.0.113.10";
+            request.Request.Headers["X-Forwarded-Proto"] = "https";
+            request.Request.Headers["Cf-Access-Jwt-Assertion"] = "viewer-token";
+        });
+
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.Contains(context.Response.Headers.SetCookie, value => value is not null && value.Contains("__Host-AiStocks-Csrf", StringComparison.Ordinal) && value.Contains("secure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task Dashboard_renders_every_required_mobile_section_and_security_headers()
     {
         using var client = ViewerClient();
