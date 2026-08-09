@@ -25,6 +25,15 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
+    public void ProductionCompositionValidatesPreprovisionedMembershipsWithoutManagingClusterRoles()
+    {
+        var composition = MigrationCatalog.All.Single(migration => migration.Id == "006_production_composition").Sql;
+        Assert.DoesNotContain("REVOKE ai_stocks_runtime FROM ai_stocks_worker", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("GRANT ai_stocks_worker_runtime TO ai_stocks_worker", composition, StringComparison.Ordinal);
+        Assert.Contains("pg_has_role('ai_stocks_worker','ai_stocks_worker_runtime','member')", composition, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void InitialMigrationDoesNotSelfGrantWhenConnectedAsMigrator()
     {
         var initial = MigrationCatalog.All.Single(migration => migration.Id == "001_production_schema").Sql;

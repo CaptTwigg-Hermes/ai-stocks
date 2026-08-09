@@ -725,8 +725,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/UnitTest1.cs": {
-    "mtime": 1786269513.5554578,
-    "ast_hash": "36f3ff185424583b3c82f388fba0b3fc",
+    "mtime": 1786273533.529595,
+    "ast_hash": "e807701eafa1776e9c69fb8035b28413",
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/packages.lock.json": {
@@ -865,8 +865,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/006_production_composition.sql": {
-    "mtime": 1786206787.9536598,
-    "ast_hash": "03ab5703d21821d3b12230b0fc4e2f67",
+    "mtime": 1786273549.085897,
+    "ast_hash": "a360e29093a62be370a9ff3bb09338d6",
     "semantic_hash": ""
   },
   "src/AiStocks.Worker/NoBrokerOrderPathProbe.cs": {

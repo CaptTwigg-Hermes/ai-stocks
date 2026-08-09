@@ -168,16 +168,19 @@ GRANT EXECUTE ON FUNCTION transition_contest(uuid,contest_status,contest_status,
 
 DO $memberships$
 BEGIN
-  IF EXISTS (SELECT FROM pg_roles WHERE rolname='ai_stocks_worker') THEN
-    REVOKE ai_stocks_runtime FROM ai_stocks_worker;
-    GRANT ai_stocks_worker_runtime TO ai_stocks_worker;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_stocks_worker') OR
+     pg_has_role('ai_stocks_worker','ai_stocks_runtime','member') OR
+     NOT pg_has_role('ai_stocks_worker','ai_stocks_worker_runtime','member') THEN
+    RAISE EXCEPTION 'ai_stocks_worker role memberships are not preprovisioned correctly' USING ERRCODE='42501';
   END IF;
-  IF EXISTS (SELECT FROM pg_roles WHERE rolname='ai_stocks_operations') THEN
-    REVOKE ai_stocks_runtime FROM ai_stocks_operations;
-    GRANT ai_stocks_operations_runtime TO ai_stocks_operations;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_stocks_operations') OR
+     pg_has_role('ai_stocks_operations','ai_stocks_runtime','member') OR
+     NOT pg_has_role('ai_stocks_operations','ai_stocks_operations_runtime','member') THEN
+    RAISE EXCEPTION 'ai_stocks_operations role memberships are not preprovisioned correctly' USING ERRCODE='42501';
   END IF;
-  IF EXISTS (SELECT FROM pg_roles WHERE rolname='ai_stocks_web') THEN
-    REVOKE ai_stocks_runtime FROM ai_stocks_web;
-    GRANT ai_stocks_web_runtime TO ai_stocks_web;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_stocks_web') OR
+     pg_has_role('ai_stocks_web','ai_stocks_runtime','member') OR
+     NOT pg_has_role('ai_stocks_web','ai_stocks_web_runtime','member') THEN
+    RAISE EXCEPTION 'ai_stocks_web role memberships are not preprovisioned correctly' USING ERRCODE='42501';
   END IF;
 END $memberships$;
