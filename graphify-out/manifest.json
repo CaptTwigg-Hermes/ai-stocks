@@ -725,8 +725,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/UnitTest1.cs": {
-    "mtime": 1786283866.0868323,
-    "ast_hash": "682ca59bd47f94b7b8caac2c7546cb21",
+    "mtime": 1786299236.7007291,
+    "ast_hash": "3426520340b4340e15fec568f1dbbdc3",
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/packages.lock.json": {
@@ -957,6 +957,11 @@
   "src/AiStocks.Persistence/Migrations/016_web_dashboard_privileges.sql": {
     "mtime": 1786280969.9633029,
     "ast_hash": "4984f8dc83e0013f58ac10565ec34a44",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Persistence/Migrations/017_web_control_hash_privileges.sql": {
+    "mtime": 1786299254.0530736,
+    "ast_hash": "6e40278657ce5b8e1128de6077cf8311",
     "semantic_hash": ""
   }
 }

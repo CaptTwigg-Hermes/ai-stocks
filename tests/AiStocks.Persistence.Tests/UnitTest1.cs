@@ -93,7 +93,7 @@ public sealed class PersistenceContractTests
     [Fact]
     public void MigrationChecksumIsStableAndSha256()
     {
-        Assert.Equal(16, MigrationCatalog.All.Count);
+        Assert.Equal(17, MigrationCatalog.All.Count);
         foreach (var migration in MigrationCatalog.All)
         {
             Assert.Matches("^[0-9a-f]{64}$", migration.Sha256);
@@ -182,6 +182,16 @@ public sealed class PersistenceContractTests
         Assert.Contains("scheduled_agent_runs", sql, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("INSERT", sql, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("UPDATE", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WebOwnerControlsCanHashCanonicalRequestsWithoutBroaderWriteAuthority()
+    {
+        var sql = MigrationCatalog.All.Single(migration => migration.Id == "017_web_control_hash_privileges").Sql;
+        Assert.Contains("GRANT EXECUTE ON FUNCTION canonical_jsonb_sha256(jsonb) TO ai_stocks_web", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("INSERT", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("UPDATE", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("DELETE", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
