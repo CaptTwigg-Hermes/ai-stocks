@@ -36,6 +36,12 @@ public sealed class RuntimeIntegrationTests
         var output = new StringWriter();
         Assert.Equal(2, await OperationsApplication.RunAsync(["unknown"], ports, output, default));
         Assert.DoesNotContain("secret", output.ToString(), StringComparison.OrdinalIgnoreCase);
+
+        output = new StringWriter();
+        ports.Failure = new MigrationExecutionException("001_production_schema", "42501", new InvalidOperationException("secret detail"));
+        Assert.Equal(2, await OperationsApplication.RunAsync(["migrate"], ports, output, default));
+        Assert.Contains("migration failed at 001_production_schema (SQLSTATE 42501)", output.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", output.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -242,7 +248,12 @@ public sealed class RuntimeIntegrationTests
     private sealed class RecordingOperationsPorts : IOperationsPorts
     {
         public List<string> Calls { get; } = [];
-        public Task MigrateAsync(CancellationToken cancellationToken) { Calls.Add("migrate"); return Task.CompletedTask; }
+        public Exception? Failure { get; set; }
+        public Task MigrateAsync(CancellationToken cancellationToken)
+        {
+            Calls.Add("migrate");
+            return Failure is null ? Task.CompletedTask : Task.FromException(Failure);
+        }
         public Task BootstrapAsync(CancellationToken cancellationToken) { Calls.Add("bootstrap"); return Task.CompletedTask; }
         public Task<ReadinessResult> PreflightAsync(CancellationToken cancellationToken) { Calls.Add("preflight"); return Task.FromResult(new ReadinessResult(true, [])); }
     }

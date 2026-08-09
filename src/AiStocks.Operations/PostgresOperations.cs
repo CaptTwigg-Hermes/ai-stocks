@@ -49,6 +49,9 @@ public static class OperationsApplication
 
     private static string SafeCategory(Exception exception) => exception switch
     {
+        MigrationExecutionException migration => migration.SqlState is null
+            ? $"migration failed at {migration.Stage}"
+            : $"migration failed at {migration.Stage} (SQLSTATE {migration.SqlState})",
         OperationsException => "invalid command or contest state",
         RuntimeConfigurationException => "invalid configuration",
         NpgsqlException => "database operation failed",

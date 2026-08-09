@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Operations/PostgresOperations.cs": {
-    "mtime": 1786204334.0816815,
-    "ast_hash": "d22a9ac0fc915f00af31a56318fc0dcb",
+    "mtime": 1786272613.2277224,
+    "ast_hash": "0c6030c4c73f64ba9d11f35d89248244",
     "semantic_hash": ""
   },
   "src/AiStocks.Operations/Program.cs": {
@@ -520,8 +520,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/PostgresMigrationRunner.cs": {
-    "mtime": 1786202201.2538903,
-    "ast_hash": "ae3ac3fb6d6539e951ea8bafda2def74",
+    "mtime": 1786272608.1156228,
+    "ast_hash": "ebad3e41afa342eb9378c9760c6362d7",
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/ResearchAttestationStore.cs": {
@@ -720,8 +720,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/RuntimeIntegrationTests.cs": {
-    "mtime": 1786208011.0820699,
-    "ast_hash": "c70771b7af1fe50b4a579a66d3af85e4",
+    "mtime": 1786272584.3551598,
+    "ast_hash": "c33d6586675b5366f919348560436377",
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/UnitTest1.cs": {
@@ -907,6 +907,11 @@
   ".github/workflows/publish-images.yml": {
     "mtime": 1786220822.577628,
     "ast_hash": "555dd802f667d4367af5a60af434a076",
+    "semantic_hash": ""
+  },
+  "tests/test_release_artifacts.py": {
+    "mtime": 1786269554.2602477,
+    "ast_hash": "acb7d7f274a3e8c221fc386d7ab8f2aa",
     "semantic_hash": ""
   }
 }
