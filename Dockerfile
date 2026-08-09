@@ -5,6 +5,7 @@ WORKDIR /src
 COPY AiStocks.slnx Directory.Build.props ./
 COPY src ./src
 COPY tests ./tests
+COPY docs/nasdaq-trading-hours.html docs/nasdaq-holiday-schedule-2026.xlsx ./docs/
 RUN dotnet restore AiStocks.slnx --locked-mode
 RUN dotnet publish src/AiStocks.Web/AiStocks.Web.csproj -c Release --no-restore -o /out/web \
  && dotnet publish src/AiStocks.Worker/AiStocks.Worker.csproj -c Release --no-restore -o /out/worker \

@@ -87,6 +87,7 @@ def test_image_build_pins_hermes_source_and_frozen_lock():
     assert "uv sync --frozen --no-dev --extra cli --extra web" in dockerfile
     assert "COPY --from=hermes-builder" in dockerfile
     assert "/opt/hermes /opt/hermes" in dockerfile
+    assert "COPY docs/nasdaq-trading-hours.html docs/nasdaq-holiday-schedule-2026.xlsx ./docs/" in dockerfile
     assert "groupadd --system --gid 10001 app" not in dockerfile
     assert dockerfile.count("groupadd --system --gid 10001 aistocks") == 2
     assert "USER aistocks" in dockerfile
