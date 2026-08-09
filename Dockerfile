@@ -12,7 +12,7 @@ RUN dotnet publish src/AiStocks.Web/AiStocks.Web.csproj -c Release --no-restore 
  && dotnet publish src/AiStocks.Collector/AiStocks.Collector.csproj -c Release --no-restore -o /out/collector \
  && dotnet publish src/AiStocks.Operations/AiStocks.Operations.csproj -c Release --no-restore -o /out/operations
 
-FROM ghcr.io/astral-sh/uv:0.8.4@sha256:40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0 AS uv
+FROM ghcr.io/astral-sh/uv:0.12.3@sha256:2d890623d310b57771ce840f0da5eed5fc6d657da05ffaa45d82797b53fa3abc AS uv
 FROM python:3.13.5-slim-bookworm@sha256:4c2cf9917bd1cbacc5e9b07320025bdb7cdf2df7b0ceaccb55e9dd7e30987419 AS hermes-builder
 ARG HERMES_COMMIT=226b095a59df0be88e195a90fbd209f236665b7b
 COPY --from=uv /uv /uvx /bin/

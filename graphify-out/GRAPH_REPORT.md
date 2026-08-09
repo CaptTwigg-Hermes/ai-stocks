@@ -1,7 +1,7 @@
 # Graph Report - coordinator  (2026-08-09)
 
 ## Corpus Check
-- 180 files · ~103,104 words
+- 180 files · ~103,108 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `607c4c50`
+- Built from commit: `d5699509`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -219,11 +219,11 @@
 - [[_COMMUNITY_Community 208|Community 208]]
 - [[_COMMUNITY_Community 209|Community 209]]
 - [[_COMMUNITY_Community 210|Community 210]]
+- [[_COMMUNITY_Community 211|Community 211]]
 - [[_COMMUNITY_Community 212|Community 212]]
 - [[_COMMUNITY_Community 213|Community 213]]
 - [[_COMMUNITY_Community 214|Community 214]]
 - [[_COMMUNITY_Community 215|Community 215]]
-- [[_COMMUNITY_Community 216|Community 216]]
 - [[_COMMUNITY_Community 217|Community 217]]
 - [[_COMMUNITY_Community 218|Community 218]]
 - [[_COMMUNITY_Community 220|Community 220]]
@@ -326,20 +326,20 @@ Cohesion: 0.26
 Nodes (6): FailClosedDashboardFacade, IDashboardFacade, RecordingFacade, ContestControlCommand, ContestControlResult, DashboardSnapshot
 
 ### Community 29 - "Community 29"
-Cohesion: 0.09
-Nodes (21): AgentRunRequest, AgentRunResult, FakeDecisionPort, FakeDiscord, FakePausePort, FakeRunner, FakeRunStore, DurableOrchestrator (+13 more)
+Cohesion: 0.13
+Nodes (9): FakeBootstrapPort, FakeDiscord, FakePausePort, FakeRunStore, ContestBootstrapper, IContestBootstrapPort, InitialAgentState, Queue (+1 more)
 
 ### Community 30 - "Community 30"
 Cohesion: 0.17
 Nodes (7): HermesResearchRunner, ImmutableDictionary, ImmutableHashSet, ResearchExecutionOptions, ResearchExecutionResult, RuntimeReport, UTF8Encoding
 
 ### Community 31 - "Community 31"
-Cohesion: 0.05
-Nodes (49): Microsoft.Extensions.Configuration, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.Configuration.FileExtensions, Microsoft.Extensions.Configuration.Json, Microsoft.Extensions.Diagnostics.Abstractions, Microsoft.Extensions.FileProviders.Abstractions, Microsoft.Extensions.FileProviders.Physical, Microsoft.Extensions.FileSystemGlobbing (+41 more)
+Cohesion: 0.06
+Nodes (42): Microsoft.Extensions.Configuration, Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.Configuration.FileExtensions, Microsoft.Extensions.Configuration.Json, Microsoft.Extensions.FileProviders.Abstractions, Microsoft.Extensions.FileProviders.Physical, Microsoft.Extensions.FileSystemGlobbing, contentHash (+34 more)
 
 ### Community 32 - "Community 32"
 Cohesion: 0.04
-Nodes (46): type, dependencies, net10.0, contentHash, resolved, type, contentHash, resolved (+38 more)
+Nodes (47): type, dependencies, net10.0, contentHash, resolved, type, contentHash, resolved (+39 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.05
@@ -370,8 +370,8 @@ Cohesion: 0.12
 Nodes (17): PostgresCollectorPersistence, PostgresMigrationRunner, PostgresDashboardFacade, AuditRow, DividendRow, EvidenceRow, FailureRow, FeeRow (+9 more)
 
 ### Community 40 - "Community 40"
-Cohesion: 0.09
-Nodes (19): FakeBootstrapPort, FakeDeliveryStore, Acquired(), AlreadyCompleted(), AuditedDiscordDelivery, Busy(), Conflict(), ContestBootstrapper (+11 more)
+Cohesion: 0.11
+Nodes (15): FakeDeliveryStore, Acquired(), AlreadyCompleted(), AuditedDiscordDelivery, Busy(), Conflict(), IDeliveryAuditPort, IDiscordPort (+7 more)
 
 ### Community 41 - "Community 41"
 Cohesion: 0.27
@@ -422,12 +422,12 @@ Cohesion: 0.13
 Nodes (19): dependencies, type, dependencies, dependencies, type, dependencies, type, dependencies (+11 more)
 
 ### Community 54 - "Community 54"
-Cohesion: 0.16
-Nodes (10): TradingSession, ImmutableArchive, SessionManifestStore, NasdaqCollector, SessionManifest, CollectorDownloadPolicy, CompleteSessionManifest, Dictionary (+2 more)
+Cohesion: 0.20
+Nodes (7): TradingSession, ImmutableArchive, SessionManifestStore, SessionManifest, CompleteSessionManifest, JsonSerializerOptions, VerifiedSessionManifest
 
 ### Community 55 - "Community 55"
-Cohesion: 0.29
-Nodes (7): dependencies, type, dependencies, type, AiStocks.Persistence, aistocks.operations, aistocks.web
+Cohesion: 0.12
+Nodes (18): dependencies, type, dependencies, type, dependencies, type, dependencies, type (+10 more)
 
 ### Community 56 - "Community 56"
 Cohesion: 0.25
@@ -446,8 +446,8 @@ Cohesion: 0.19
 Nodes (5): EvidenceVerifier, HashSet, HttpStatusCode, IElement, INode
 
 ### Community 60 - "Community 60"
-Cohesion: 0.12
-Nodes (12): DurableFirdsStore, AtomicFile, NasdaqStatusMachine, PinnedStatusSeedVerifier, AsOf, byte, FirdsSnapshot, InstrumentTradingState (+4 more)
+Cohesion: 0.10
+Nodes (13): NasdaqCollector, AtomicFile, NasdaqStatusMachine, PinnedStatusSeedVerifier, AsOf, byte, CollectorDownloadPolicy, Dictionary (+5 more)
 
 ### Community 61 - "Community 61"
 Cohesion: 0.31
@@ -494,16 +494,16 @@ Cohesion: 0.16
 Nodes (6): PostgresCollectorReadiness, IOperationsPorts, OperationsApplication, PostgresOperationsPorts, ReadinessResult, TextWriter
 
 ### Community 72 - "Community 72"
-Cohesion: 0.20
-Nodes (9): type, dependencies, type, dependencies, AiStocks.Core, net10.0, aistocks.core, aistocks.marketdata (+1 more)
+Cohesion: 0.14
+Nodes (13): type, dependencies, type, dependencies, AiStocks.Core, net10.0, aistocks.core, aistocks.marketdata (+5 more)
 
 ### Community 73 - "Community 73"
-Cohesion: 0.08
-Nodes (12): RunWindow, CollectorWorker, FakeSchedulePort, DurableScheduleRegistrar, IDurableRunSchedulePort, RunSchedule, HermesAgentRunner, PostgresWorkerState (+4 more)
+Cohesion: 0.06
+Nodes (25): AgentRunRequest, AgentRunResult, RunWindow, FakeDecisionPort, FakeRunner, FakeSchedulePort, DurableOrchestrator, DurableScheduleRegistrar (+17 more)
 
 ### Community 74 - "Community 74"
-Cohesion: 0.11
-Nodes (17): type, type, type, dependencies, net10.0, contentHash, resolved, type (+9 more)
+Cohesion: 0.14
+Nodes (13): type, dependencies, net10.0, contentHash, resolved, type, aistocks.core, Microsoft.TestPlatform.ObjectModel (+5 more)
 
 ### Community 76 - "Community 76"
 Cohesion: 0.20
@@ -675,15 +675,15 @@ Nodes (8): Microsoft.CodeCoverage, Microsoft.TestPlatform.TestHost, contentHash,
 
 ### Community 122 - "Community 122"
 Cohesion: 0.40
-Nodes (5): xunit.runner.visualstudio, contentHash, requested, resolved, type
+Nodes (3): CollectorWorker, WorkerRuntimeService, BackgroundService
 
 ### Community 123 - "Community 123"
 Cohesion: 0.29
 Nodes (7): Microsoft.TestPlatform.ObjectModel, Newtonsoft.Json, contentHash, dependencies, resolved, type, Microsoft.TestPlatform.TestHost
 
 ### Community 124 - "Community 124"
-Cohesion: 0.26
-Nodes (6): FirdsUniverseParser, Change, DateOnly, FirdsInstrument, NasdaqStatusEvent, XElement
+Cohesion: 0.25
+Nodes (8): DurableFirdsStore, FirdsUniverseParser, Change, DateOnly, FirdsInstrument, FirdsSnapshot, Stream, Uri
 
 ### Community 125 - "Community 125"
 Cohesion: 0.29
@@ -954,8 +954,8 @@ Cohesion: 0.50
 Nodes (4): contentHash, resolved, type, Microsoft.Extensions.FileSystemGlobbing
 
 ### Community 195 - "Community 195"
-Cohesion: 0.50
-Nodes (4): contentHash, resolved, type, Microsoft.Extensions.Hosting.Abstractions
+Cohesion: 0.18
+Nodes (11): Microsoft.Extensions.Diagnostics.Abstractions, contentHash, dependencies, resolved, type, contentHash, dependencies, resolved (+3 more)
 
 ### Community 196 - "Community 196"
 Cohesion: 0.50
@@ -971,7 +971,7 @@ Nodes (4): contentHash, resolved, type, Microsoft.Extensions.Logging
 
 ### Community 199 - "Community 199"
 Cohesion: 0.50
-Nodes (4): xunit.assert, contentHash, resolved, type
+Nodes (4): xunit.abstractions, contentHash, resolved, type
 
 ### Community 200 - "Community 200"
 Cohesion: 0.50
@@ -990,8 +990,8 @@ Cohesion: 0.50
 Nodes (4): xunit.assert, contentHash, resolved, type
 
 ### Community 208 - "Community 208"
-Cohesion: 0.12
-Nodes (20): dependencies, type, dependencies, type, dependencies, type, dependencies, dependencies (+12 more)
+Cohesion: 0.19
+Nodes (13): dependencies, type, dependencies, type, dependencies, type, AiStocks.MarketData, AiStocks.Research (+5 more)
 
 ### Community 209 - "Community 209"
 Cohesion: 0.20
@@ -1000,6 +1000,10 @@ Nodes (6): DenyNetworkEventListener, NoBrokerOrderPathProbe, ConcurrentBag, Even
 ### Community 210 - "Community 210"
 Cohesion: 0.13
 Nodes (5): OversizedReportStream, NeverEndingStream, long, Memory, SeekOrigin
+
+### Community 211 - "Community 211"
+Cohesion: 0.50
+Nodes (4): xunit.analyzers, contentHash, resolved, type
 
 ### Community 213 - "Community 213"
 Cohesion: 0.50
@@ -1012,10 +1016,6 @@ Nodes (9): _quote(), _race(), _request(), test_concurrent_idempotent_submission_
 ### Community 215 - "Community 215"
 Cohesion: 0.44
 Nodes (9): decimal, evidence(), quote(), request(), session(), test_all_corporate_actions_replay_deterministically_and_conflict_per_agent(), test_cancel_is_immutable_idempotent_and_prevents_later_execution(), test_final_liquidation_uses_adverse_slippage_fees_and_freezes_ranking() (+1 more)
-
-### Community 216 - "Community 216"
-Cohesion: 0.50
-Nodes (4): contentHash, resolved, type, Microsoft.Extensions.Logging.Debug
 
 ### Community 218 - "Community 218"
 Cohesion: 0.50
@@ -1037,7 +1037,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.040) - this node is a cross-community bridge._
 - **Why does `AccessIdentity` connect `Community 19` to `Community 0`, `Community 67`, `Community 70`, `Community 46`, `Community 214`?**
   _High betweenness centrality (0.021) - this node is a cross-community bridge._
-- **Why does `AgentContext` connect `Community 17` to `Community 98`, `Community 3`, `Community 5`, `Community 73`, `Community 29`?**
+- **Why does `AgentContext` connect `Community 17` to `Community 73`, `Community 98`, `Community 3`, `Community 5`?**
   _High betweenness centrality (0.019) - this node is a cross-community bridge._
 - **Are the 13 inferred relationships involving `TradingService` (e.g. with `MarketProvider` and `Quote`) actually correct?**
   _`TradingService` has 13 INFERRED edges - model-reasoned connections that need verification._

@@ -285,8 +285,8 @@
     "semantic_hash": ""
   },
   "tests/test_release_artifacts.py": {
-    "mtime": 1786260697.147927,
-    "ast_hash": "fd7cb0120f840a0ac67d3b54610fd45f",
+    "mtime": 1786261115.7358818,
+    "ast_hash": "af96e91e62f63ba503066cb8c667ee38",
     "semantic_hash": ""
   },
   "tests/test_worker.py": {
