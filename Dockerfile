@@ -32,7 +32,7 @@ RUN apt-get update \
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble@sha256:f1126d438ccc359f51cc6d4701a8deae513856cf10f5fe645d29ea6403dcac6b AS runtime
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl \
+ && apt-get install -y --no-install-recommends ca-certificates curl libicu74 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 10001 aistocks \
  && useradd --system --uid 10001 --gid aistocks --home-dir /app aistocks
@@ -68,7 +68,7 @@ ENTRYPOINT ["/ops/scripts/backup-cycle.sh"]
 
 FROM python:3.13.5-slim-bookworm@sha256:4c2cf9917bd1cbacc5e9b07320025bdb7cdf2df7b0ceaccb55e9dd7e30987419 AS worker
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl \
+ && apt-get install -y --no-install-recommends ca-certificates curl libicu72 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 10001 aistocks \
  && useradd --system --uid 10001 --gid aistocks --home-dir /app aistocks
