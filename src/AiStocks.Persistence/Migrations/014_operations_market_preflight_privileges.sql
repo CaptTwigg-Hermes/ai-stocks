@@ -1,0 +1,1 @@
+GRANT SELECT ON TABLE market_session_manifests TO ai_stocks_operations_runtime;

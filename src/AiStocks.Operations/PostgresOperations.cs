@@ -96,7 +96,16 @@ public sealed class PostgresOperationsPorts(NpgsqlDataSource migrator, NpgsqlDat
                     "SELECT count(*)=4 AND count(DISTINCT model_id)=4 AND bool_and(initial_cash=30000) FROM agents",
                     cancellationToken).ConfigureAwait(false)) failures.Add("four-agents");
             if (!await BooleanAsync(connection,
-                    "SELECT count(DISTINCT session_id)>=20 FROM market_observations WHERE verified AND NOT warning AND NOT suspended AND complete_history_sessions>=20",
+                    """
+                    SELECT EXISTS (
+                      SELECT 1 FROM market_session_manifests m
+                      JOIN market_observations o USING(session_id)
+                      WHERE m.complete
+                        AND o.verified
+                        AND NOT o.warning
+                        AND NOT o.suspended
+                        AND o.complete_history_sessions >= 20)
+                    """,
                     cancellationToken).ConfigureAwait(false)) failures.Add("market-data");
         }
         catch (PostgresException) { failures.Add("database"); }

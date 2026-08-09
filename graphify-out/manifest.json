@@ -420,8 +420,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.MarketData/NasdaqCsv.cs": {
-    "mtime": 1786206751.352935,
-    "ast_hash": "db447b2903d9b1ee1b04191ec6a80879",
+    "mtime": 1786279001.6287029,
+    "ast_hash": "3121b06e73d53f49227ef1d5ed5dd260",
     "semantic_hash": ""
   },
   "src/AiStocks.MarketData/NasdaqStatus.cs": {
@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Operations/PostgresOperations.cs": {
-    "mtime": 1786272613.2277224,
-    "ast_hash": "0c6030c4c73f64ba9d11f35d89248244",
+    "mtime": 1786281607.0358014,
+    "ast_hash": "ea82143e8f3c949bd7fc689215e6a894",
     "semantic_hash": ""
   },
   "src/AiStocks.Operations/Program.cs": {
@@ -700,8 +700,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.MarketData.Tests/MarketDataTests.cs": {
-    "mtime": 1786218263.7599893,
-    "ast_hash": "a059b57e1fe42edad1388be2f72d294f",
+    "mtime": 1786278577.0164297,
+    "ast_hash": "cfcfc676051f747c230beda2a986bec7",
     "semantic_hash": ""
   },
   "tests/AiStocks.MarketData.Tests/packages.lock.json": {
@@ -715,8 +715,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/PostgresIntegrationTests.cs": {
-    "mtime": 1786217879.1244986,
-    "ast_hash": "a092253737ded0832edfe0b0ef88d7e6",
+    "mtime": 1786281627.7082043,
+    "ast_hash": "7237351056f7aa919692dbebb9127626",
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/RuntimeIntegrationTests.cs": {
@@ -725,8 +725,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/UnitTest1.cs": {
-    "mtime": 1786276542.9642723,
-    "ast_hash": "34f31e606218c94c890593a9b48681a4",
+    "mtime": 1786280963.7071798,
+    "ast_hash": "0c27afa3b5804a7fbdb6185e493b52a4",
     "semantic_hash": ""
   },
   "tests/AiStocks.Persistence.Tests/packages.lock.json": {
@@ -840,8 +840,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Collector/PostgresCollectorPersistence.cs": {
-    "mtime": 1786217758.3221543,
-    "ast_hash": "f7409d9e08eecd99cf9950861d4b7563",
+    "mtime": 1786280850.7209606,
+    "ast_hash": "3f7944ef874ddfa5fcc6a2327f2b8675",
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/004_market_runtime.sql": {
@@ -922,6 +922,41 @@
   "src/AiStocks.Persistence/Migrations/010_collector_hash_privileges.sql": {
     "mtime": 1786276557.1245492,
     "ast_hash": "2e8ce37e386e87961b5a69478d4d618b",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Persistence/Migrations/011_collector_poll_state.sql": {
+    "mtime": 1786278140.0355835,
+    "ast_hash": "59b7db6084029f2964d8032e5fd0eaec",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Persistence/Migrations/012_strict_trade_timing.sql": {
+    "mtime": 1786278923.9271824,
+    "ast_hash": "13c141b0f8e6aa2bc51b658395939f56",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Persistence/Migrations/013_operations_preflight_privileges.sql": {
+    "mtime": 1786280269.4335432,
+    "ast_hash": "3eb1a41da4b3e779380079f282299d76",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Persistence/Migrations/014_operations_market_preflight_privileges.sql": {
+    "mtime": 1786280557.6352038,
+    "ast_hash": "fe5415b5f9dc204d2a5faf6a9a40be43",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Collector/Properties/AssemblyInfo.cs": {
+    "mtime": 1786280857.8811014,
+    "ast_hash": "56bb63e3a4d8e28a83ce14b2ea9157b9",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Persistence/Migrations/015_strict_trade_timing_constraint_cleanup.sql": {
+    "mtime": 1786280876.3414638,
+    "ast_hash": "4038dbe5c3b4ebc8ddd92d3e98bd3d47",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Persistence/Migrations/016_web_dashboard_privileges.sql": {
+    "mtime": 1786280969.9633029,
+    "ast_hash": "4984f8dc83e0013f58ac10565ec34a44",
     "semantic_hash": ""
   }
 }

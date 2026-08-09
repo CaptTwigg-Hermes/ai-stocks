@@ -47,12 +47,12 @@ public static class NasdaqCsvParser
             {
                 var executed = ParseTime(fields[index["Trading date and time"]]);
                 var published = ParseTime(fields[index["Publication date and time"]]);
-                var delay = published - executed;
                 var price = decimal.Parse(fields[index["Price"]], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
                 var quantity = long.Parse(fields[index["Quantity"]], NumberStyles.None, CultureInfo.InvariantCulture);
                 var id = fields[index["Transaction identification code"]].Trim();
-                if (price <= 0 || quantity <= 0 || id.Length == 0 || delay < TimeSpan.FromMinutes(15) || delay > TimeSpan.FromMinutes(20) || fetchedAt < published)
-                    throw new MarketDataException("Nasdaq trade row violates value or delay constraints");
+                if (price <= 0 || quantity <= 0 || id.Length == 0 || published < executed - TimeSpan.FromSeconds(1) ||
+                    fetchedAt < published || fetchedAt - executed < TimeSpan.FromMinutes(15))
+                    throw new MarketDataException("Nasdaq trade row violates value or timing constraints");
                 result.Add(new(executed, fields[index["Instrument identification code"]], price,
                     fields[index["Price currency"]], fields[index["Price notation"]], quantity,
                     fields[index["Venue of execution"]], published, id, fields[index["Flags"]], fetchedAt));
@@ -133,12 +133,16 @@ public static class NasdaqTradeSelection
 public static class TradeInstrumentMapper
 {
     public static FirdsInstrument Resolve(NasdaqTrade trade, IEnumerable<FirdsInstrument> instruments)
+        => TryResolve(trade, instruments)
+            ?? throw new MarketDataException("Trade ISIN has no authoritative FIRDS order-book mapping");
+
+    public static FirdsInstrument? TryResolve(NasdaqTrade trade, IEnumerable<FirdsInstrument> instruments)
     {
         var matches = instruments.Where(x => x.Isin == trade.Isin && x.Venue == trade.Venue).ToArray();
         return matches.Length == 1
             ? matches[0]
-            : throw new MarketDataException(matches.Length == 0
-                ? "Trade ISIN has no authoritative FIRDS order-book mapping"
-                : "Trade source lacks order-book identity and FIRDS mapping is ambiguous");
+            : matches.Length == 0
+                ? null
+                : throw new MarketDataException("Trade source lacks order-book identity and FIRDS mapping is ambiguous");
     }
 }

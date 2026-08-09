@@ -61,6 +61,22 @@ public sealed class MarketDataTests
     }
 
     [Fact]
+    public void CsvAcceptsOfficialNearEqualPublicationTimestampAfterFeedDelay()
+    {
+        const string csv = """
+            "sep=;"
+            Trading date and time;Instrument identification code;Price;Missing Price;Price currency;Price notation;Quantity;Venue of execution;Trading system;Publication date and time;Venue of publication;Transaction identification code;Flags
+            2026-08-07T07:15:00.017Z;SE0000108656;96.90;;SEK;MONE;10;XSTO;CLOB;2026-08-07T07:15:00.016Z;XSTO;official-row;---
+            """;
+
+        var rows = NasdaqCsvParser.Parse(Encoding.UTF8.GetBytes(csv), DateTimeOffset.Parse("2026-08-07T07:30:00.017Z"));
+
+        Assert.Single(rows);
+        Assert.Throws<MarketDataException>(() => NasdaqCsvParser.Parse(
+            Encoding.UTF8.GetBytes(csv), DateTimeOffset.Parse("2026-08-07T07:29:59Z")));
+    }
+
+    [Fact]
     public void AtomicArchiveDetectsTamperingAndReplayConflict()
     {
         using var temp = new TemporaryDirectory();

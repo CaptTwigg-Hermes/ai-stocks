@@ -239,12 +239,13 @@ public sealed class PostgresCollectorPersistence(
             raw.Parameters.AddWithValue(report.FetchedAt.ToUniversalTime()); raw.Parameters.AddWithValue(File.ReadAllBytes(report.CsvPath)); raw.Parameters.AddWithValue(report.Sha256);
             raw.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = metadata });
             await raw.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            await using var lookup = new NpgsqlCommand("SELECT id,payload_hash::text,source_url,retrieved_at,metadata_json=$2::jsonb FROM raw_market_reports WHERE report_name=$1", connection, transaction);
+            await using var lookup = new NpgsqlCommand("SELECT id,payload_hash::text,source_url,retrieved_at=$3,metadata_json=$2::jsonb FROM raw_market_reports WHERE report_name=$1", connection, transaction);
             lookup.Parameters.AddWithValue(report.Report);
             lookup.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = metadata });
+            lookup.Parameters.AddWithValue(report.FetchedAt.ToUniversalTime());
             await using var reader = await lookup.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || reader.GetGuid(0) != id || reader.GetString(1) != report.Sha256 ||
-                reader.GetString(2) != report.SourceUrl.AbsoluteUri || reader.GetFieldValue<DateTimeOffset>(3) != report.FetchedAt.ToUniversalTime() || !reader.GetBoolean(4))
+                reader.GetString(2) != report.SourceUrl.AbsoluteUri || !reader.GetBoolean(3) || !reader.GetBoolean(4))
                 throw new MarketDataException("PostgreSQL raw report identity conflict");
             rawIds[report.Report] = reader.GetGuid(0);
         }
@@ -288,7 +289,8 @@ public sealed class PostgresCollectorPersistence(
             foreach (var trade in NasdaqCsvParser.Parse(File.ReadAllBytes(report.CsvPath), report.FetchedAt)
                 .Where(x => x.Venue == "XSTO" && x.Currency == "SEK" && x.PriceNotation == "MONE" && session.Contains(x.ExecutedAt)))
             {
-                var instrument = TradeInstrumentMapper.Resolve(trade, instruments);
+                var instrument = TradeInstrumentMapper.TryResolve(trade, instruments);
+                if (instrument is null) continue;
                 var key = (instrument.Isin, instrument.OrderBookId);
                 totals[key] = (totals[key].Value + trade.Price * trade.Quantity, totals[key].Count + 1);
                 var strictId = StableGuid($"trade:{entry.Report}:{entry.Sha256}:{instrument.OrderBookId}:{trade.TransactionId}");
@@ -315,15 +317,16 @@ public sealed class PostgresCollectorPersistence(
         }
         foreach (var (key, total) in totals)
         {
+            var tradedValue = decimal.Round(total.Value, 2, MidpointRounding.AwayFromZero);
             await using var stats = new NpgsqlCommand("""
                 INSERT INTO instrument_session_stats(instrument_id,session_id,traded_value,complete) VALUES($1,$2,$3,true) ON CONFLICT DO NOTHING
                 """, connection, transaction);
-            stats.Parameters.AddWithValue(instrumentIds[key]); stats.Parameters.AddWithValue(verifiedManifest.Manifest.SessionId); stats.Parameters.AddWithValue(total.Value);
+            stats.Parameters.AddWithValue(instrumentIds[key]); stats.Parameters.AddWithValue(verifiedManifest.Manifest.SessionId); stats.Parameters.AddWithValue(tradedValue);
             await stats.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             await RequireMatchAsync(connection, transaction, """
                 SELECT traded_value=$3 AND complete FROM instrument_session_stats WHERE instrument_id=$1 AND session_id=$2
                 """, "PostgreSQL session statistics identity conflict", cancellationToken,
-                instrumentIds[key], verifiedManifest.Manifest.SessionId, total.Value).ConfigureAwait(false);
+                instrumentIds[key], verifiedManifest.Manifest.SessionId, tradedValue).ConfigureAwait(false);
         }
         foreach (var item in projectedTrades.DistinctBy(x => x.StrictId))
         {
@@ -338,7 +341,7 @@ public sealed class PostgresCollectorPersistence(
             await using var historyReader = await history.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await historyReader.ReadAsync(cancellationToken).ConfigureAwait(false) || historyReader.IsDBNull(0))
                 throw new MarketDataException("PostgreSQL observation history is missing");
-            var averageDailyValue = historyReader.GetDecimal(0);
+            var averageDailyValue = NormalizeDatabaseMoney(historyReader.GetDecimal(0));
             var completeSessions = historyReader.GetInt64(1);
             await historyReader.DisposeAsync().ConfigureAwait(false);
             var state = statuses.StateAt(item.Instrument.Isin, item.Trade.ExecutedAt);
@@ -412,6 +415,9 @@ public sealed class PostgresCollectorPersistence(
         if (await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not true)
             throw new MarketDataException(error);
     }
+
+    internal static decimal NormalizeDatabaseMoney(decimal value) =>
+        decimal.Round(value, 2, MidpointRounding.AwayFromZero);
 
     private static Guid StableGuid(string value)
     {

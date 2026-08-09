@@ -93,7 +93,7 @@ public sealed class PersistenceContractTests
     [Fact]
     public void MigrationChecksumIsStableAndSha256()
     {
-        Assert.Equal(10, MigrationCatalog.All.Count);
+        Assert.Equal(16, MigrationCatalog.All.Count);
         foreach (var migration in MigrationCatalog.All)
         {
             Assert.Matches("^[0-9a-f]{64}$", migration.Sha256);
@@ -125,6 +125,52 @@ public sealed class PersistenceContractTests
         Assert.Contains("collector_runtime_state", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("REVOKE INSERT ON instruments,trading_sessions,instrument_session_stats,raw_market_reports,market_observations FROM ai_stocks_runtime", sql, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("GRANT UPDATE ON market_session_manifests", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CollectorPollStateAllowsAStartedPollAfterThePreviousSuccess()
+    {
+        var sql = MigrationCatalog.All.Single(migration => migration.Id == "011_collector_poll_state").Sql;
+        Assert.Contains("DROP CONSTRAINT IF EXISTS collector_runtime_state_check", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void StrictTradeTimingUsesObservedFeedDelayRatherThanPublicationFieldDelay()
+    {
+        var sql = MigrationCatalog.All.Single(migration => migration.Id == "012_strict_trade_timing").Sql;
+        Assert.Contains("retrieved_at >= traded_at + interval '15 minutes'", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void OperationsPreflightCanReadMigrationHistory()
+    {
+        var sql = MigrationCatalog.All.Single(migration => migration.Id == "013_operations_preflight_privileges").Sql;
+        Assert.Contains("GRANT SELECT ON TABLE schema_migrations", sql, StringComparison.OrdinalIgnoreCase);
+        var marketSql = MigrationCatalog.All.Single(migration => migration.Id == "014_operations_market_preflight_privileges").Sql;
+        Assert.Contains("GRANT SELECT ON TABLE market_session_manifests", marketSql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CollectorNormalizesDatabaseMoneyBeforeIdempotentComparison()
+    {
+        Assert.Equal(1065.92m, AiStocks.Collector.PostgresCollectorPersistence.NormalizeDatabaseMoney(1065.915m));
+    }
+
+    [Fact]
+    public void StrictTradeTimingCleanupHandlesGeneratedConstraintNames()
+    {
+        var sql = MigrationCatalog.All.Single(migration => migration.Id == "015_strict_trade_timing_constraint_cleanup").Sql;
+        Assert.Contains("market_strict_trade_rows_published_at_check", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WebDashboardHasReadOnlyAccessToEveryQueriedProjection()
+    {
+        var sql = MigrationCatalog.All.Single(migration => migration.Id == "016_web_dashboard_privileges").Sql;
+        Assert.Contains("market_observations", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("scheduled_agent_runs", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("INSERT", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("UPDATE", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

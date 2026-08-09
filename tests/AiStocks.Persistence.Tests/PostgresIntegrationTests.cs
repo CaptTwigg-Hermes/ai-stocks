@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using AiStocks.Collector;
 using AiStocks.MarketData;
+using AiStocks.Operations;
 using AiStocks.Persistence;
 using Npgsql;
 
@@ -428,9 +429,16 @@ public sealed class PostgresIntegrationTests
             statuses.InitializeBestEffortUniverse(firds.LoadVerified().Instruments.Select(x => x.Isin),
                 DateTimeOffset.Parse("2026-08-06T12:00:00Z"));
             var session = StockholmCalendar.GetSession(new DateOnly(2026, 8, 6))!;
-            var csv = await File.ReadAllBytesAsync(Path.Combine(fixtures, "nasdaq-posttrade.csv"));
+            var csvText = await File.ReadAllTextAsync(Path.Combine(fixtures, "nasdaq-posttrade.csv"));
+            var csv = Encoding.UTF8.GetBytes(csvText
+                .Replace("2026-08-06T10:14:59Z", "2026-08-06T09:59:59Z", StringComparison.Ordinal)
+                .Replace("2026-08-06T10:15:01Z", "2026-08-06T10:00:01Z", StringComparison.Ordinal)
+                .Replace("2026-08-06T10:15:00.500Z", "2026-08-06T10:00:00.500Z", StringComparison.Ordinal)
+                .Replace("2026-08-06T15:45:00Z", "2026-08-06T15:30:00Z", StringComparison.Ordinal)
+                .Replace("96.90;;SEK;MONE;10;", "96.901;;SEK;MONE;11;", StringComparison.Ordinal)
+                + "2026-08-06T10:30:00Z;SE9999999999;10.00;;SEK;MONE;1;XSTO;CLOB;2026-08-06T10:30:00Z;XSTO;unmapped-row;---\n");
             var reports = SessionManifest.ExpectedReports(session).Select(name => archive.Archive(name, csv,
-                new Uri($"https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName={name}"), session.Close.AddMinutes(15))).ToArray();
+                new Uri($"https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName={name}"), session.Close.AddMinutes(15).AddTicks(4))).ToArray();
             var manifestPath = manifests.Save(session, reports, session.Close.AddHours(1));
             var listing = string.Join(',', reports.Select(x => $"\"{x.Report}\""));
             using var http = new HttpClient(new StubHandler(request =>
@@ -481,6 +489,28 @@ public sealed class PostgresIntegrationTests
                 WHERE traded_at='2026-08-06T15:30:00Z' AND NOT warning AND NOT suspended AND verified
                 """));
             Assert.Equal(1L, await ScalarLong(connection, "SELECT count(*) FROM instrument_session_stats WHERE complete"));
+            var launchReadiness = await new PostgresOperationsPorts(dataSource, dataSource)
+                .PreflightAsync(CancellationToken.None);
+            Assert.False(launchReadiness.Ready);
+            Assert.Contains("market-data", launchReadiness.Failures);
+            await Execute(connection, "ALTER TABLE market_observations DISABLE TRIGGER market_observations_no_update_delete");
+            try
+            {
+                await Execute(connection, "UPDATE market_observations SET complete_history_sessions=19");
+                launchReadiness = await new PostgresOperationsPorts(dataSource, dataSource)
+                    .PreflightAsync(CancellationToken.None);
+                Assert.False(launchReadiness.Ready);
+                Assert.Contains("market-data", launchReadiness.Failures);
+                await Execute(connection, "UPDATE market_observations SET complete_history_sessions=20");
+                launchReadiness = await new PostgresOperationsPorts(dataSource, dataSource)
+                    .PreflightAsync(CancellationToken.None);
+                Assert.True(launchReadiness.Ready, string.Join(',', launchReadiness.Failures));
+            }
+            finally
+            {
+                await Execute(connection, "UPDATE market_observations SET complete_history_sessions=1");
+                await Execute(connection, "ALTER TABLE market_observations ENABLE TRIGGER market_observations_no_update_delete");
+            }
             await persistence.PersistAsync(new CollectionResult([], [manifestPath], []), session.Close.AddHours(1), CancellationToken.None);
             Assert.Equal(await ScalarLong(connection, "SELECT count(*) FROM market_strict_trade_rows"),
                 await ScalarLong(connection, "SELECT count(*) FROM market_observations"));
