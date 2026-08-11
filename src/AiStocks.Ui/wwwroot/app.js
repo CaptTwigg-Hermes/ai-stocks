@@ -3,6 +3,7 @@
 
   const apiBase = window.AISTOCKS_API_URL;
   if (!apiBase) throw new Error("AI Stocks runtime configuration is missing.");
+  const isLeaderboardPage = /^\/leaderboard\/?$/.test(window.location.pathname);
   const state = {
     selectedInstrument: null,
     side: "buy",
@@ -16,6 +17,8 @@
   const byId = (id) => document.getElementById(id);
   const ui = {
     apiState: byId("api-state"),
+    tradePage: byId("trade-page"),
+    leaderboardPage: byId("leaderboard-page"),
     search: byId("stock-search"),
     results: byId("search-results"),
     resultCount: byId("result-count"),
@@ -38,6 +41,11 @@
     portfolioStatus: byId("portfolio-status"),
     leaderboard: byId("leaderboard-list"),
     leaderboardStatus: byId("leaderboard-status"),
+    leaderboardFull: byId("leaderboard-page-list"),
+    leaderboardPageStatus: byId("leaderboard-page-status"),
+    leaderboardRefresh: byId("leaderboard-refresh"),
+    leaderName: byId("leader-name"),
+    leaderValue: byId("leader-value"),
     activity: byId("activity-list"),
     activityStatus: byId("activity-status"),
     refresh: byId("refresh-data"),
@@ -45,10 +53,19 @@
     toast: byId("toast")
   };
 
+  ui.tradePage.hidden = isLeaderboardPage;
+  ui.leaderboardPage.hidden = !isLeaderboardPage;
+  document.title = isLeaderboardPage ? "Leaderboard · AI Stocks" : "AI Stocks · Stock Race";
+  document.querySelectorAll("[data-route]").forEach((link) => {
+    const active = link.dataset.route === (isLeaderboardPage ? "leaderboard" : "trade");
+    if (active) link.setAttribute("aria-current", "page");
+  });
+
   const dkk = new Intl.NumberFormat("da-DK", {
     style: "currency", currency: "DKK", maximumFractionDigits: 2
   });
   const number = new Intl.NumberFormat("en", { maximumFractionDigits: 2 });
+  const leaderboardNumber = new Intl.NumberFormat("da-DK", { maximumFractionDigits: 2 });
   const clock = new Intl.DateTimeFormat("en", {
     hour: "2-digit", minute: "2-digit", second: "2-digit"
   });
@@ -182,21 +199,35 @@
     });
   }
 
-  function renderLeaderboard(data) {
-    state.loaded.leaderboard = true;
-    ui.leaderboard.replaceChildren();
+  function renderLeaderboardList(target, data, expanded = false) {
+    target.replaceChildren();
+    target.setAttribute("aria-busy", "false");
+    const returnFormatter = expanded ? leaderboardNumber : number;
     data.items.forEach((entry) => {
       const item = document.createElement("li");
+      if (expanded) {
+        item.className = "leaderboard-entry";
+        item.dataset.rank = String(entry.rank);
+      }
       const rank = element("span", "rank", String(entry.rank));
       const identity = element("div");
       identity.append(element("strong", "", entry.displayName), element("small", "", entry.participantType));
       const value = element("b", "", dkk.format(entry.valueDkk));
-      const change = element("em", "", `${entry.returnPercent >= 0 ? "+" : ""}${number.format(entry.returnPercent)}%`);
+      const change = element("em", "", `${entry.returnPercent > 0 ? "+" : ""}${returnFormatter.format(entry.returnPercent)}%`);
       change.classList.toggle("negative", entry.returnPercent < 0);
       value.append(change);
       item.append(rank, identity, value);
-      ui.leaderboard.append(item);
+      target.append(item);
     });
+  }
+
+  function renderLeaderboard(data) {
+    state.loaded.leaderboard = true;
+    renderLeaderboardList(ui.leaderboard, data);
+    renderLeaderboardList(ui.leaderboardFull, data, true);
+    const leader = data.items[0];
+    ui.leaderName.textContent = leader?.displayName || "No participants";
+    ui.leaderValue.textContent = leader ? dkk.format(leader.valueDkk) : "—";
   }
 
   function renderOrders(data) {
@@ -244,8 +275,13 @@
   let refreshGeneration = 0;
   async function refreshAll(showConfirmation = false) {
     const generation = ++refreshGeneration;
-    ui.refresh.disabled = true;
-    ui.refresh.textContent = "Refreshing…";
+    const refreshButtons = [ui.refresh, ui.leaderboardRefresh];
+    const leaderboardLists = [ui.leaderboard, ui.leaderboardFull];
+    refreshButtons.forEach((button) => {
+      button.disabled = true;
+      button.textContent = "Refreshing…";
+    });
+    leaderboardLists.forEach((list) => list.setAttribute("aria-busy", "true"));
     try {
       const results = await Promise.allSettled([
         api("/api/v1/portfolio"), api("/api/v1/leaderboard"), api("/api/v1/orders")
@@ -261,23 +297,36 @@
         const [scope, status, render] = panels[index];
         const succeeded = result.status === "fulfilled";
         serviceResult(scope, succeeded);
-        status.classList.toggle("error", !succeeded);
+        const statuses = scope === "leaderboard" ? [status, ui.leaderboardPageStatus] : [status];
+        statuses.forEach((panelStatus) => panelStatus.classList.toggle("error", !succeeded));
         if (succeeded) {
-          status.textContent = "";
+          statuses.forEach((panelStatus) => { panelStatus.textContent = ""; });
           render(result.value);
         } else {
           failures.push(result.reason);
-          status.textContent = state.loaded[scope]
+          const message = state.loaded[scope]
             ? "Refresh failed. Showing the last loaded data."
             : "Could not load this panel. Try Refresh.";
+          statuses.forEach((panelStatus) => { panelStatus.textContent = message; });
+          if (scope === "leaderboard" && !state.loaded.leaderboard) {
+            leaderboardLists.forEach((list) =>
+              list.replaceChildren(element("li", "muted-empty", "Standings unavailable.")));
+            ui.leaderName.textContent = "Unavailable";
+            ui.leaderValue.textContent = "—";
+          }
+        }
+        if (scope === "leaderboard") {
+          leaderboardLists.forEach((list) => list.setAttribute("aria-busy", "false"));
         }
       });
       if (failures.length) showToast("Some account data could not be refreshed.");
-      else if (showConfirmation) showToast("Portfolio refreshed.");
+      else if (showConfirmation) showToast(isLeaderboardPage ? "Leaderboard refreshed." : "Portfolio refreshed.");
     } finally {
       if (generation === refreshGeneration) {
-        ui.refresh.disabled = false;
-        ui.refresh.textContent = "Refresh";
+        refreshButtons.forEach((button) => {
+          button.disabled = false;
+          button.textContent = "Refresh";
+        });
       }
     }
   }
@@ -344,14 +393,16 @@
   ui.quantity.addEventListener("input", updateEstimate);
   ui.form.addEventListener("submit", submitOrder);
   ui.refresh.addEventListener("click", () => refreshAll(true));
+  ui.leaderboardRefresh.addEventListener("click", () => refreshAll(true));
   document.querySelectorAll("[data-action]").forEach((button) =>
     button.addEventListener("click", () => setSide(button.dataset.action)));
   document.addEventListener("keydown", (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+    if (!isLeaderboardPage && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
       event.preventDefault();
       ui.search.focus();
     }
   });
 
-  Promise.all([search(), refreshAll()]).catch(() => {});
+  const initialLoad = isLeaderboardPage ? refreshAll() : Promise.all([search(), refreshAll()]);
+  initialLoad.catch(() => {});
 })();

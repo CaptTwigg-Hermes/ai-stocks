@@ -42,3 +42,26 @@ def test_ui_keeps_accessible_minimal_interaction_contract():
     assert "refreshGeneration" in script
     assert "generation !== refreshGeneration" in script
     assert "prefers-reduced-motion: reduce" in script
+    assert 'href="/leaderboard"' in html
+    assert 'id="trade-page"' in html
+    assert 'id="leaderboard-page"' in html
+    assert 'id="leaderboard-page-list"' in html
+    assert 'id="leaderboard-refresh"' in html
+    assert "Loading standings…" in html
+    assert "Live exhibition order" not in html
+    assert "window.location.pathname" in script
+    assert "isLeaderboardPage" in script
+    assert 'isLeaderboardPage ? "Leaderboard refreshed." : "Portfolio refreshed."' in script
+    assert "const leaderboardLists = [ui.leaderboard, ui.leaderboardFull]" in script
+    assert 'list.setAttribute("aria-busy", "true")' in script
+    assert 'list.setAttribute("aria-busy", "false")' in script
+    assert 'list.replaceChildren(element("li", "muted-empty", "Standings unavailable."))' in script
+    assert 'ui.leaderName.textContent = "Unavailable"' in script
+    assert 'const number = new Intl.NumberFormat("en"' in script
+    assert 'const leaderboardNumber = new Intl.NumberFormat("da-DK"' in script
+    assert "const returnFormatter = expanded ? leaderboardNumber : number" in script
+    assert "leaderboard-page" in css and "leaderboard-full" in css
+    assert ".leaderboard-full .leaderboard-entry > b" in css and "grid-column: 2" in css
+    assert "overflow-wrap: anywhere" in css
+    assert ".leaderboard-full .leaderboard-entry > div strong" in css
+    assert ".leader-summary strong" in css

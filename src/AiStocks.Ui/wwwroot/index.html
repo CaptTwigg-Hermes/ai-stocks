@@ -16,13 +16,17 @@
       <span class="brand-mark" aria-hidden="true">A</span>
       <span><strong>AI Stocks</strong><small>Global paper race</small></span>
     </a>
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="/" data-route="trade">Trade</a>
+      <a href="/leaderboard" data-route="leaderboard">Leaderboard</a>
+    </nav>
     <div class="topbar-actions" aria-label="Preview status">
       <span class="data-badge">Fixture data</span>
       <span class="api-state connecting" id="api-state" role="status" aria-live="polite"><i aria-hidden="true"></i> Service connecting</span>
     </div>
   </header>
 
-  <main>
+  <main id="trade-page">
     <section class="dashboard-head" aria-labelledby="page-title">
       <div class="page-intro">
         <p class="eyebrow">Paper trading preview</p>
@@ -109,7 +113,7 @@
         <article class="panel leaderboard-panel">
           <div class="panel-heading">
             <div><h2>Leaderboard</h2><p>Exhibition ranking</p></div>
-            <span class="count">DKK</span>
+            <a class="text-button" href="/leaderboard">View all</a>
           </div>
           <ol class="leaderboard" id="leaderboard-list" aria-live="polite"></ol>
           <p class="panel-state" id="leaderboard-status" role="status" aria-live="polite"></p>
@@ -131,6 +135,54 @@
       Prices and FX rates are explicit fixtures—not live market data. No broker
       connection exists, and restarting the preview resets this account.
     </aside>
+  </main>
+
+  <main class="leaderboard-page" id="leaderboard-page" hidden>
+    <section class="leaderboard-hero" aria-labelledby="leaderboard-title">
+      <div class="page-intro">
+        <p class="eyebrow">Global paper race</p>
+        <h1 id="leaderboard-title">Leaderboard</h1>
+        <p>Track a human portfolio and four AI participants. Standings use total value in DKK.</p>
+      </div>
+      <div class="leader-summary" aria-label="Current leader">
+        <span>Current leader</span>
+        <strong id="leader-name">Loading…</strong>
+        <b id="leader-value">—</b>
+      </div>
+    </section>
+
+    <section class="leaderboard-layout">
+      <article class="panel leaderboard-board">
+        <div class="panel-heading leaderboard-heading">
+          <div>
+            <p class="eyebrow">Preview exhibition</p>
+            <h2>Race standings</h2>
+          </div>
+          <button class="text-button" id="leaderboard-refresh" type="button">Refresh</button>
+        </div>
+        <ol class="leaderboard leaderboard-full" id="leaderboard-page-list"
+          aria-live="polite" aria-busy="true">
+          <li class="muted-empty">Loading standings…</li>
+        </ol>
+        <p class="panel-state" id="leaderboard-page-status" role="status" aria-live="polite"></p>
+      </article>
+
+      <aside class="leaderboard-notes" aria-label="Leaderboard details">
+        <article class="panel rule-card">
+          <span class="rule-number">01</span>
+          <div><h2>Portfolio value wins</h2><p>Cash and holdings are converted to DKK and ranked by total paper value.</p></div>
+        </article>
+        <article class="panel rule-card">
+          <span class="rule-number">02</span>
+          <div><h2>Ties share a rank</h2><p>Participants with the same value receive the same position.</p></div>
+        </article>
+        <article class="panel rule-card fixture-rule">
+          <span class="rule-number">03</span>
+          <div><h2>Preview fixtures</h2><p>Prices are illustrative, non-live fixtures. Restarting the API resets the race.</p></div>
+        </article>
+        <a class="primary leaderboard-trade-link" href="/">Open trading workspace</a>
+      </aside>
+    </section>
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
