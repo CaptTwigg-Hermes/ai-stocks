@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using AiStocks.Security;
 using AiStocks.Web;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;

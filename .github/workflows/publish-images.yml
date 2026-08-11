@@ -14,12 +14,54 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      AISTOCKS_TEST_DATABASE_URL: Host=localhost;Port=5432;Database=ai_stocks_test;Username=aistocks_test;Password=aistocks_test
+      TEST_POSTGRES_URL: postgresql+psycopg://aistocks_test:aistocks_test@localhost:5432/ai_stocks_test
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+        env:
+          POSTGRES_DB: ai_stocks_test
+          POSTGRES_USER: aistocks_test
+          POSTGRES_PASSWORD: aistocks_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aistocks_test -d ai_stocks_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Bootstrap disposable PostgreSQL roles
+        run: |
+          docker run --rm --network host -e PGPASSWORD=aistocks_test -v "$PWD:/src:ro" \
+            postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 psql -h 127.0.0.1 -U aistocks_test -d postgres \
+            --set ON_ERROR_STOP=1 --file /src/tests/postgres/bootstrap.sql
+
+      - name: Build and test .NET solution
+        run: |
+          docker run --rm --network host -e AISTOCKS_TEST_DATABASE_URL -v "$PWD:/src" -w /src \
+            mcr.microsoft.com/dotnet/sdk:10.0-noble@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 \
+            bash -ec 'dotnet restore AiStocks.slnx --locked-mode && dotnet build AiStocks.slnx -c Release --no-restore && dotnet test AiStocks.slnx -c Release --no-build --no-restore'
+
+      - name: Run Python and negative-capability gates
+        run: |
+          python3 -m pip install uv==0.12.3
+          uv run pytest -q
+          uv run python scripts/prove_no_broker.py
+
   publish:
+    needs: verify
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        target: [app, collector, worker, reporter, operations, backup-operations]
+        target: [api, ui, app, collector, worker, reporter, operations, backup-operations]
     steps:
       - name: Check out exact source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

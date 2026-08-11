@@ -47,6 +47,9 @@
           "AngleSharp.Css": "[1.0.1, )"
         }
       },
+      "aistocks.security": {
+        "type": "Project"
+      },
       "aistocks.trading": {
         "type": "Project",
         "dependencies": {

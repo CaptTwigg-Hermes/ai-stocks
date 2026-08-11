@@ -7,7 +7,9 @@ COPY src ./src
 COPY tests ./tests
 COPY docs/nasdaq-trading-hours.html docs/nasdaq-holiday-schedule-2026.xlsx ./docs/
 RUN dotnet restore AiStocks.slnx --locked-mode
-RUN dotnet publish src/AiStocks.Web/AiStocks.Web.csproj -c Release --no-restore -o /out/web \
+RUN dotnet publish src/AiStocks.Api/AiStocks.Api.csproj -c Release --no-restore -o /out/api \
+ && dotnet publish src/AiStocks.Ui/AiStocks.Ui.csproj -c Release --no-restore -o /out/ui \
+ && dotnet publish src/AiStocks.Web/AiStocks.Web.csproj -c Release --no-restore -o /out/web \
  && dotnet publish src/AiStocks.Worker/AiStocks.Worker.csproj -c Release --no-restore -o /out/worker \
  && dotnet publish src/AiStocks.Collector/AiStocks.Collector.csproj -c Release --no-restore -o /out/collector \
  && dotnet publish src/AiStocks.Operations/AiStocks.Operations.csproj -c Release --no-restore -o /out/operations
@@ -41,6 +43,16 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
     DOTNET_EnableDiagnostics=0 \
     DOTNET_CLI_TELEMETRY_OPTOUT=1
 USER aistocks
+
+FROM runtime AS api
+COPY --from=build --chown=aistocks:aistocks /out/api ./
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "AiStocks.Api.dll"]
+
+FROM runtime AS ui
+COPY --from=build --chown=aistocks:aistocks /out/ui ./
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "AiStocks.Ui.dll"]
 
 FROM runtime AS app
 COPY --from=build --chown=aistocks:aistocks /out/web ./

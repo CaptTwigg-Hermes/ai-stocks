@@ -1,16 +1,20 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/AiStocks.Api/AiStocks.Api.csproj" />
     <Project Path="src/AiStocks.Collector/AiStocks.Collector.csproj" />
     <Project Path="src/AiStocks.Core/AiStocks.Core.csproj" />
     <Project Path="src/AiStocks.MarketData/AiStocks.MarketData.csproj" />
     <Project Path="src/AiStocks.Operations/AiStocks.Operations.csproj" />
     <Project Path="src/AiStocks.Persistence/AiStocks.Persistence.csproj" />
     <Project Path="src/AiStocks.Research/AiStocks.Research.csproj" />
+    <Project Path="src/AiStocks.Security/AiStocks.Security.csproj" />
     <Project Path="src/AiStocks.Trading/AiStocks.Trading.csproj" />
+    <Project Path="src/AiStocks.Ui/AiStocks.Ui.csproj" />
     <Project Path="src/AiStocks.Web/AiStocks.Web.csproj" />
     <Project Path="src/AiStocks.Worker/AiStocks.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AiStocks.Api.Tests/AiStocks.Api.Tests.csproj" />
     <Project Path="tests/AiStocks.Core.Tests/AiStocks.Core.Tests.csproj" />
     <Project Path="tests/AiStocks.MarketData.Tests/AiStocks.MarketData.Tests.csproj" />
     <Project Path="tests/AiStocks.Persistence.Tests/AiStocks.Persistence.Tests.csproj" />

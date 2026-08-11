@@ -10,8 +10,32 @@ x-runtime-security: &runtime-security
   stop_grace_period: 30s
 
 services:
+  contest-guard:
+    <<: *runtime-security
+    profiles: ["contest"]
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:operations-${AISTOCKS_IMAGE_VERSION:-latest}
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ['test "$$AISTOCKS_DEPLOYMENT_PROFILE" = "contest"']
+    environment:
+      AISTOCKS_DEPLOYMENT_PROFILE: ${AISTOCKS_DEPLOYMENT_PROFILE:?set to contest or preview}
+    restart: "no"
+
+  preview-guard:
+    <<: *runtime-security
+    profiles: ["preview"]
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:operations-${AISTOCKS_IMAGE_VERSION:-latest}
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ['test "$$AISTOCKS_DEPLOYMENT_PROFILE" = "preview"']
+    environment:
+      AISTOCKS_DEPLOYMENT_PROFILE: ${AISTOCKS_DEPLOYMENT_PROFILE:?set to contest or preview}
+    restart: "no"
+
   app:
     <<: *runtime-security
+    profiles: ["contest"]
+    depends_on:
+      contest-guard:
+        condition: service_completed_successfully
     image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:app-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       APP_ENV: production
@@ -35,8 +59,59 @@ services:
       start_period: 20s
     networks: [egress]
 
+  api:
+    <<: *runtime-security
+    profiles: ["preview"]
+    depends_on:
+      preview-guard:
+        condition: service_completed_successfully
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:api-${AISTOCKS_IMAGE_VERSION:-latest}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      PREVIEW_MODE: "1"
+      TZ: Europe/Stockholm
+      UI_ORIGINS: ${PREVIEW_UI_ORIGINS:-http://192.168.50.2:3232}
+    ports:
+      - "${API_BIND_ADDRESS:-192.168.50.2}:${API_PORT:-3233}:8080"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [egress]
+
+  ui:
+    <<: *runtime-security
+    profiles: ["preview"]
+    depends_on:
+      preview-guard:
+        condition: service_completed_successfully
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:ui-${AISTOCKS_IMAGE_VERSION:-latest}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      TZ: Europe/Stockholm
+      API_PUBLIC_ORIGIN: ${PREVIEW_API_ORIGIN:-http://192.168.50.2:3233}
+    ports:
+      - "${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8080"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [egress]
+
   collector:
     <<: *runtime-security
+    profiles: ["contest"]
+    depends_on:
+      contest-guard:
+        condition: service_completed_successfully
     image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:collector-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       APP_ENV: production
@@ -64,6 +139,10 @@ services:
 
   worker:
     <<: *runtime-security
+    profiles: ["contest"]
+    depends_on:
+      contest-guard:
+        condition: service_completed_successfully
     image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:worker-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       APP_ENV: production
@@ -90,6 +169,10 @@ services:
 
   reporter:
     <<: *runtime-security
+    profiles: ["contest"]
+    depends_on:
+      contest-guard:
+        condition: service_completed_successfully
     image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:reporter-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       APP_ENV: production

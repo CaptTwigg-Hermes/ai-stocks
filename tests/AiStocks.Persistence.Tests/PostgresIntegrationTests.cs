@@ -382,9 +382,10 @@ public sealed class PostgresIntegrationTests
             await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);
             await Execute(connection, "CREATE TABLE orders(id bigint PRIMARY KEY)");
 
-            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            var exception = await Assert.ThrowsAsync<MigrationExecutionException>(() =>
                 new PostgresMigrationRunner(dataSource).ApplyAsync(CancellationToken.None));
-            Assert.Contains("clean database", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("schema-guard", exception.Stage);
+            Assert.Contains("clean database", exception.InnerException?.Message, StringComparison.OrdinalIgnoreCase);
             await using var check = new NpgsqlCommand("SELECT to_regclass('public.schema_migrations') IS NULL", connection);
             Assert.True(await check.ExecuteScalarAsync(CancellationToken.None) is true);
         }

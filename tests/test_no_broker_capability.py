@@ -28,10 +28,24 @@ def test_executable_negative_capability_inventory_passes():
     assert proof["order_path_denial_probe"]["paper_order_count"] == 1
     assert proof["order_path_denial_probe"]["network_events"] == []
     assert {table["executable"] for table in proof["endpoint_tables"]} == {
-        "AiStocks.Collector", "AiStocks.Web", "AiStocks.Worker"
+        "AiStocks.Api", "AiStocks.Collector", "AiStocks.Ui", "AiStocks.Web", "AiStocks.Worker"
     }
+    production_api = next(
+        table for table in proof["endpoint_tables"]
+        if table["executable"] == "AiStocks.Api" and table["environment"] == "Production"
+    )
+    preview_api = next(
+        table for table in proof["endpoint_tables"]
+        if table["executable"] == "AiStocks.Api" and table["environment"] == "Testing"
+    )
+    assert not any(route["method"] != "GET" for route in production_api["routes"])
+    assert {"method": "POST", "path": "/api/v1/orders"} in preview_api["routes"]
+    assert proof["simulated_mutation_routes"] == [
+        {"environment": "Testing", "executable": "AiStocks.Api", "method": "POST", "path": "/api/v1/orders"}
+    ]
     assert proof["routes"] == [
         {"method": "GET", "path": "/"},
+        {"method": "GET", "path": "/__endpoint-inventory"},
         {"method": "POST", "path": "/admin/pause"},
         {"method": "POST", "path": "/admin/pre-start-reset"},
         {"method": "POST", "path": "/admin/resume"},
@@ -45,8 +59,17 @@ def test_executable_negative_capability_inventory_passes():
         {"method": "GET", "path": "/api/leaderboard"},
         {"method": "GET", "path": "/api/portfolios"},
         {"method": "GET", "path": "/api/queued-orders"},
+        {"method": "GET", "path": "/api/v1/instruments"},
+        {"method": "GET", "path": "/api/v1/leaderboard"},
+        {"method": "GET", "path": "/api/v1/me"},
+        {"method": "GET", "path": "/api/v1/orders"},
+        {"method": "POST", "path": "/api/v1/orders"},
+        {"method": "GET", "path": "/api/v1/portfolio"},
         {"method": "GET", "path": "/healthz"},
         {"method": "GET", "path": "/readyz"},
+        {"method": "GET", "path": "/runtime-config.js"},
+        {"method": "GET", "path": "/{*path:nonfile}"},
+        {"method": "HEAD", "path": "/{*path:nonfile}"},
     ]
 
 

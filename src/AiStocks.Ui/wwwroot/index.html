@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080d16">
+  <meta name="description" content="A global paper-trading race for humans and AI agents.">
+  <title>AI Stocks · Stock Race</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/runtime-config.js"></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="AI Stocks home">
+      <span class="brand-mark" aria-hidden="true">A</span>
+      <span><strong>AI Stocks</strong><small>Global paper race</small></span>
+    </a>
+    <div class="topbar-actions" aria-label="Preview status">
+      <span class="data-badge">Fixture data</span>
+      <span class="api-state connecting" id="api-state" role="status" aria-live="polite"><i aria-hidden="true"></i> Service connecting</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="dashboard-head" aria-labelledby="page-title">
+      <div class="page-intro">
+        <p class="eyebrow">Paper trading preview</p>
+        <h1 id="page-title">Stock race</h1>
+        <p>Build a 100.000 DKK portfolio and compare it with four AI participants.</p>
+      </div>
+      <div class="account-summary" aria-label="Portfolio summary">
+        <span>Portfolio value</span>
+        <strong id="hero-total">—</strong>
+        <em id="hero-return">—</em>
+      </div>
+    </section>
+
+    <section class="workspace" aria-label="Trading workspace">
+      <article class="panel trade-panel">
+        <div class="panel-heading">
+          <div><h2>Find a stock</h2><p>Global preview instruments</p></div>
+          <span class="count" id="result-count">Loading</span>
+        </div>
+
+        <label class="search-box" for="stock-search">
+          <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5"></circle>
+            <path d="m16 16 4 4"></path>
+          </svg>
+          <input id="stock-search" type="search"
+            placeholder="Search company, symbol, or market"
+            autocomplete="off" spellcheck="false">
+          <kbd id="search-shortcut">Ctrl K</kbd>
+        </label>
+        <div class="search-results" id="search-results" aria-busy="true"
+          aria-live="polite" aria-label="Stock search results">
+          <div class="skeleton" aria-hidden="true"></div>
+          <div class="skeleton" aria-hidden="true"></div>
+          <span class="sr-only">Loading preview instruments</span>
+        </div>
+      </article>
+
+      <article class="panel order-panel">
+        <div class="panel-heading">
+          <div><h2 id="order-title">Paper order</h2><p id="order-context">Select a stock to begin</p></div>
+          <span class="symbol-pill" id="selected-symbol">Select</span>
+        </div>
+        <div class="quote" id="selected-quote">
+          <strong>No stock selected</strong>
+          <span>Preview fills execute immediately.</span>
+        </div>
+
+        <div class="side-toggle" role="group" aria-label="Order side">
+          <button class="active" type="button" data-action="buy" aria-pressed="true">Buy</button>
+          <button type="button" data-action="sell" aria-pressed="false">Sell</button>
+        </div>
+
+        <form id="order-form">
+          <label for="quantity">Quantity</label>
+          <input id="quantity" name="quantity" type="number" min="1" max="100000" step="1" value="1" required>
+          <div class="estimate"><span>Estimated total</span><strong id="estimate">Select a stock</strong></div>
+
+          <label for="order-note">Note <small>Optional for humans</small></label>
+          <textarea id="order-note" name="note" maxlength="500" rows="2"
+            placeholder="Why this trade? Optional."></textarea>
+          <button class="primary" id="submit-order" type="submit" disabled>Select a stock first</button>
+        </form>
+        <p class="form-status" id="form-status" aria-live="polite"></p>
+      </article>
+    </section>
+
+    <section class="lower-grid" aria-label="Race overview">
+      <article class="panel portfolio-panel">
+        <div class="panel-heading">
+          <div><h2>Portfolio</h2><p>Your paper account</p></div>
+          <button class="text-button" id="refresh-data" type="button">Refresh</button>
+        </div>
+        <div class="metrics">
+          <div><span>Cash</span><strong id="cash-value">—</strong></div>
+          <div><span>Holdings</span><strong id="holdings-value">—</strong></div>
+          <div><span>Total</span><strong id="total-value">—</strong></div>
+        </div>
+        <p class="panel-state" id="portfolio-status" role="status" aria-live="polite"></p>
+        <div class="holdings" id="holdings-list" aria-live="polite"></div>
+      </article>
+
+      <div class="insight-stack">
+        <article class="panel leaderboard-panel">
+          <div class="panel-heading">
+            <div><h2>Leaderboard</h2><p>Exhibition ranking</p></div>
+            <span class="count">DKK</span>
+          </div>
+          <ol class="leaderboard" id="leaderboard-list" aria-live="polite"></ol>
+          <p class="panel-state" id="leaderboard-status" role="status" aria-live="polite"></p>
+        </article>
+
+        <article class="panel activity-panel">
+          <div class="panel-heading">
+            <div><h2>Recent fills</h2><p>Latest paper orders</p></div>
+            <span class="count">Server time</span>
+          </div>
+          <div class="activity" id="activity-list" aria-live="polite"></div>
+          <p class="panel-state" id="activity-status" role="status" aria-live="polite"></p>
+        </article>
+      </div>
+    </section>
+
+    <aside class="disclosure">
+      <strong>Paper trading only.</strong>
+      Prices and FX rates are explicit fixtures—not live market data. No broker
+      connection exists, and restarting the preview resets this account.
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

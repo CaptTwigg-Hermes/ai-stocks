@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using AiStocks.Persistence;
+using AiStocks.Security;
 using AiStocks.Web;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
@@ -85,6 +86,8 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+if (!builder.Environment.IsEnvironment("Testing"))
+    _ = app.Services.GetRequiredService<IAccessAssertionValidator>();
 app.Use(async (context, next) =>
 {
     context.Response.Headers.XContentTypeOptions = "nosniff";

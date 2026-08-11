@@ -29,8 +29,13 @@ ROUTE_HELPER = re.compile(r'\bMapControl\s*\(\s*(?P<receiver>[A-Za-z_]\w*)\s*,\s
 PROCESS = re.compile(r"\bProcessStartInfo\b|\bProcess\.Start\s*\(")
 NETWORK_API = re.compile(r"\b(?:Socket|HttpClient|HttpRequestMessage|WebRequest|TcpClient)\b")
 ALLOWED_PROCESS_PROJECTS = {"AiStocks.Research", "AiStocks.Operations"}
-ALLOWED_MUTATIONS = {"/admin/start", "/admin/pause", "/admin/resume", "/admin/pre-start-reset"}
-SHIPPED_EXECUTABLES = {"AiStocks.Collector", "AiStocks.Web", "AiStocks.Worker"}
+ALLOWED_MUTATIONS = {
+    "/admin/start", "/admin/pause", "/admin/resume", "/admin/pre-start-reset",
+    "/api/v1/orders",
+}
+SHIPPED_EXECUTABLES = {
+    "AiStocks.Api", "AiStocks.Collector", "AiStocks.Ui", "AiStocks.Web", "AiStocks.Worker",
+}
 
 
 def relative(path: pathlib.Path) -> str:
@@ -61,7 +66,12 @@ def order_path_denial_probe(findings: list[str]) -> dict[str, object]:
         findings.append("executable order-path denial probe unavailable; build AiStocks.Worker first")
         return unavailable
     environment = os.environ.copy()
-    environment.update({"http_proxy": "http://127.0.0.1:1", "https_proxy": "http://127.0.0.1:1", "NO_PROXY": ""})
+    environment.update({
+        "http_proxy": "http://127.0.0.1:1",
+        "https_proxy": "http://127.0.0.1:1",
+        "NO_PROXY": "",
+        "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1",
+    })
     try:
         result = subprocess.run(  # noqa: S603  # nosec B603
             [dotnet, str(dll), "--probe-order-path-denial"], cwd=ROOT, env=environment,
@@ -86,19 +96,26 @@ def order_path_denial_probe(findings: list[str]) -> dict[str, object]:
     return probe
 
 
-def runtime_endpoint_table(executable: str, findings: list[str]) -> dict[str, object]:
+def runtime_endpoint_table(executable: str, findings: list[str], environment_name: str = "Testing") -> dict[str, object]:
     configuration = os.environ.get("AISTOCKS_BUILD_CONFIGURATION", "Release")
     dll = SOURCE / executable / "bin" / configuration / "net10.0" / f"{executable}.dll"
     dotnet = shutil.which("dotnet") or ("/opt/data/dotnet/dotnet" if pathlib.Path("/opt/data/dotnet/dotnet").is_file() else None)
     if dotnet is None or not dll.is_file():
         findings.append(f"runtime endpoint inventory unavailable for {executable}; build the shipped executables first")
-        return {"executable": executable, "routes": []}
+        return {"executable": executable, "environment": environment_name, "routes": []}
     environment = os.environ.copy()
     denied_database = "Host=127.0.0.1;Database=aistocks_endpoint_inventory;Username=denied;Password=denied"
     environment.update({
-        "DOTNET_ENVIRONMENT": "Testing",
+        "DOTNET_ENVIRONMENT": environment_name,
+        "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1",
         "DATABASE_URL": denied_database,
         "COLLECTOR_DATABASE_URL": denied_database,
+        "API_PUBLIC_ORIGIN": "https://api.example.invalid",
+        "UI_ORIGINS": "https://ui.example.invalid",
+        "ACCESS_TEAM_DOMAIN": "https://contest.cloudflareaccess.com",
+        "ACCESS_AUD": "endpoint-inventory-audience",
+        "ACCESS_OWNER_EMAILS": "owner@example.invalid",
+        "ACCESS_VIEWER_EMAILS": "viewer@example.invalid",
         "FIRDS_ACQUISITION_PLAN_PATH": str(ROOT / "tests" / "AiStocks.MarketData.Tests" / "Fixtures" / "firds-plan-unused.json"),
         "ARTIFACT_ROOT": str(ROOT),
     })
@@ -108,12 +125,12 @@ def runtime_endpoint_table(executable: str, findings: list[str]) -> dict[str, ob
             text=True, capture_output=True, check=False, timeout=10)
     except (OSError, subprocess.TimeoutExpired) as error:
         findings.append(f"runtime endpoint inventory failed for {executable}: {error}")
-        return {"executable": executable, "routes": []}
+        return {"executable": executable, "environment": environment_name, "routes": []}
     marker = next((line.removeprefix("AISTOCKS_ENDPOINTS=") for line in result.stdout.splitlines()
                    if line.startswith("AISTOCKS_ENDPOINTS=")), None)
     if result.returncode != 0 or marker is None:
         findings.append(f"runtime endpoint inventory failed for {executable}: exit {result.returncode}")
-        return {"executable": executable, "routes": []}
+        return {"executable": executable, "environment": environment_name, "routes": []}
     try:
         values = json.loads(marker)
         routes = sorted(({"method": str(item["method"]).upper(), "path": str(item["path"])} for item in values),
@@ -123,7 +140,7 @@ def runtime_endpoint_table(executable: str, findings: list[str]) -> dict[str, ob
     except (json.JSONDecodeError, KeyError, TypeError) as error:
         findings.append(f"runtime endpoint inventory malformed for {executable}: {error}")
         routes = []
-    return {"executable": executable, "routes": routes}
+    return {"executable": executable, "environment": environment_name, "routes": routes}
 
 
 def inventory() -> dict[str, object]:
@@ -182,7 +199,7 @@ def inventory() -> dict[str, object]:
         environment.extend(reads["environment"])
         configuration.extend(reads["configuration"])
         unresolved = reads["dynamic"]
-        if rel == "src/AiStocks.Web/Program.cs":
+        if rel in {"src/AiStocks.Api/Program.cs", "src/AiStocks.Web/Program.cs"}:
             names = sorted(set(re.findall(r'\bRequired\(\s*"([A-Za-z0-9_:.-]+)"\s*\)', text)))
             configuration.extend({"file": rel, "line": item["line"], "name": name, "via": "Required(name)"}
                                  for item in unresolved if item["expression"] == "name" for name in names)
@@ -216,6 +233,14 @@ def inventory() -> dict[str, object]:
                 findings.append(f"unapproved HTTP mutation route at {rel}:{line}: POST {route_path}")
 
     endpoint_tables = [runtime_endpoint_table(executable, findings) for executable in sorted(SHIPPED_EXECUTABLES)]
+    endpoint_tables.append(runtime_endpoint_table("AiStocks.Api", findings, "Production"))
+    production_api = next(table for table in endpoint_tables
+                          if table["executable"] == "AiStocks.Api" and table["environment"] == "Production")
+    production_mutations = [route for route in cast(list[dict[str, Any]], production_api["routes"])
+                            if route["method"] != "GET"]
+    if production_mutations:
+        findings.append("production API exposes simulated mutation routes: " +
+                        ", ".join(f"{route['method']} {route['path']}" for route in production_mutations))
     worker_packages = {item["name"].casefold() for item in resolved if item["file"] == "src/AiStocks.Worker/packages.lock.json"}
     if worker_packages & FORBIDDEN_PACKAGES:
         findings.append("order-path provider denial failed: " + ", ".join(sorted(worker_packages & FORBIDDEN_PACKAGES)))
@@ -227,6 +252,16 @@ def inventory() -> dict[str, object]:
     flat_routes = [{"method": method, "path": path} for path, method in sorted({
         (str(route["path"]), str(route["method"])) for table in endpoint_tables
         for route in cast(list[dict[str, Any]], table["routes"])})]
+    simulated_mutations = sorted(({
+        "environment": str(table["environment"]),
+        "executable": str(table["executable"]),
+        "method": str(route["method"]),
+        "path": str(route["path"]),
+    } for table in endpoint_tables
+        for route in cast(list[dict[str, Any]], table["routes"])
+        if table["executable"] == "AiStocks.Api"
+        and table["environment"] == "Testing"
+        and route["method"] != "GET"), key=lambda item: (item["path"], item["method"]))
     return {"ok": not findings, "findings": sorted(findings),
             "packages": sorted(packages, key=lambda i: (i["name"], i["file"])),
             "resolved_lock_packages": sorted(resolved, key=lambda i: (i["name"], i["file"], i["framework"])),
@@ -236,6 +271,7 @@ def inventory() -> dict[str, object]:
             "dynamic_configuration_reads": sorted(dynamic_configuration, key=lambda i: (str(i["file"]), str(i["line"]))),
             "process_calls": sorted(processes, key=lambda i: (str(i["file"]), str(i["line"]))),
             "endpoint_tables": endpoint_tables,
+            "simulated_mutation_routes": simulated_mutations,
             "order_path_denial_probe": order_probe,
             "routes": flat_routes}
 

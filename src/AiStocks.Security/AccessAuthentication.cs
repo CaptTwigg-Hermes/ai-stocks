@@ -4,9 +4,10 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AiStocks.Web;
+namespace AiStocks.Security;
 
 public sealed class AccessOptions
 {
@@ -71,6 +72,7 @@ public sealed class CloudflareAccessValidator : IAccessAssertionValidator, IDisp
     private readonly TimeSpan _cacheTtl;
     private readonly TimeSpan _refreshCooldown;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
+    private readonly ReaderWriterLockSlim _keysLock = new();
     private IReadOnlyDictionary<string, RSA> _keys = new Dictionary<string, RSA>();
     private DateTimeOffset _expiresAt;
     private DateTimeOffset _lastRefreshAttempt = DateTimeOffset.MinValue;
@@ -107,20 +109,25 @@ public sealed class CloudflareAccessValidator : IAccessAssertionValidator, IDisp
         if (kid.Length is 0 or > 256) throw new AuthenticationFailureException("Invalid key id.");
 
         var now = _clock.GetUtcNow();
-        if (!_keys.TryGetValue(kid, out var key) || now >= _expiresAt)
+        var refreshRequired = false;
+        _keysLock.EnterReadLock();
+        try { refreshRequired = !_keys.ContainsKey(kid) || now >= _expiresAt; }
+        finally { _keysLock.ExitReadLock(); }
+        if (refreshRequired)
         {
             await RefreshAsync(now, cancellationToken);
-            _keys.TryGetValue(kid, out key);
         }
-        if (key is null) throw new AuthenticationFailureException("Signing key is unavailable.");
         byte[] signature;
         try { signature = Decode(parts[2]); }
         catch (FormatException exception) { throw new AuthenticationFailureException("Invalid signature encoding.", exception); }
+        _keysLock.EnterReadLock();
         try
         {
+            if (!_keys.TryGetValue(kid, out var key)) throw new AuthenticationFailureException("Signing key is unavailable.");
             if (!key.VerifyData(Encoding.ASCII.GetBytes($"{parts[0]}.{parts[1]}"), signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)) throw new AuthenticationFailureException("Invalid signature.");
         }
         catch (CryptographicException exception) { throw new AuthenticationFailureException("Invalid signature.", exception); }
+        finally { _keysLock.ExitReadLock(); }
 
         using var payload = ParsePart(parts[1]);
         var claims = payload.RootElement;
@@ -151,9 +158,14 @@ public sealed class CloudflareAccessValidator : IAccessAssertionValidator, IDisp
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception) { return; }
-            foreach (var old in _keys.Values) if (!candidate.Values.Contains(old)) old.Dispose();
-            _keys = candidate;
-            _expiresAt = now + _cacheTtl;
+            _keysLock.EnterWriteLock();
+            try
+            {
+                foreach (var old in _keys.Values) if (!candidate.Values.Contains(old)) old.Dispose();
+                _keys = candidate;
+                _expiresAt = now + _cacheTtl;
+            }
+            finally { _keysLock.ExitWriteLock(); }
         }
         finally { _refreshLock.Release(); }
     }
@@ -242,7 +254,10 @@ public sealed class CloudflareAccessValidator : IAccessAssertionValidator, IDisp
 
     public void Dispose()
     {
-        foreach (var key in _keys.Values) key.Dispose();
+        _keysLock.EnterWriteLock();
+        try { foreach (var key in _keys.Values) key.Dispose(); }
+        finally { _keysLock.ExitWriteLock(); }
+        _keysLock.Dispose();
         _refreshLock.Dispose();
     }
 }

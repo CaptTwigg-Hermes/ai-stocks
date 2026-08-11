@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AiStocks.Core\AiStocks.Core.csproj" />
     <ProjectReference Include="..\AiStocks.Persistence\AiStocks.Persistence.csproj" />
+    <ProjectReference Include="..\AiStocks.Security\AiStocks.Security.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

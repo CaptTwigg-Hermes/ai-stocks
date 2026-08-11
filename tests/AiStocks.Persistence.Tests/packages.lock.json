@@ -175,6 +175,9 @@
           "AngleSharp.Css": "[1.0.1, )"
         }
       },
+      "aistocks.security": {
+        "type": "Project"
+      },
       "aistocks.trading": {
         "type": "Project",
         "dependencies": {
@@ -185,7 +188,8 @@
         "type": "Project",
         "dependencies": {
           "AiStocks.Core": "[1.0.0, )",
-          "AiStocks.Persistence": "[1.0.0, )"
+          "AiStocks.Persistence": "[1.0.0, )",
+          "AiStocks.Security": "[1.0.0, )"
         }
       },
       "aistocks.worker": {

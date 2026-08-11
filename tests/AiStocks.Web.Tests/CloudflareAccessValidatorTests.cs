@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using AiStocks.Web;
+using AiStocks.Security;
 using Microsoft.Extensions.Options;
 
 namespace AiStocks.Web.Tests;
@@ -73,6 +73,42 @@ public sealed class CloudflareAccessValidatorTests
         fetcher.Document = Jwks(second, "second");
         clock.Now = clock.Now.AddSeconds(2);
         Assert.Equal("viewer", (await validator.ValidateAsync(Token(second, "second"), default)).Role);
+    }
+
+    [Fact]
+    public async Task Concurrent_rotation_never_disposes_a_key_visible_to_an_active_validator()
+    {
+        using var first = RSA.Create(2048);
+        using var second = RSA.Create(2048);
+        var clock = new MutableTimeProvider(Now);
+        var fetcher = new FakeJwksFetcher(Jwks(first, "first"));
+        using var validator = Validator(fetcher, clock, TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(1));
+        var firstToken = Token(first, "first");
+        Assert.Equal("viewer", (await validator.ValidateAsync(firstToken, default)).Role);
+
+        fetcher.Document = Jwks(second, "second");
+        clock.Now = clock.Now.AddSeconds(2);
+        var validations = Enumerable.Range(0, 2_000)
+            .Select(_ => Task.Run(async () =>
+            {
+                try
+                {
+                    await validator.ValidateAsync(firstToken, default);
+                    return null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            }))
+            .ToArray();
+        var rotation = validator.ValidateAsync(Token(second, "second"), default);
+
+        var errors = await Task.WhenAll(validations);
+        var rotatedIdentity = await rotation;
+        Assert.DoesNotContain(errors, error => error is not null and not AuthenticationFailureException);
+        Assert.Contains(errors, error => error is null);
+        Assert.Equal("viewer", rotatedIdentity.Role);
     }
 
     private static CloudflareAccessValidator Validator(FakeJwksFetcher fetcher, TimeProvider? clock = null, TimeSpan? ttl = null, TimeSpan? cooldown = null) => new(

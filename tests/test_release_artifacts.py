@@ -1,3 +1,5 @@
+import os
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -9,19 +11,39 @@ PINNED_HERMES = "226b095a59df0be88e195a90fbd209f236665b7b"
 def test_dockge_compose_separates_and_hardens_services():
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     services = compose["services"]
-    assert {"app", "collector", "worker"} <= set(services)
+    assert {"api", "ui", "app", "collector", "worker"} <= set(services)
     assert services["app"]["ports"] == ["${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8080"]
-    for name in ("app", "collector", "worker"):
+    assert services["ui"]["ports"] == ["${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8080"]
+    assert services["api"]["ports"] == ["${API_BIND_ADDRESS:-192.168.50.2}:${API_PORT:-3233}:8080"]
+    assert services["app"]["profiles"] == ["contest"]
+    assert services["api"]["profiles"] == ["preview"]
+    assert services["ui"]["profiles"] == ["preview"]
+    for name in ("collector", "worker", "reporter"):
+        assert services[name]["profiles"] == ["contest"]
+    assert services["contest-guard"]["profiles"] == ["contest"]
+    assert services["preview-guard"]["profiles"] == ["preview"]
+    assert all("profiles" in service for service in services.values())
+    for name in ("app", "collector", "worker", "reporter"):
+        assert services[name]["depends_on"]["contest-guard"]["condition"] == "service_completed_successfully"
+    for name in ("api", "ui"):
+        assert services[name]["depends_on"]["preview-guard"]["condition"] == "service_completed_successfully"
+    assert services["api"]["environment"]["PREVIEW_MODE"] == "1"
+    assert services["api"]["environment"]["ASPNETCORE_ENVIRONMENT"] == "Development"
+    for name in ("api", "ui", "app", "collector", "worker"):
         service = services[name]
         assert service["read_only"] is True
         assert service["cap_drop"] == ["ALL"]
         assert "no-new-privileges:true" in service["security_opt"]
         assert service["init"] is True
-    assert "HERMES_HOME" not in services["app"]["environment"]
+    assert "DATABASE_URL" in services["app"]["environment"]
+    assert "DATABASE_URL" not in services["ui"]["environment"]
+    assert "HERMES_HOME" not in services["ui"]["environment"]
     repository = "${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}"
     version = "${AISTOCKS_IMAGE_VERSION:-latest}"
     targets = {
+        "api": "api",
         "app": "app",
+        "ui": "ui",
         "collector": "collector",
         "worker": "worker",
         "reporter": "reporter",
@@ -52,19 +74,110 @@ def test_dockge_compose_separates_and_hardens_services():
         "CMD", "curl", "--fail", "--silent", "--max-time", "2",
         "http://127.0.0.1:8080/healthz",
     ]
+    assert services["api"]["healthcheck"]["test"] == expected_health
+    assert services["ui"]["healthcheck"]["test"] == expected_health
     assert services["app"]["healthcheck"]["test"] == expected_health
     assert services["worker"]["healthcheck"]["test"] == expected_health
     expected_health[-1] = "http://127.0.0.1:8080/readyz"
     assert services["collector"]["healthcheck"]["test"] == expected_health
 
 
-def test_example_environment_renders_compose_with_fail_closed_proxy_configuration():
+def test_compose_mode_preflight_rejects_running_opposite_profile(tmp_path):
+    fake = tmp_path / "compose"
+    fake.write_text("#!/bin/sh\nif [ \"$1\" = ps ]; then printf 'api\\n'; exit 0; fi\nprintf '%s\\n' \"$*\"\n")
+    fake.chmod(0o755)
+    env = os.environ | {"COMPOSE": str(fake)}
+
+    result = subprocess.run(
+        [ROOT / "scripts/compose-mode.sh", "contest", "up", "-d"],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "preview runtime is still active" in result.stderr
+    assert "--profile contest up" not in result.stdout
+
+
+def test_compose_mode_rejects_global_options_before_action(tmp_path):
+    fake = tmp_path / "compose"
+    log = tmp_path / "invoked"
+    fake.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$COMPOSE_LOG\"\n")
+    fake.chmod(0o755)
+    env = os.environ | {"COMPOSE": str(fake), "COMPOSE_LOG": str(log)}
+
+    for arguments in (
+        ("--ansi", "never", "up", "-d"),
+        ("-f", "other-compose.yaml", "start"),
+        ("--project-name", "other", "restart"),
+    ):
+        result = subprocess.run(
+            [ROOT / "scripts/compose-mode.sh", "preview", *arguments],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+        )
+
+        assert result.returncode != 0, (arguments, result)
+        assert "Compose global options are forbidden" in result.stderr
+    assert not log.exists()
+
+
+def test_compose_mode_preflight_fails_closed_when_status_is_unknown(tmp_path):
+    fake = tmp_path / "compose"
+    log = tmp_path / "started"
+    fake.write_text(
+        "#!/bin/sh\n"
+        "if [ \"$1\" = ps ]; then printf 'status unavailable\\n' >&2; exit 42; fi\n"
+        "printf '%s\\n' \"$*\" >> \"$START_LOG\"\n"
+    )
+    fake.chmod(0o755)
+    env = os.environ | {"COMPOSE": str(fake), "START_LOG": str(log)}
+
+    for mode in ("contest", "preview"):
+        for action in ("up", "start", "restart"):
+            result = subprocess.run(
+                [ROOT / "scripts/compose-mode.sh", mode, action],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+            )
+
+            assert result.returncode != 0, (mode, action, result)
+            assert "could not determine active runtime services" in result.stderr
+    assert not log.exists()
+
+
+def test_compose_mode_preflight_launches_exactly_one_runtime_profile(tmp_path):
+    fake = tmp_path / "compose"
+    fake.write_text("#!/bin/sh\nif [ \"$1\" = ps ]; then exit 0; fi\nprintf '%s|%s\\n' \"$AISTOCKS_DEPLOYMENT_PROFILE\" \"$*\"\n")
+    fake.chmod(0o755)
+    env = os.environ | {"COMPOSE": str(fake)}
+
+    result = subprocess.run(
+        [ROOT / "scripts/compose-mode.sh", "preview", "up", "-d", "api", "ui"],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert result.stdout.strip() == "preview|--profile preview up -d api ui"
+
+
+def test_example_environment_renders_fail_closed_access_and_separate_preview_routing():
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     example = (ROOT / ".env.example").read_text()
-    assert compose["services"]["app"]["environment"]["TRUSTED_PROXY_IPS"].startswith(
-        "${TRUSTED_PROXY_IPS:?"
-    )
-    for name in ("TRUSTED_PROXY_IPS", "COLLECTOR_DATABASE_URL"):
+    app_environment = compose["services"]["app"]["environment"]
+    assert app_environment["ACCESS_TEAM_DOMAIN"].startswith("${ACCESS_TEAM_DOMAIN:?")
+    assert compose["services"]["api"]["environment"]["UI_ORIGINS"].startswith("${PREVIEW_UI_ORIGINS:-")
+    assert compose["services"]["ui"]["environment"]["API_PUBLIC_ORIGIN"].startswith("${PREVIEW_API_ORIGIN:-")
+    for name in ("TRUSTED_PROXY_IPS", "COLLECTOR_DATABASE_URL", "PREVIEW_API_ORIGIN", "PREVIEW_UI_ORIGINS"):
         assert f"{name}=" in example
     assert "STATUS_PINNED_KEY_ID=" not in example
 
@@ -100,7 +213,20 @@ def test_github_publishes_every_dockge_image_target():
     workflow = yaml.safe_load((ROOT / ".github/workflows/publish-images.yml").read_text())
     assert workflow["permissions"] == {"contents": "read", "packages": "write"}
     targets = workflow["jobs"]["publish"]["strategy"]["matrix"]["target"]
-    assert targets == ["app", "collector", "worker", "reporter", "operations", "backup-operations"]
+    assert workflow["jobs"]["publish"]["needs"] == "verify"
+    verify_steps = "\n".join(step.get("run", "") for step in workflow["jobs"]["verify"]["steps"])
+    verify_job = workflow["jobs"]["verify"]
+    assert verify_job["services"]["postgres"]["image"].startswith("postgres:17")
+    assert "AISTOCKS_TEST_DATABASE_URL" in verify_job["env"]
+    assert "TEST_POSTGRES_URL" in verify_job["env"]
+    assert "dotnet test" in verify_steps
+    assert "tests/postgres/bootstrap.sql" in verify_steps
+    bootstrap = (ROOT / "tests/postgres/bootstrap.sql").read_text()
+    for role in ("ai_stocks_worker", "ai_stocks_operations", "ai_stocks_web"):
+        assert role in bootstrap
+    assert "uv run pytest -q" in verify_steps
+    assert "uv run python scripts/prove_no_broker.py" in verify_steps
+    assert targets == ["api", "ui", "app", "collector", "worker", "reporter", "operations", "backup-operations"]
     build = workflow["jobs"]["publish"]["steps"][-1]
     assert build["with"]["target"] == "${{ matrix.target }}"
     assert build["with"]["push"] is True
@@ -109,10 +235,21 @@ def test_github_publishes_every_dockge_image_target():
 
 def test_release_gate_and_restore_fail_closed_with_scheduled_backup():
     verify = (ROOT / "scripts" / "verify-release.sh").read_text()
+    readme = (ROOT / "README.md").read_text()
     restore = (ROOT / "scripts" / "restore-test.sh").read_text()
     cycle = (ROOT / "scripts" / "backup-cycle.sh").read_text()
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     assert "AISTOCKS_TEST_DATABASE_URL is required" in verify
+    assert "TEST_POSTGRES_URL is required" in verify
+    assert "/workspace/house-consensus" not in verify
+    assert "uv run pytest -q" in verify
+    assert "uv run python scripts/prove_no_broker.py" in verify
+    assert "scripts/compose-mode.sh contest" in readme
+    assert "scripts/compose-mode.sh preview" in readme
+    assert "contest stop app worker collector reporter" in readme
+    assert "scripts/compose-mode.sh contest config -q" in verify
+    assert "scripts/compose-mode.sh preview config -q" in verify
+    assert "volatile" in readme.lower() and "fixture" in readme.lower()
     assert "restored migration checksums or contest invariants failed verification" in restore
     assert "120000" in restore
     assert "backup or restore verification failed" in cycle

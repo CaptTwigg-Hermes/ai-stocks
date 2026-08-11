@@ -5,7 +5,8 @@ broker integration and cannot place real orders.
 
 ## Production topology
 
-- Dockge runs `app`, `worker`, `collector`, and `reporter`.
+- The authoritative private 2026 contest uses the explicit `contest` profile:
+  Dockge runs `app`, `worker`, `collector`, and `reporter`.
 - PostgreSQL is external. There is no database service in this
   Compose stack.
 - The app binds by default to `192.168.50.2:3232` for the existing
@@ -18,15 +19,22 @@ broker integration and cannot place real orders.
 - `migrate` and `backup-tools` are one-shot services under the
   `operations` profile.
 
+The separate `api` and `ui` services are an explicit **local preview** under
+the `preview` profile. They provide fixture-priced global search and volatile
+in-memory human paper trading with 100,000 DKK. Preview state resets on API
+restart, has no broker/provider connection, is not the contest ledger, and must
+not be routed through the production Cloudflare hostname. The preview profile
+reuses port 3232, so never enable `contest` and `preview` together.
+
 Do not start the contest until every release gate in
 `docs/acceptance-contract.md` has passed.
 
 ## Dockge preparation
 
-Pushes to `main` publish six target-specific images to
+Pushes to `main` publish eight target-specific images to
 `ghcr.io/capttwigg-hermes/ai-stocks`. The Compose stack pulls
-`app-latest`, `collector-latest`, `worker-latest`, `reporter-latest`,
-`operations-latest`, and `backup-operations-latest`; Dockge no longer
+`app-latest`, `api-latest`, `ui-latest`, `collector-latest`, `worker-latest`,
+`reporter-latest`, `operations-latest`, and `backup-operations-latest`; Dockge no longer
 needs a local source checkout or Docker build context. Set
 `AISTOCKS_IMAGE_VERSION` to a full Git commit SHA instead of `latest`
 when an immutable rollback target is required.
@@ -129,18 +137,29 @@ candidate image, then run the one-shot `migrate` service from the
 Equivalent CLI verification:
 
 ```bash
-docker compose config --quiet
-docker compose build --pull app worker collector reporter backup-scheduler
-docker compose --profile operations run --rm migrate
-docker compose --profile operations run --rm migrate bootstrap
-docker compose up -d collector
+scripts/compose-mode.sh contest config --quiet
+scripts/compose-mode.sh contest pull app worker collector reporter
+scripts/compose-mode.sh operations pull backup-scheduler
+scripts/compose-mode.sh operations run --rm migrate
+scripts/compose-mode.sh operations run --rm migrate bootstrap
+scripts/compose-mode.sh contest up -d collector
 # The collector acquires FIRDS/RSS/post-trade bytes and projects verified observations.
 # Wait until it has accumulated 20 complete verified sessions and /readyz passes.
-docker compose --profile operations run --rm migrate preflight
-docker compose up -d app worker reporter
-docker compose --profile operations up -d backup-scheduler
-docker compose ps
-docker compose logs --tail=100 app worker collector reporter
+scripts/compose-mode.sh operations run --rm migrate preflight
+scripts/compose-mode.sh contest up -d app worker reporter
+scripts/compose-mode.sh operations up -d backup-scheduler
+scripts/compose-mode.sh contest ps
+scripts/compose-mode.sh contest logs --tail=100 app worker collector reporter
+```
+
+To run only the local volatile human preview at the same LAN address, stop all
+contest runtimes first. The preflight refuses to start either runtime mode while
+the other is active and forbids additive `--profile` arguments:
+
+```bash
+scripts/compose-mode.sh contest stop app worker collector reporter
+scripts/compose-mode.sh preview up -d api ui
+scripts/compose-mode.sh preview ps
 ```
 
 The migration runner applies checksum-locked SQL migrations. Those
@@ -154,7 +173,7 @@ PostgreSQL observation projection. `/readyz` remains closed until the required
 
 Verify separately:
 
-1. all four runtime services are running and the three HTTP runtime services are healthy;
+1. all four contest runtime services are running and the three contest HTTP runtime services are healthy;
 2. unauthenticated direct-origin requests fail closed;
 3. an authorized Access session reaches the dashboard;
 4. only identities in `ACCESS_OWNER_EMAILS` can use contest controls;
@@ -205,7 +224,8 @@ have both succeeded in the Docker-capable deployment environment.
 ## Stop and incident handling
 
 ```bash
-docker compose stop app worker collector reporter
+scripts/compose-mode.sh contest stop app worker collector reporter
+scripts/compose-mode.sh preview stop api ui
 ```
 
 Do not use `docker compose down --volumes` as an operational habit.
