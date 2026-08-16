@@ -170,6 +170,78 @@ def test_compose_mode_preflight_launches_exactly_one_runtime_profile(tmp_path):
     assert result.stdout.strip() == "preview|--profile preview up -d api ui"
 
 
+def test_ai_exhibition_and_market_warmup_have_explicit_isolated_services():
+    compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
+    services = compose["services"]
+
+    exhibition = services["exhibition"]
+    assert exhibition["profiles"] == ["preview"]
+    assert exhibition["depends_on"]["preview-guard"]["condition"] == "service_completed_successfully"
+    assert exhibition["depends_on"]["api"]["condition"] == "service_healthy"
+    assert exhibition["environment"]["AI_EXHIBITION_API_ORIGIN"] == "http://api:8080"
+    assert exhibition["environment"]["AI_EXHIBITION_KEY"].startswith("${AI_EXHIBITION_KEY:?")
+    assert exhibition["environment"]["HERMES_CREDENTIAL_FILE"] == "/run/hermes-credentials/copilot.env"
+    assert exhibition["volumes"] == [
+        "${HERMES_COPILOT_ENV_FILE:?set a mode-0600 Copilot-only Hermes env file}:/run/hermes-credentials/copilot.env:ro"
+    ]
+    assert services["api"]["environment"]["AI_EXHIBITION_MODE"] == "1"
+    assert services["api"]["environment"]["AI_EXHIBITION_KEY"].startswith("${AI_EXHIBITION_KEY:?")
+
+    assert services["warmup-guard"]["profiles"] == ["warmup"]
+    warmup = services["warmup-collector"]
+    assert warmup["profiles"] == ["warmup"]
+    assert warmup["depends_on"]["warmup-guard"]["condition"] == "service_completed_successfully"
+    assert warmup["image"] == services["collector"]["image"]
+    assert warmup["environment"] == services["collector"]["environment"]
+    assert warmup["volumes"] == services["collector"]["volumes"]
+
+
+def test_compose_mode_allows_warmup_with_preview_but_not_with_contest_collector(tmp_path):
+    fake = tmp_path / "compose"
+    fake.write_text(
+        "#!/bin/sh\n"
+        "if [ \"$1\" = ps ]; then printf '%s\\n' \"$RUNNING_SERVICES\"; exit 0; fi\n"
+        "printf '%s|%s\\n' \"$AISTOCKS_DEPLOYMENT_PROFILE\" \"$*\"\n"
+    )
+    fake.chmod(0o755)
+
+    preview_running = os.environ | {
+        "COMPOSE": str(fake),
+        "RUNNING_SERVICES": "api\nui",
+    }
+    result = subprocess.run(
+        [ROOT / "scripts/compose-mode.sh", "warmup", "up", "-d", "warmup-collector"],
+        cwd=ROOT,
+        env=preview_running,
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, result
+    assert result.stdout.strip() == "warmup|--profile warmup up -d warmup-collector"
+
+    contest_collector_running = preview_running | {"RUNNING_SERVICES": "collector"}
+    result = subprocess.run(
+        [ROOT / "scripts/compose-mode.sh", "warmup", "up", "-d", "warmup-collector"],
+        cwd=ROOT,
+        env=contest_collector_running,
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "contest collector is still active" in result.stderr
+
+    warmup_running = preview_running | {"RUNNING_SERVICES": "warmup-collector"}
+    result = subprocess.run(
+        [ROOT / "scripts/compose-mode.sh", "contest", "up", "-d", "collector"],
+        cwd=ROOT,
+        env=warmup_running,
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "warmup collector is still active" in result.stderr
+
+
 def test_example_environment_renders_fail_closed_access_and_separate_preview_routing():
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     example = (ROOT / ".env.example").read_text()
