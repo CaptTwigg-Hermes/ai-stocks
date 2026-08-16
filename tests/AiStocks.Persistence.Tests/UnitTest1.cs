@@ -168,6 +168,18 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
+    public void CollectorPersistsObservationOnlyAtFullDelayedAvailability()
+    {
+        var trade = new AiStocks.MarketData.NasdaqTrade(
+            DateTimeOffset.Parse("2026-08-10T07:17:59.991Z"), "SE0000108656", 96.90m, "SEK", "MONE", 10,
+            "XSTO", DateTimeOffset.Parse("2026-08-10T07:17:59.991Z"), "000113444", "---",
+            DateTimeOffset.Parse("2026-08-10T07:32:13.229699Z"));
+
+        Assert.Equal(DateTimeOffset.Parse("2026-08-10T07:32:59.991Z"),
+            AiStocks.Collector.PostgresCollectorPersistence.NormalizeObservationAvailability(trade));
+    }
+
+    [Fact]
     public void StrictTradeTimingCleanupHandlesGeneratedConstraintNames()
     {
         var sql = MigrationCatalog.All.Single(migration => migration.Id == "015_strict_trade_timing_constraint_cleanup").Sql;

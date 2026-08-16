@@ -28,7 +28,7 @@ def test_executable_negative_capability_inventory_passes():
     assert proof["order_path_denial_probe"]["paper_order_count"] == 1
     assert proof["order_path_denial_probe"]["network_events"] == []
     assert {table["executable"] for table in proof["endpoint_tables"]} == {
-        "AiStocks.Api", "AiStocks.Collector", "AiStocks.Ui", "AiStocks.Web", "AiStocks.Worker"
+        "AiStocks.Api", "AiStocks.Collector", "AiStocks.Exhibition.Worker", "AiStocks.Ui", "AiStocks.Web", "AiStocks.Worker"
     }
     production_api = next(
         table for table in proof["endpoint_tables"]

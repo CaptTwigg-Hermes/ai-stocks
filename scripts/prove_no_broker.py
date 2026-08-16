@@ -31,10 +31,10 @@ NETWORK_API = re.compile(r"\b(?:Socket|HttpClient|HttpRequestMessage|WebRequest|
 ALLOWED_PROCESS_PROJECTS = {"AiStocks.Research", "AiStocks.Operations"}
 ALLOWED_MUTATIONS = {
     "/admin/start", "/admin/pause", "/admin/resume", "/admin/pre-start-reset",
-    "/api/v1/orders",
+    "/api/v1/orders", "/internal/preview/ai-status", "/internal/preview/ai-decisions",
 }
 SHIPPED_EXECUTABLES = {
-    "AiStocks.Api", "AiStocks.Collector", "AiStocks.Ui", "AiStocks.Web", "AiStocks.Worker",
+    "AiStocks.Api", "AiStocks.Collector", "AiStocks.Exhibition.Worker", "AiStocks.Ui", "AiStocks.Web", "AiStocks.Worker",
 }
 
 
@@ -118,6 +118,9 @@ def runtime_endpoint_table(executable: str, findings: list[str], environment_nam
         "ACCESS_VIEWER_EMAILS": "viewer@example.invalid",
         "FIRDS_ACQUISITION_PLAN_PATH": str(ROOT / "tests" / "AiStocks.MarketData.Tests" / "Fixtures" / "firds-plan-unused.json"),
         "ARTIFACT_ROOT": str(ROOT),
+        "AI_EXHIBITION_API_ORIGIN": "https://api.example.invalid",
+        "AI_EXHIBITION_KEY": "x" * 32,
+        "HERMES_CREDENTIAL_FILE": str(ROOT / ".env.example"),
     })
     try:
         result = subprocess.run(  # noqa: S603  # nosec B603
@@ -126,8 +129,10 @@ def runtime_endpoint_table(executable: str, findings: list[str], environment_nam
     except (OSError, subprocess.TimeoutExpired) as error:
         findings.append(f"runtime endpoint inventory failed for {executable}: {error}")
         return {"executable": executable, "environment": environment_name, "routes": []}
-    marker = next((line.removeprefix("AISTOCKS_ENDPOINTS=") for line in result.stdout.splitlines()
-                   if line.startswith("AISTOCKS_ENDPOINTS=")), None)
+    marker_name = ("AISTOCKS_EXHIBITION_ENDPOINTS=" if executable == "AiStocks.Exhibition.Worker"
+                   else "AISTOCKS_ENDPOINTS=")
+    marker = next((line.removeprefix(marker_name) for line in result.stdout.splitlines()
+                   if line.startswith(marker_name)), None)
     if result.returncode != 0 or marker is None:
         findings.append(f"runtime endpoint inventory failed for {executable}: exit {result.returncode}")
         return {"executable": executable, "environment": environment_name, "routes": []}

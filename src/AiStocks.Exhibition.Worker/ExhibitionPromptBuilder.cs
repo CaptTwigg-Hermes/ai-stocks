@@ -9,12 +9,16 @@ public static class ExhibitionPromptBuilder
     {
         if (!ContestContract.IsExactAgent(agent.Id, agent.ModelId)) throw new InvalidOperationException("Unknown contest agent.");
         using var instruments = StrictJson.Parse(instrumentsJson, 2 * 1024 * 1024);
-        if (instruments.RootElement.ValueKind != JsonValueKind.Array)
-            throw new InvalidOperationException("Instrument response must be an array.");
+        if (instruments.RootElement.ValueKind != JsonValueKind.Object ||
+            !instruments.RootElement.TryGetProperty("items", out var instrumentItems) || instrumentItems.ValueKind != JsonValueKind.Array ||
+            !instruments.RootElement.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != "preview-fixtures")
+            throw new InvalidOperationException("Instrument response must be a preview-fixtures object.");
         using var progress = StrictJson.Parse(progressJson, 2 * 1024 * 1024);
         if (progress.RootElement.ValueKind != JsonValueKind.Object ||
-            !progress.RootElement.TryGetProperty("agents", out var agents) || agents.ValueKind != JsonValueKind.Array)
-            throw new InvalidOperationException("AI progress response must contain an agents array.");
+            !progress.RootElement.TryGetProperty("participants", out var agents) || agents.ValueKind != JsonValueKind.Array ||
+            !progress.RootElement.TryGetProperty("isNonLive", out var isNonLive) || !isNonLive.GetBoolean() ||
+            !progress.RootElement.TryGetProperty("strictContest", out var strictContest) || strictContest.GetBoolean())
+            throw new InvalidOperationException("AI progress response must contain a non-live exhibition snapshot.");
         var matches = agents.EnumerateArray().Where(item =>
             item.ValueKind == JsonValueKind.Object &&
             item.TryGetProperty("agentId", out var id) && id.ValueKind == JsonValueKind.String &&
@@ -29,16 +33,16 @@ public static class ExhibitionPromptBuilder
             You may research only public HTTPS web sources. Do not seek rival state. The only portfolio context below is your own.
 
             FIXTURE INSTRUMENTS (instrumentId values in this JSON are the only allowed trade targets):
-            {{instruments.RootElement.GetRawText()}}
+            {{instrumentItems.GetRawText()}}
 
             YOUR OWN PORTFOLIO:
             {{portfolio.GetRawText()}}
 
             Return exactly one JSON object and no markdown or commentary. It must have exactly these properties and types:
             {"agentId":"exact fixed GUID","modelId":"exact fixed model ID","action":"buy|sell|hold","instrumentId":"fixture instrumentId or null","quantity":0,"reason":"non-empty string","confidence":0.0,"evidence":[{"url":"absolute HTTPS URL","publishedAt":"offset-bearing ISO-8601 timestamp","exactExcerpt":"exact visible source text"}]}
-            Rules: buy/sell require a fixture instrumentId, whole-share quantity 1..10000000, and at least one evidence item. hold requires instrumentId null and quantity 0. confidence is 0..1. Every evidence claim will be independently fetched and verified; fabrication rejects the decision.
+            Rules: buy/sell require a fixture instrumentId, whole-share quantity 1..10000000, and at least one evidence item. hold requires instrumentId null, quantity 0, and may use an empty evidence array when no source can be independently verified. confidence is 0..1. Every supplied evidence claim will be independently fetched and verified; fabrication rejects the decision. Prefer a truthful hold with [] over invented, inaccessible, or unverifiable evidence.
             Example shape only (replace identity and values with the required real values):
-            {"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"No verified fixture opportunity","confidence":0.5,"evidence":[{"url":"https://example.com/article","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact visible source sentence"}]}
+            {"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"No independently verified fixture opportunity","confidence":0.5,"evidence":[]}
             """;
     }
 }

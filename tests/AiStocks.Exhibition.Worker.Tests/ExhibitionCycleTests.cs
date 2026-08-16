@@ -9,6 +9,103 @@ namespace AiStocks.Exhibition.Worker.Tests;
 public sealed class ExhibitionCycleTests
 {
     [Fact]
+    public async Task RunAsync_QueueStatusFailureForOneAgent_DoesNotPreventOtherAgents()
+    {
+        var failedAgent = ContestContract.Agents[0];
+        var api = new FakeApi { FailQueuedAgentId = failedAgent.Id };
+        var invoker = new FakeInvoker { FailingAgentId = null };
+        var cycle = new ExhibitionCycle(api, invoker, new FakeVerifier(), new ExhibitionHealthState(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(3, invoker.Agents.Count);
+        Assert.DoesNotContain(failedAgent.Id, invoker.Agents);
+        Assert.Equal(3, result.Succeeded);
+        Assert.Single(result.Failures);
+        Assert.Equal(failedAgent.Id, result.Failures[0].AgentId);
+    }
+
+    [Fact]
+    public async Task RunAsync_LostDecisionResponse_ReconcilesAuthoritativeSuccess()
+    {
+        var reconciledAgent = ContestContract.Agents[0];
+        var api = new FakeApi { LoseDecisionResponseAgentId = reconciledAgent.Id };
+        var invoker = new FakeInvoker { FailingAgentId = null };
+        var cycle = new ExhibitionCycle(api, invoker, new FakeVerifier(), new ExhibitionHealthState(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(4, result.Succeeded);
+        Assert.Empty(result.Failures);
+        Assert.DoesNotContain(api.Statuses, status =>
+            status.Contains($"\"agentId\":\"{reconciledAgent.Id:D}\"", StringComparison.Ordinal) &&
+            status.Contains("\"status\":\"failed\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunAsync_ReconciliationRejectsSuccessWithoutLifecycleTimestamps()
+    {
+        var affectedAgent = ContestContract.Agents[0];
+        var api = new FakeApi
+        {
+            LoseDecisionResponseAgentId = affectedAgent.Id,
+            OmitReconciliationTimestamps = true
+        };
+        var cycle = new ExhibitionCycle(api, new FakeInvoker { FailingAgentId = null }, new FakeVerifier(),
+            new ExhibitionHealthState(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(3, result.Succeeded);
+        Assert.Single(result.Failures);
+        Assert.Equal(affectedAgent.Id, result.Failures[0].AgentId);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task RunAsync_ReconciliationRejectsMissingQueueTimeOrDuplicateIdentity(
+        bool omitQueuedAt, bool duplicateParticipant)
+    {
+        var affectedAgent = ContestContract.Agents[0];
+        var api = new FakeApi
+        {
+            LoseDecisionResponseAgentId = affectedAgent.Id,
+            OmitQueuedAt = omitQueuedAt,
+            DuplicateReconciliationParticipant = duplicateParticipant
+        };
+        var cycle = new ExhibitionCycle(api, new FakeInvoker { FailingAgentId = null }, new FakeVerifier(),
+            new ExhibitionHealthState(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(3, result.Succeeded);
+        Assert.Single(result.Failures);
+        Assert.Equal(affectedAgent.Id, result.Failures[0].AgentId);
+    }
+
+    [Fact]
+    public async Task RunAsync_ReconciliationRejectsAmbiguousDuplicateTargetIdentity()
+    {
+        var affectedAgent = ContestContract.Agents[0];
+        var api = new FakeApi
+        {
+            LoseDecisionResponseAgentId = affectedAgent.Id,
+            AmbiguousDuplicateTargetIdentity = true
+        };
+        var cycle = new ExhibitionCycle(api, new FakeInvoker { FailingAgentId = null }, new FakeVerifier(),
+            new ExhibitionHealthState(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(3, result.Succeeded);
+        Assert.Single(result.Failures);
+        Assert.Equal(affectedAgent.Id, result.Failures[0].AgentId);
+    }
+
+    [Fact]
     public async Task RunAsync_RecordsOneFailureButRunsAndPostsAttestedResultsForOtherAgents()
     {
         var api = new FakeApi();
@@ -22,41 +119,123 @@ public sealed class ExhibitionCycleTests
 
         Assert.Equal(4, invoker.Agents.Count);
         Assert.Equal(3, api.Posts.Count);
-        Assert.Equal(1, verifier.Calls);
+        Assert.Equal(9, api.Statuses.Count);
+        Assert.Equal(4, api.Statuses.Count(status => status.Contains("\"status\":\"queued\"", StringComparison.Ordinal)));
+        Assert.Contains(api.Statuses, status => status.Contains("\"status\":\"failed\"", StringComparison.Ordinal));
+        Assert.Equal(3, verifier.Calls);
         Assert.Single(result.Failures);
         Assert.Equal("degraded", health.Snapshot().Status);
         var posted = JsonDocument.Parse(api.Posts[0]);
-        Assert.Equal("copilot", posted.RootElement.GetProperty("actualProvider").GetString());
-        Assert.Equal(new string('a', 64), posted.RootElement.GetProperty("runtimeReportSha256").GetString());
+        Assert.Equal("copilot", posted.RootElement.GetProperty("runtimeProvider").GetString());
+        Assert.Equal(new string('a', 64), posted.RootElement.GetProperty("reportSha256").GetString());
+        Assert.Equal("buy", posted.RootElement.GetProperty("action").GetString());
+        Assert.Equal("SE0000115446", posted.RootElement.GetProperty("instrumentId").GetString());
         Assert.StartsWith("20260816T120000Z-", posted.RootElement.GetProperty("runId").GetString(), StringComparison.Ordinal);
     }
 
     private sealed class FakeApi : IExhibitionApi
     {
+        public Guid? FailQueuedAgentId { get; init; }
+        public Guid? LoseDecisionResponseAgentId { get; init; }
+        public bool OmitReconciliationTimestamps { get; init; }
+        public bool OmitQueuedAt { get; init; }
+        public bool DuplicateReconciliationParticipant { get; init; }
+        public bool AmbiguousDuplicateTargetIdentity { get; init; }
+        private string? committedDecision;
         public List<string> Posts { get; } = [];
-        public Task<string> GetInstrumentsAsync(CancellationToken cancellationToken) => Task.FromResult("[{\"instrumentId\":\"SE0000115446\",\"dataMode\":\"fixture\"}]");
-        public Task<string> GetProgressAsync(CancellationToken cancellationToken) => Task.FromResult("{\"agents\":[" + string.Join(',', ContestContract.Agents.Select(a => "{\"agentId\":\"" + a.Id.ToString("D") + "\",\"portfolio\":{\"cash\":30000,\"positions\":[]}}")) + "]}");
-        public Task PostDecisionAsync(string runId, string json, CancellationToken cancellationToken) { Posts.Add(json); return Task.CompletedTask; }
+        public List<string> Statuses { get; } = [];
+        public Task<string> GetInstrumentsAsync(CancellationToken cancellationToken) => Task.FromResult("{\"items\":[{\"id\":\"SE0000115446\",\"dataMode\":\"preview-fixtures\"}],\"dataMode\":\"preview-fixtures\"}");
+        public Task<string> GetProgressAsync(CancellationToken cancellationToken)
+        {
+            if (committedDecision is not null)
+            {
+                using var decision = JsonDocument.Parse(committedDecision);
+                var root = decision.RootElement;
+                var participant = new Dictionary<string, object?>
+                {
+                    ["agentId"] = root.GetProperty("agentId").GetGuid(),
+                    ["modelId"] = root.GetProperty("modelId").GetString(),
+                    ["runId"] = root.GetProperty("runId").GetString(),
+                    ["status"] = "succeeded",
+                    ["queuedAt"] = OmitQueuedAt ? null : DateTimeOffset.Parse("2026-08-16T11:59:59Z"),
+                    ["startedAt"] = OmitReconciliationTimestamps ? null : DateTimeOffset.Parse("2026-08-16T12:00:00Z"),
+                    ["completedAt"] = OmitReconciliationTimestamps ? null : DateTimeOffset.Parse("2026-08-16T12:00:01Z"),
+                    ["latestDecision"] = new
+                    {
+                        runId = root.GetProperty("runId").GetString(),
+                        completedAt = OmitReconciliationTimestamps ? (DateTimeOffset?)null : DateTimeOffset.Parse("2026-08-16T12:00:01Z")
+                    }
+                };
+                var snapshotParticipants = DuplicateReconciliationParticipant
+                    ? new[] { participant, participant }
+                    : AmbiguousDuplicateTargetIdentity
+                        ? new[]
+                        {
+                            participant,
+                            new Dictionary<string, object?>(participant) { ["modelId"] = "wrong-model" }
+                        }
+                        : new[] { participant };
+                return Task.FromResult(JsonSerializer.Serialize(new
+                {
+                    participants = snapshotParticipants,
+                    dataMode = "preview-fixtures",
+                    isNonLive = true,
+                    strictContest = false
+                }));
+            }
+            return Task.FromResult("{\"participants\":[" + string.Join(',', ContestContract.Agents.Select(a => "{\"agentId\":\"" + a.Id.ToString("D") + "\",\"portfolio\":{\"cashDkk\":100000,\"holdings\":[]}}")) + "],\"isNonLive\":true,\"strictContest\":false}");
+        }
+        public Task PostDecisionAsync(string runId, string json, CancellationToken cancellationToken)
+        {
+            Posts.Add(json);
+            using var decision = JsonDocument.Parse(json);
+            if (decision.RootElement.GetProperty("agentId").GetGuid() == LoseDecisionResponseAgentId)
+            {
+                committedDecision = json;
+                throw new HttpRequestException("response lost after commit");
+            }
+            return Task.CompletedTask;
+        }
+        public Task PostStatusAsync(string json, CancellationToken cancellationToken)
+        {
+            if (FailQueuedAgentId is not null &&
+                json.Contains($"\"agentId\":\"{FailQueuedAgentId:D}\"", StringComparison.Ordinal) &&
+                json.Contains("\"status\":\"queued\"", StringComparison.Ordinal))
+                throw new HttpRequestException("queued status unavailable");
+            Statuses.Add(json);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeInvoker : IExhibitionModelInvoker
     {
+        public Guid? FailingAgentId { get; init; } = ContestContract.Agents[0].Id;
         public List<Guid> Agents { get; } = [];
         public Task<ResearchExecutionResult> InvokeAsync(AgentDefinition agent, string prompt, CancellationToken cancellationToken)
         {
             Agents.Add(agent.Id);
-            if (agent == ContestContract.Agents[0]) throw new InvalidOperationException("outage");
+            if (agent.Id == FailingAgentId) throw new InvalidOperationException("outage");
             var output = agent == ContestContract.Agents[1]
                 ? $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"buy","instrumentId":"SE0000115446","quantity":1,"reason":"Verified fixture opportunity","confidence":0.5,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}"""
-                : $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"No verified opportunity","confidence":0.5,"evidence":[]}""";
+                : $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"No verified opportunity","confidence":0.5,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}""";
             return Task.FromResult(new ResearchExecutionResult(output, string.Empty, new InvocationProvenance
             {
-                AgentId = agent.Id, RequestedModelId = agent.ModelId, RequestedProvider = "copilot",
-                ModelId = agent.ModelId, Provider = "copilot", RuntimeReport = ImmutableArray<byte>.Empty,
-                RuntimeReportSha256 = new string('a', 64), Executable = "/hermes", Arguments = [],
-                EnvironmentVariableNames = ["HERMES_HOME"], PromptSha256 = new string('b', 64),
-                StartedAt = DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CompletedAt = DateTimeOffset.Parse("2026-08-16T12:00:01Z"),
-                ExitCode = 0, StandardOutputSha256 = new string('c', 64), StandardErrorSha256 = new string('d', 64)
+                AgentId = agent.Id,
+                RequestedModelId = agent.ModelId,
+                RequestedProvider = "copilot",
+                ModelId = agent.ModelId,
+                Provider = "copilot",
+                RuntimeReport = ImmutableArray<byte>.Empty,
+                RuntimeReportSha256 = new string('a', 64),
+                Executable = "/hermes",
+                Arguments = [],
+                EnvironmentVariableNames = ["HERMES_HOME"],
+                PromptSha256 = new string('b', 64),
+                StartedAt = DateTimeOffset.Parse("2026-08-16T12:00:00Z"),
+                CompletedAt = DateTimeOffset.Parse("2026-08-16T12:00:01Z"),
+                ExitCode = 0,
+                StandardOutputSha256 = new string('c', 64),
+                StandardErrorSha256 = new string('d', 64)
             }));
         }
     }

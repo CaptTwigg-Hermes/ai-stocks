@@ -68,16 +68,42 @@ public sealed record PreviewLeaderboardDto(
     [property: JsonPropertyName("dataMode")] string DataMode);
 
 public sealed record AiProgressDto(
-    [property: JsonPropertyName("agents")] IReadOnlyList<AiProgressAgentDto> Agents,
+    [property: JsonPropertyName("participants")] IReadOnlyList<AiProgressAgentDto> Participants,
+    [property: JsonPropertyName("activity")] IReadOnlyList<AiActivityDto> Activity,
     [property: JsonPropertyName("dataMode")] string DataMode,
-    [property: JsonPropertyName("isLive")] bool IsLive);
+    [property: JsonPropertyName("isNonLive")] bool IsNonLive,
+    [property: JsonPropertyName("strictContest")] bool StrictContest);
 
 public sealed record AiProgressAgentDto(
     [property: JsonPropertyName("agentId")] Guid AgentId,
     [property: JsonPropertyName("modelId")] string ModelId,
+    [property: JsonPropertyName("displayName")] string DisplayName,
     [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("runId")] string? RunId,
+    [property: JsonPropertyName("queuedAt")] DateTimeOffset? QueuedAt,
+    [property: JsonPropertyName("startedAt")] DateTimeOffset? StartedAt,
+    [property: JsonPropertyName("completedAt")] DateTimeOffset? CompletedAt,
+    [property: JsonPropertyName("error")] string? Error,
     [property: JsonPropertyName("portfolio")] PreviewPortfolioDto Portfolio,
     [property: JsonPropertyName("latestDecision")] AiDecisionDto? LatestDecision);
+
+public sealed record AiStatusRequestDto(
+    [property: JsonPropertyName("runId")] string RunId,
+    [property: JsonPropertyName("agentId")] Guid AgentId,
+    [property: JsonPropertyName("modelId")] string ModelId,
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("error")] string? Error,
+    [property: JsonPropertyName("occurredAt")] DateTimeOffset OccurredAt);
+
+public sealed record AiActivityDto(
+    [property: JsonPropertyName("runId")] string RunId,
+    [property: JsonPropertyName("agentId")] Guid AgentId,
+    [property: JsonPropertyName("modelId")] string ModelId,
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("action")] string? Action,
+    [property: JsonPropertyName("reason")] string? Reason,
+    [property: JsonPropertyName("error")] string? Error,
+    [property: JsonPropertyName("occurredAt")] DateTimeOffset OccurredAt);
 
 public sealed record AiDecisionDto(
     [property: JsonPropertyName("runId")] string RunId,

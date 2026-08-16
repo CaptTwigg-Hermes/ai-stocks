@@ -14,7 +14,17 @@ public sealed record NasdaqTrade(
     DateTimeOffset PublishedAt,
     string TransactionId,
     string Flags,
-    DateTimeOffset FetchedAt);
+    DateTimeOffset FetchedAt)
+{
+    public DateTimeOffset AvailableAt
+    {
+        get
+        {
+            var delayed = ExecutedAt.AddMinutes(15);
+            return FetchedAt > delayed ? FetchedAt : delayed;
+        }
+    }
+}
 
 public static class NasdaqCsvParser
 {
@@ -51,7 +61,7 @@ public static class NasdaqCsvParser
                 var quantity = long.Parse(fields[index["Quantity"]], NumberStyles.None, CultureInfo.InvariantCulture);
                 var id = fields[index["Transaction identification code"]].Trim();
                 if (price <= 0 || quantity <= 0 || id.Length == 0 || published < executed - TimeSpan.FromSeconds(1) ||
-                    fetchedAt < published || fetchedAt - executed < TimeSpan.FromMinutes(15))
+                    fetchedAt < published)
                     throw new MarketDataException("Nasdaq trade row violates value or timing constraints");
                 result.Add(new(executed, fields[index["Instrument identification code"]], price,
                     fields[index["Price currency"]], fields[index["Price notation"]], quantity,
@@ -107,16 +117,18 @@ public static class NasdaqCsvParser
 
 public static class NasdaqTradeSelection
 {
-    public static NasdaqTrade FirstEligible(IEnumerable<NasdaqTrade> rows, string isin, DateTimeOffset decisionAt, TradingSession session, NasdaqStatusMachine statuses)
+    public static NasdaqTrade FirstEligible(IEnumerable<NasdaqTrade> rows, string isin, DateTimeOffset decisionAt,
+        DateTimeOffset asOf, TradingSession session, NasdaqStatusMachine statuses)
     {
         if (!statuses.IsEligible(isin)) throw new MarketDataException("Instrument status is unknown or ineligible");
-        return FirstEligibleCore(rows, isin, decisionAt, session);
+        return FirstEligibleCore(rows, isin, decisionAt, asOf, session);
     }
 
-    private static NasdaqTrade FirstEligibleCore(IEnumerable<NasdaqTrade> rows, string isin, DateTimeOffset decisionAt, TradingSession session)
+    private static NasdaqTrade FirstEligibleCore(IEnumerable<NasdaqTrade> rows, string isin, DateTimeOffset decisionAt,
+        DateTimeOffset asOf, TradingSession session)
     {
         return rows.Where(x => x.Isin == isin && x.Venue == "XSTO" && x.Currency == "SEK" && x.PriceNotation == "MONE" &&
-                x.ExecutedAt >= decisionAt && session.Contains(x.ExecutedAt))
+                x.ExecutedAt >= decisionAt && x.AvailableAt <= asOf && session.Contains(x.ExecutedAt))
             .OrderBy(x => x.ExecutedAt).ThenBy(x => x.TransactionId, StringComparer.Ordinal).FirstOrDefault()
             ?? throw new MarketDataException("No eligible post-decision XSTO trade");
     }

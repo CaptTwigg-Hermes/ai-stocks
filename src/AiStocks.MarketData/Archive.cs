@@ -101,6 +101,35 @@ public sealed class ImmutableArchive(string root)
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 }
 
+public sealed record ArchiveReplayResult(int Reports, long Rows);
+
+public static class NasdaqArchiveReplay
+{
+    public static ArchiveReplayResult Replay(string root)
+    {
+        var archive = new ImmutableArchive(root);
+        var directories = Directory.EnumerateDirectories(Path.GetFullPath(root), "NordicEquity-posttrade-*", SearchOption.TopDirectoryOnly)
+            .Order(StringComparer.Ordinal).ToArray();
+        if (directories.Length == 0) throw new MarketDataException($"Archive replay found no report pairs under {root}");
+        long rows = 0;
+        foreach (var directory in directories)
+        {
+            try
+            {
+                var report = Path.GetFileName(directory);
+                NasdaqReportName.Validate(report);
+                var archived = archive.Verify(report);
+                rows = checked(rows + NasdaqCsvParser.Parse(File.ReadAllBytes(archived.CsvPath), archived.FetchedAt).Count);
+            }
+            catch (Exception exception) when (exception is MarketDataException or IOException or UnauthorizedAccessException or OverflowException)
+            {
+                throw new MarketDataException($"Archive replay failed for {directory}: {exception.Message}", exception);
+            }
+        }
+        return new(directories.Length, rows);
+    }
+}
+
 public sealed record ManifestReport(string Report, string Sha256);
 public sealed record CompleteSessionManifest(int SchemaVersion, bool Complete, string SessionId, DateTimeOffset SessionOpen,
     DateTimeOffset SessionClose, DateTimeOffset FinalizedAt, string SourceListingUrl, IReadOnlyList<ManifestReport> Reports);

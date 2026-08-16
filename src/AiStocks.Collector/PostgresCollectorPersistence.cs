@@ -299,7 +299,7 @@ public sealed class PostgresCollectorPersistence(
                 var strictId = StableGuid($"trade:{entry.Report}:{entry.Sha256}:{instrument.OrderBookId}:{trade.TransactionId}");
                 var tradedAt = NormalizeDatabaseTimestamp(trade.ExecutedAt);
                 var publishedAt = NormalizeDatabaseTimestamp(trade.PublishedAt);
-                var retrievedAt = NormalizeDatabaseTimestamp(trade.FetchedAt);
+                var retrievedAt = NormalizeObservationAvailability(trade);
                 await using var row = new NpgsqlCommand("""
                     INSERT INTO market_strict_trade_rows(id,session_id,raw_market_report_id,instrument_id,transaction_id,traded_at,published_at,retrieved_at,price,quantity,flags)
                     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING
@@ -361,7 +361,7 @@ public sealed class PostgresCollectorPersistence(
             });
             var observationId = StableGuid("observation:" + item.StrictId);
             var tradedAt = NormalizeDatabaseTimestamp(item.Trade.ExecutedAt);
-            var retrievedAt = NormalizeDatabaseTimestamp(item.Trade.FetchedAt);
+            var retrievedAt = NormalizeObservationAvailability(item.Trade);
             await using var observation = new NpgsqlCommand("""
                 INSERT INTO market_observations(id,instrument_id,raw_market_report_id,traded_at,retrieved_at,price,quantity,
                   average_daily_value_20,complete_history_sessions,session_id,is_official_pats,warning,suspended,verified,source_json,source_hash)
@@ -429,6 +429,9 @@ public sealed class PostgresCollectorPersistence(
 
     internal static DateTimeOffset NormalizeDatabaseTimestamp(DateTimeOffset value) =>
         value.ToUniversalTime().AddTicks(-(value.ToUniversalTime().Ticks % TimeSpan.TicksPerMicrosecond));
+
+    internal static DateTimeOffset NormalizeObservationAvailability(NasdaqTrade trade) =>
+        NormalizeDatabaseTimestamp(trade.AvailableAt);
 
     private static Guid StableGuid(string value)
     {

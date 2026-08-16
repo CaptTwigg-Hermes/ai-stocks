@@ -44,4 +44,16 @@ public sealed class ExhibitionDecisionParserTests
         Assert.Throws<ExhibitionDecisionException>(() => parser.Parse(unknownTrade, Agent, fixtures));
         Assert.Throws<ExhibitionDecisionException>(() => parser.Parse(invalidHold, Agent, fixtures));
     }
+
+    [Fact]
+    public void Parse_AcceptsTruthfulHoldWithoutFabricatedEvidence()
+    {
+        var hold = $$"""{"agentId":"{{Agent.Id:D}}","modelId":"{{Agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"wait","confidence":0.5,"evidence":[]}""";
+
+        var parsed = new ExhibitionDecisionParser().Parse(
+            hold, Agent, new HashSet<string>(StringComparer.Ordinal) { "SE0000115446" });
+
+        Assert.Equal(ExhibitionAction.Hold, parsed.Action);
+        Assert.Empty(parsed.Evidence);
+    }
 }

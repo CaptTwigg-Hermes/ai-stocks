@@ -11,6 +11,7 @@ RUN dotnet publish src/AiStocks.Api/AiStocks.Api.csproj -c Release --no-restore 
  && dotnet publish src/AiStocks.Ui/AiStocks.Ui.csproj -c Release --no-restore -o /out/ui \
  && dotnet publish src/AiStocks.Web/AiStocks.Web.csproj -c Release --no-restore -o /out/web \
  && dotnet publish src/AiStocks.Worker/AiStocks.Worker.csproj -c Release --no-restore -o /out/worker \
+ && dotnet publish src/AiStocks.Exhibition.Worker/AiStocks.Exhibition.Worker.csproj -c Release --no-restore -o /out/exhibition \
  && dotnet publish src/AiStocks.Collector/AiStocks.Collector.csproj -c Release --no-restore -o /out/collector \
  && dotnet publish src/AiStocks.Operations/AiStocks.Operations.csproj -c Release --no-restore -o /out/operations
 
@@ -96,6 +97,10 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
 USER aistocks
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "AiStocks.Worker.dll"]
+
+FROM worker AS exhibition
+COPY --from=build --chown=aistocks:aistocks /out/exhibition /app
+ENTRYPOINT ["dotnet", "AiStocks.Exhibition.Worker.dll"]
 
 FROM worker AS reporter
 COPY --from=build --chown=aistocks:aistocks /out/operations /app

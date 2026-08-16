@@ -130,6 +130,20 @@ if (localAuth)
     if (aiExhibitionMode)
     {
         api.MapGet("/ai-progress", (PreviewRaceStore store) => Results.Ok(store.AiProgress()));
+        app.MapPost("/internal/preview/ai-status", (AiStatusRequestDto request, PreviewRaceStore store, HttpContext context) =>
+        {
+            if (!ValidSecret(context, aiExhibitionKey!)) return Results.Unauthorized();
+            try
+            {
+                store.UpdateAiStatus(request);
+                return Results.Ok();
+            }
+            catch (PreviewOrderException exception)
+            {
+                return ApiEndpointResults.Problem(exception.Code, "AI fixture status rejected",
+                    StatusCodes.Status400BadRequest, context, exception.Message);
+            }
+        }).WithMetadata(new Microsoft.AspNetCore.Cors.DisableCorsAttribute());
         app.MapPost("/internal/preview/ai-decisions", (AiDecisionRequestDto request, PreviewRaceStore store, HttpContext context) =>
         {
             if (!ValidSecret(context, aiExhibitionKey!)) return Results.Unauthorized();

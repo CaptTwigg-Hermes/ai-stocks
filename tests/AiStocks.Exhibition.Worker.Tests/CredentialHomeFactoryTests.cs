@@ -20,6 +20,7 @@ public sealed class CredentialHomeFactoryTests
 
             Assert.NotEqual(first.Path, second.Path);
             var copied = Assert.Single(Directory.GetFiles(first.Path));
+            Assert.Equal(".env", Path.GetFileName(copied));
             Assert.Equal("secret", await File.ReadAllTextAsync(copied));
             if (!OperatingSystem.IsWindows())
                 Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(copied));

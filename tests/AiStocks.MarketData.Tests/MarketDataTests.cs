@@ -45,7 +45,8 @@ public sealed class MarketDataTests
             key.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256), Path.Combine(temp.Path, "status.json"));
         var rows = NasdaqCsvParser.Parse(File.ReadAllBytes(Fixture("nasdaq-posttrade.csv")), DateTimeOffset.Parse("2026-08-06T16:00:00Z"));
         var session = StockholmCalendar.GetSession(FullDay)!;
-        var trade = NasdaqTradeSelection.FirstEligible(rows, "SE0000108656", DateTimeOffset.Parse("2026-08-06T10:00:00Z"), session, statuses);
+        var trade = NasdaqTradeSelection.FirstEligible(rows, "SE0000108656", DateTimeOffset.Parse("2026-08-06T10:00:00Z"),
+            DateTimeOffset.Parse("2026-08-06T16:00:00Z"), session, statuses);
         Assert.Equal(96.95m, trade.Price);
         Assert.Equal("3", trade.TransactionId);
         Assert.Equal(98.10m, NasdaqTradeSelection.ClosingAuctionPrice(rows, "SE0000108656", session));
@@ -72,8 +73,48 @@ public sealed class MarketDataTests
         var rows = NasdaqCsvParser.Parse(Encoding.UTF8.GetBytes(csv), DateTimeOffset.Parse("2026-08-07T07:30:00.017Z"));
 
         Assert.Single(rows);
-        Assert.Throws<MarketDataException>(() => NasdaqCsvParser.Parse(
+        var early = Assert.Single(NasdaqCsvParser.Parse(
             Encoding.UTF8.GetBytes(csv), DateTimeOffset.Parse("2026-08-07T07:29:59Z")));
+        Assert.Equal(DateTimeOffset.Parse("2026-08-07T07:30:00.017Z"), early.AvailableAt);
+    }
+
+    [Fact]
+    public void CsvAcceptsCapturedReportRetrievedJustBeforePerTradeDelay()
+    {
+        const string csv = """
+            "sep=;"
+            Trading date and time;Instrument identification code;Price;Missing Price;Price currency;Price notation;Quantity;Venue of execution;Trading system;Publication date and time;Venue of publication;Transaction identification code;Flags
+            2026-08-10T07:17:59.991Z;SE0000108656;96.90;;SEK;MONE;10;XSTO;CLOB;2026-08-10T07:17:59.991Z;XSTO;000113444;---
+            """;
+        var fetchedAt = DateTimeOffset.Parse("2026-08-10T07:32:13.229699Z");
+
+        var trade = Assert.Single(NasdaqCsvParser.Parse(Encoding.UTF8.GetBytes(csv), fetchedAt));
+
+        Assert.Equal(fetchedAt, trade.FetchedAt);
+    }
+
+    [Fact]
+    public void TradeSelectionWaitsUntilTheFullDelayedAvailabilityTime()
+    {
+        const string csv = """
+            "sep=;"
+            Trading date and time;Instrument identification code;Price;Missing Price;Price currency;Price notation;Quantity;Venue of execution;Trading system;Publication date and time;Venue of publication;Transaction identification code;Flags
+            2026-08-10T07:17:59.991Z;SE0000108656;96.90;;SEK;MONE;10;XSTO;CLOB;2026-08-10T07:17:59.991Z;XSTO;000113444;---
+            """;
+        var rows = NasdaqCsvParser.Parse(Encoding.UTF8.GetBytes(csv), DateTimeOffset.Parse("2026-08-10T07:32:13.229699Z"));
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var temp = new TemporaryDirectory();
+        var payload = "{\"asOf\":\"2026-08-10T07:00:00Z\",\"states\":{\"SE0000108656\":\"Clear\"}}";
+        var statuses = new PinnedStatusSeedVerifier("test-key", key.ExportSubjectPublicKeyInfo()).Load(payload,
+            key.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256), Path.Combine(temp.Path, "status.json"));
+        var decisionAt = DateTimeOffset.Parse("2026-08-10T07:17:00Z");
+        var availableAt = DateTimeOffset.Parse("2026-08-10T07:32:59.991Z");
+        var session = StockholmCalendar.GetSession(new DateOnly(2026, 8, 10))!;
+
+        Assert.Throws<MarketDataException>(() => NasdaqTradeSelection.FirstEligible(
+            rows, "SE0000108656", decisionAt, availableAt.AddTicks(-1), session, statuses));
+        Assert.Equal("000113444", NasdaqTradeSelection.FirstEligible(
+            rows, "SE0000108656", decisionAt, availableAt, session, statuses).TransactionId);
     }
 
     [Fact]
@@ -88,6 +129,21 @@ public sealed class MarketDataTests
         File.AppendAllText(item.CsvPath, "tamper");
         Assert.Throws<MarketDataException>(() => store.Verify(report));
         Assert.Throws<MarketDataException>(() => store.Archive(report, bytes, item.SourceUrl, item.FetchedAt));
+    }
+
+    [Fact]
+    public void ArchiveReplayVerifiesEveryMetadataCsvPair()
+    {
+        using var temp = new TemporaryDirectory();
+        var report = "NordicEquity-posttrade-2026-08-06T1016";
+        var source = new Uri("https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName=" + report);
+        new ImmutableArchive(temp.Path).Archive(report, File.ReadAllBytes(Fixture("nasdaq-posttrade.csv")), source,
+            DateTimeOffset.Parse("2026-08-06T16:00:00Z"));
+
+        var result = NasdaqArchiveReplay.Replay(temp.Path);
+
+        Assert.Equal(1, result.Reports);
+        Assert.Equal(4, result.Rows);
     }
 
     [Fact]

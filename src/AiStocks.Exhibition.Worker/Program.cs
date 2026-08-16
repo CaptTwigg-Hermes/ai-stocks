@@ -67,16 +67,19 @@ await app.RunAsync().ConfigureAwait(false);
 
 static ExhibitionOptions LoadOptions(IConfiguration configuration)
 {
-    static string Required(IConfiguration values, string key) =>
-        values[key] is { Length: > 0 } value ? value : throw new InvalidOperationException($"{key} is required.");
+    static string Required(IConfiguration values, string key, string alias) =>
+        values[key] is { Length: > 0 } value ? value :
+        values[alias] is { Length: > 0 } aliased ? aliased :
+        throw new InvalidOperationException($"{key} ({alias}) is required.");
     return new ExhibitionOptions
     {
-        ApiBaseUrl = new Uri(Required(configuration, "Exhibition:ApiBaseUrl"), UriKind.Absolute),
-        InternalKey = Required(configuration, "Exhibition:InternalKey"),
-        CopilotCredentialFile = Required(configuration, "Exhibition:CopilotCredentialFile"),
+        ApiBaseUrl = new Uri(Required(configuration, "Exhibition:ApiBaseUrl", "AI_EXHIBITION_API_ORIGIN"), UriKind.Absolute),
+        InternalKey = Required(configuration, "Exhibition:InternalKey", "AI_EXHIBITION_KEY"),
+        CopilotCredentialFile = Required(configuration, "Exhibition:CopilotCredentialFile", "HERMES_CREDENTIAL_FILE"),
         HermesHomeRoot = configuration["Exhibition:HermesHomeRoot"] ?? "/dev/shm/aistocks-exhibition",
         HermesExecutable = configuration["Exhibition:HermesExecutable"] ?? "/opt/hermes/bin/hermes",
-        CycleInterval = TimeSpan.FromSeconds(configuration.GetValue("Exhibition:CycleIntervalSeconds", 3600)),
+        CycleInterval = TimeSpan.FromSeconds(configuration.GetValue<int?>("Exhibition:CycleIntervalSeconds") ??
+            configuration.GetValue("AI_EXHIBITION_INTERVAL_SECONDS", 3600)),
         HttpTimeout = TimeSpan.FromSeconds(configuration.GetValue("Exhibition:HttpTimeoutSeconds", 30)),
         MaximumApiResponseBytes = configuration.GetValue("Exhibition:MaximumApiResponseBytes", 2 * 1024 * 1024)
     };

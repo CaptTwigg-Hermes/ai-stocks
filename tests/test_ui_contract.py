@@ -67,12 +67,18 @@ def test_ui_keeps_accessible_minimal_interaction_contract():
     assert ".leader-summary strong" in css
 
 
+def test_exhibition_leaderboard_uses_shared_rank_semantics():
+    script = (UI / "app.js").read_text()
+    assert "values.filter((candidate) => candidate > value).length + 1" in script
+
+
 def test_exhibition_mode_replaces_human_workspace_without_breaking_preview_fallback():
     html = (UI / "index.html").read_text()
     script = (UI / "app.js").read_text()
 
     assert 'id="ai-race-page" hidden' in html
     assert 'id="ai-participants"' in html
+    assert 'id="ai-activity"' in html
     assert 'id="ai-refresh" type="button"' in html
     assert 'api("/api/v1/ai-progress")' in script
     assert 'data.strictContest === false' in script
@@ -93,12 +99,13 @@ def test_exhibition_cards_are_four_defensive_safe_complete_ai_participants():
         assert f'"{model_id}"' in script
     assert "data.participants.length !== 4" in script
     assert "new Set(data.participants.map((participant) => participant.modelId))" in script
-    for label in ("Status", "Last action", "Decision time", "Rationale", "Confidence", "Verified sources", "Cash", "Holdings value", "Total"):
+    for label in ("Status", "Failure", "Last action", "Decision time", "Rationale", "Confidence", "Verified sources", "Cash", "Holdings value", "Total"):
         assert f'"{label}"' in script
-    for status in ("pending", "running", "degraded", "failure", "success"):
+    for status in ("pending", "queued", "running", "succeeded", "failed"):
         assert f'"{status}"' in script
     assert "renderAiHoldings" in script
     assert "renderEvidence" in script
+    assert "renderAiActivity" in script
     assert 'url.protocol !== "https:"' in script
     assert "link.rel = \"noopener noreferrer\"" in script
     assert "innerHTML" not in script

@@ -1,6 +1,23 @@
 using AiStocks.MarketData;
 using AiStocks.Collector;
 
+if (args.Contains("--replay-archive", StringComparer.Ordinal))
+{
+    try
+    {
+        if (args.Length != 2 || args[0] != "--replay-archive")
+            throw new ArgumentException("Usage: AiStocks.Collector --replay-archive <archive-root>");
+        var replay = NasdaqArchiveReplay.Replay(args[1]);
+        Console.WriteLine($"NASDAQ_ARCHIVE_REPLAY_OK reports={replay.Reports} rows={replay.Rows}");
+    }
+    catch (Exception exception)
+    {
+        Console.Error.WriteLine("NASDAQ_ARCHIVE_REPLAY_FAILED " + exception.Message);
+        Environment.ExitCode = 1;
+    }
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 var archivePath = builder.Configuration["ARCHIVE_PATH"] ?? "/data/nasdaq";
 var artifactRoot = builder.Configuration["ARTIFACT_ROOT"] ?? AppContext.BaseDirectory;

@@ -11,6 +11,7 @@ public interface IExhibitionApi
 {
     Task<string> GetInstrumentsAsync(CancellationToken cancellationToken);
     Task<string> GetProgressAsync(CancellationToken cancellationToken);
+    Task PostStatusAsync(string json, CancellationToken cancellationToken);
     Task PostDecisionAsync(string runId, string json, CancellationToken cancellationToken);
 }
 
@@ -62,6 +63,10 @@ public sealed class ExhibitionCycle(
             var runId = CreateRunId(scheduledAt, agent);
             try
             {
+                await api.PostStatusAsync(StatusJson(runId, agent, "queued", null, scheduledAt), cancellationToken)
+                    .ConfigureAwait(false);
+                await api.PostStatusAsync(StatusJson(runId, agent, "running", null, DateTimeOffset.UtcNow), cancellationToken)
+                    .ConfigureAwait(false);
                 var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson);
                 var execution = await invoker.InvokeAsync(agent, prompt, cancellationToken).ConfigureAwait(false);
                 var decision = new ExhibitionDecisionParser().Parse(execution.StandardOutput, agent, instrumentIds);
@@ -77,42 +82,29 @@ public sealed class ExhibitionCycle(
                 {
                     runId,
                     agentId = agent.Id,
-                    requestedModelId = provenance.RequestedModelId,
-                    requestedProvider = provenance.RequestedProvider,
-                    actualModelId = provenance.ModelId,
-                    actualProvider = provenance.Provider,
-                    runtimeReportSha256 = provenance.RuntimeReportSha256,
-                    promptSha256 = provenance.PromptSha256,
-                    completedAt = provenance.CompletedAt,
-                    decision = new
+                    modelId = agent.ModelId,
+                    action = decision.Action.ToString().ToLowerInvariant(),
+                    decision.InstrumentId,
+                    decision.Quantity,
+                    decision.Reason,
+                    decision.Confidence,
+                    evidence = verified.Select(item => new
                     {
-                        action = decision.Action.ToString().ToLowerInvariant(),
-                        instrumentId = decision.InstrumentId,
-                        quantity = decision.Quantity,
-                        decision.Reason,
-                        decision.Confidence,
-                        evidence = verified.Select(item => new
-                        {
-                            originalUrl = item.OriginalUrl,
-                            finalUrl = item.FinalUrl,
-                            item.PublishedAt,
-                            item.RetrievedAt,
-                            item.VerificationStartedAt,
-                            item.ContentSha256,
-                            item.ExactExcerpt,
-                            item.ContentType,
-                            responseHeaders = item.ResponseHeaders,
-                            hops = item.Hops.Select(hop => new
-                            {
-                                requestedUrl = hop.RequestedUrl,
-                                resolvedAddresses = hop.ResolvedAddresses.Select(address => address.ToString()),
-                                pinnedAddress = hop.PinnedAddress.ToString(),
-                                hop.StatusCode,
-                                redirectTarget = hop.RedirectTarget,
-                                hop.ResponseReceivedAt
-                            })
-                        })
-                    }
+                        url = item.FinalUrl.AbsoluteUri,
+                        item.PublishedAt,
+                        item.RetrievedAt,
+                        item.ContentSha256,
+                        item.ExactExcerpt
+                    }),
+                    runtimeModel = provenance.ModelId,
+                    runtimeProvider = provenance.Provider,
+                    runtimeModelObserved = true,
+                    runtimeProviderObserved = true,
+                    providerMatch = provenance.Provider == provenance.RequestedProvider,
+                    modelMatch = provenance.ModelId == provenance.RequestedModelId,
+                    reportSha256 = provenance.RuntimeReportSha256,
+                    completedAt = provenance.CompletedAt,
+                    promptSha256 = provenance.PromptSha256
                 }, JsonOptions);
                 await api.PostDecisionAsync(runId, payload, cancellationToken).ConfigureAwait(false);
                 succeeded++;
@@ -120,7 +112,35 @@ public sealed class ExhibitionCycle(
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception exception)
             {
+                try
+                {
+                    var authoritative = await api.GetProgressAsync(cancellationToken).ConfigureAwait(false);
+                    if (IsAuthoritativeSuccess(authoritative, agent, runId))
+                    {
+                        succeeded++;
+                        logger.LogWarning(exception,
+                            "Exhibition decision response was lost for {AgentId} ({RunId}); authoritative API state confirms success",
+                            agent.Id, runId);
+                        continue;
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+                catch (Exception reconciliationException)
+                {
+                    logger.LogWarning(reconciliationException,
+                        "Could not reconcile exhibition agent {AgentId} ({RunId}) after failure", agent.Id, runId);
+                }
                 failures.Add(new ExhibitionAgentFailure(agent.Id, agent.ModelId, exception.Message));
+                try
+                {
+                    var boundedError = exception.Message.Length > 1_000 ? exception.Message[..1_000] : exception.Message;
+                    await api.PostStatusAsync(StatusJson(runId, agent, "failed", boundedError, DateTimeOffset.UtcNow), cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception statusException)
+                {
+                    logger.LogError(statusException, "Could not publish failure status for exhibition agent {AgentId}", agent.Id);
+                }
                 logger.LogError(exception, "Exhibition agent {AgentId} ({ModelId}) failed for {RunId}; no result was fabricated", agent.Id, agent.ModelId, runId);
             }
         }
@@ -128,19 +148,65 @@ public sealed class ExhibitionCycle(
         return new ExhibitionCycleResult(scheduledAt, succeeded, failures);
     }
 
+    private static string StatusJson(string runId, AgentDefinition agent, string status, string? error, DateTimeOffset occurredAt) =>
+        JsonSerializer.Serialize(new { runId, agentId = agent.Id, modelId = agent.ModelId, status, error, occurredAt }, JsonOptions);
+
     private static HashSet<string> ReadFixtureInstrumentIds(string json)
     {
         using var document = StrictJson.Parse(json, 2 * 1024 * 1024);
-        if (document.RootElement.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("Instrument response must be an array.");
+        if (document.RootElement.ValueKind != JsonValueKind.Object ||
+            !document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array ||
+            !document.RootElement.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != "preview-fixtures")
+            throw new InvalidOperationException("Instrument response must be a preview-fixtures object.");
         var result = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var item in document.RootElement.EnumerateArray())
+        foreach (var item in items.EnumerateArray())
         {
-            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("instrumentId", out var id) || id.ValueKind != JsonValueKind.String ||
+            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("id", out var id) || id.ValueKind != JsonValueKind.String ||
                 string.IsNullOrWhiteSpace(id.GetString()) || !result.Add(id.GetString()!))
-                throw new InvalidOperationException("Every fixture instrument must have a unique non-empty instrumentId.");
+                throw new InvalidOperationException("Every fixture instrument must have a unique non-empty id.");
         }
         if (result.Count == 0) throw new InvalidOperationException("Fixture instrument response cannot be empty.");
         return result;
+    }
+
+    private static bool IsAuthoritativeSuccess(string json, AgentDefinition agent, string runId)
+    {
+        using var document = StrictJson.Parse(json, 2 * 1024 * 1024);
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != "preview-fixtures" ||
+            !root.TryGetProperty("isNonLive", out var isNonLive) || isNonLive.ValueKind != JsonValueKind.True ||
+            !root.TryGetProperty("strictContest", out var strictContest) || strictContest.ValueKind != JsonValueKind.False ||
+            !root.TryGetProperty("participants", out var participants) || participants.ValueKind != JsonValueKind.Array)
+            return false;
+        var matchingParticipants = 0;
+        var targetIdentityCount = 0;
+        foreach (var participant in participants.EnumerateArray())
+        {
+            if (participant.ValueKind != JsonValueKind.Object ||
+                !participant.TryGetProperty("agentId", out var agentId) || !agentId.TryGetGuid(out var parsedAgentId) ||
+                parsedAgentId != agent.Id)
+                continue;
+            targetIdentityCount++;
+            if (targetIdentityCount > 1) return false;
+            if (!participant.TryGetProperty("modelId", out var modelId) || modelId.GetString() != agent.ModelId ||
+                !participant.TryGetProperty("runId", out var participantRunId) || participantRunId.GetString() != runId ||
+                !participant.TryGetProperty("status", out var status) || status.GetString() != "succeeded" ||
+                !participant.TryGetProperty("queuedAt", out var queuedAtElement) ||
+                !queuedAtElement.TryGetDateTimeOffset(out var queuedAt) ||
+                !participant.TryGetProperty("startedAt", out var startedAtElement) ||
+                !startedAtElement.TryGetDateTimeOffset(out var startedAt) || startedAt <= queuedAt ||
+                !participant.TryGetProperty("completedAt", out var completedAtElement) ||
+                !completedAtElement.TryGetDateTimeOffset(out var completedAt) || completedAt <= startedAt ||
+                !participant.TryGetProperty("latestDecision", out var decision) || decision.ValueKind != JsonValueKind.Object ||
+                !decision.TryGetProperty("runId", out var decisionRunId) || decisionRunId.GetString() != runId ||
+                !decision.TryGetProperty("completedAt", out var decisionCompletedAtElement) ||
+                !decisionCompletedAtElement.TryGetDateTimeOffset(out var decisionCompletedAt) || decisionCompletedAt != completedAt)
+                continue;
+            matchingParticipants++;
+            if (matchingParticipants > 1) return false;
+        }
+        return matchingParticipants == 1;
     }
 
     private static string CreateRunId(DateTimeOffset scheduledAt, AgentDefinition agent)

@@ -18,7 +18,10 @@ public sealed class CredentialHomeFactory(string root, string credentialFile)
         {
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(home,
                 UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-            var destination = Path.Combine(home, Path.GetFileName(source));
+            // Hermes only loads provider credentials from $HERMES_HOME/.env.
+            // Keep the mounted source name irrelevant so deployment can use a
+            // descriptive secret filename without silently losing credentials.
+            var destination = Path.Combine(home, ".env");
             await using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read,
                 4096, FileOptions.Asynchronous | FileOptions.SequentialScan))
             await using (var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None,

@@ -12,16 +12,19 @@ public sealed class ExhibitionApiClientTests
         var handler = new RecordingHandler();
         var options = new ExhibitionOptions
         {
-            ApiBaseUrl = new Uri("https://api.example.test/"), InternalKey = new string('k', 32),
-            CopilotCredentialFile = "/run/secrets/copilot.json", HermesHomeRoot = "/dev/shm/exhibition"
+            ApiBaseUrl = new Uri("https://api.example.test/"),
+            InternalKey = new string('k', 32),
+            CopilotCredentialFile = "/run/secrets/copilot.json",
+            HermesHomeRoot = "/dev/shm/exhibition"
         };
         var api = new ExhibitionApiClient(new HttpClient(handler) { BaseAddress = options.ApiBaseUrl }, options);
 
         await api.GetInstrumentsAsync(CancellationToken.None);
         await api.GetProgressAsync(CancellationToken.None);
+        await api.PostStatusAsync("{\"status\":\"queued\"}", CancellationToken.None);
         await api.PostDecisionAsync("run-1", "{}", CancellationToken.None);
 
-        Assert.Equal(["/api/v1/instruments", "/api/v1/ai-progress", "/api/v1/internal/ai-decisions"], handler.Paths);
+        Assert.Equal(["/api/v1/instruments", "/api/v1/ai-progress", "/internal/preview/ai-status", "/internal/preview/ai-decisions"], handler.Paths);
         Assert.All(handler.Keys, key => Assert.Equal(new string('k', 32), key));
         Assert.Equal("run-1", handler.IdempotencyKeys.Single(value => value is not null));
     }

@@ -555,10 +555,10 @@ input[type="number"], textarea {
   font-weight: 850;
   text-transform: uppercase;
 }
-.status-badge.success { color: var(--accent); border-color: var(--accent-strong); }
+.status-badge.succeeded { color: var(--accent); border-color: var(--accent-strong); }
 .status-badge.running { color: #a8c7ff; border-color: #5e80bd; }
-.status-badge.pending { color: #e5c978; border-color: #8e7b46; }
-.status-badge.degraded, .status-badge.failure { color: var(--danger); border-color: #a45961; }
+.status-badge.pending, .status-badge.queued { color: #e5c978; border-color: #8e7b46; }
+.status-badge.failed { color: var(--danger); border-color: #a45961; }
 .ai-metrics { margin-bottom: 14px; }
 .ai-detail { min-width: 0; }
 .ai-detail span, .ai-detail strong { display: block; }

@@ -30,6 +30,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
     private readonly Dictionary<Guid, AiAccount> aiAccounts = ContestContract.Agents
         .ToDictionary(agent => agent.Id, agent => new AiAccount(agent.Id, agent.ModelId));
     private readonly Dictionary<string, AiRun> aiRuns = new(StringComparer.Ordinal);
+    private readonly List<AiActivityDto> aiActivity = [];
 
     public InstrumentListDto Search(string? query)
     {
@@ -90,8 +91,11 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         lock (sync)
         {
             return new(aiAccounts.Values.OrderBy(account => account.ModelId, StringComparer.Ordinal)
-                .Select(account => new AiProgressAgentDto(account.AgentId, account.ModelId, account.Status,
-                    PortfolioFor(account.Account), account.LatestDecision)).ToArray(), DataMode, false);
+                .Select(account => new AiProgressAgentDto(account.AgentId, account.ModelId, account.ModelId,
+                    account.Status, account.RunId, account.QueuedAt, account.StartedAt, account.CompletedAt,
+                    account.Error, PortfolioFor(account.Account), account.LatestDecision)).ToArray(),
+                aiActivity.OrderByDescending(item => item.OccurredAt).Take(100).ToArray(),
+                DataMode, IsNonLive: true, StrictContest: false);
         }
     }
 
@@ -125,6 +129,12 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                 throw new PreviewOrderException("run-capacity", "The fixture decision capacity has been reached.");
 
             var account = aiAccounts[request.AgentId];
+            if (!string.Equals(account.RunId, request.RunId, StringComparison.Ordinal))
+                throw new PreviewOrderException("run-decision-conflict", "The decision runId must match the agent's current run.");
+            if (account.Status != "running")
+                throw new PreviewOrderException("decision-status-conflict", "A fixture decision may complete only a running run.");
+            if (account.StartedAt is null || request.CompletedAt <= account.StartedAt)
+                throw new PreviewOrderException("stale-decision", "Decision completion must follow the current run's start time.");
             var action = request.Action.Trim().ToLowerInvariant();
             InstrumentDto? instrument = null;
             if (action is "buy" or "sell") instrument = Instruments.Single(item => item.Id == request.InstrumentId);
@@ -154,10 +164,102 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                 request.Reason.Trim(), request.Confidence, request.Evidence,
                 new(request.RuntimeProvider, request.RuntimeModel, request.ReportSha256), request.CompletedAt);
             account.Status = "succeeded";
+            account.RunId = request.RunId;
+            account.QueuedAt ??= request.CompletedAt;
+            account.StartedAt ??= request.CompletedAt;
+            account.CompletedAt = request.CompletedAt;
+            account.Error = null;
             account.LatestDecision = decision;
+            account.SeenRunIds.Add(request.RunId);
+            AddAiActivity(new(request.RunId, request.AgentId, request.ModelId, "succeeded", action,
+                request.Reason.Trim(), null, request.CompletedAt));
             aiRuns.Add(request.RunId, new(fingerprint, decision));
             return new(decision, false);
         }
+    }
+
+    public void UpdateAiStatus(AiStatusRequestDto request)
+    {
+        if (request.RunId is null || request.RunId.Length is < 8 or > 128 ||
+            request.RunId.Any(character => character is < '!' or > '~'))
+            throw new PreviewOrderException("invalid-run-id", "runId must contain 8-128 visible ASCII characters.");
+        if (!ContestContract.IsExactAgent(request.AgentId, request.ModelId))
+            throw new PreviewOrderException("agent-model-mismatch", "agentId and modelId must exactly match ContestContract.Agents.");
+        var status = request.Status?.Trim().ToLowerInvariant();
+        if (status is not ("queued" or "running" or "failed"))
+            throw new PreviewOrderException("invalid-status", "status must be queued, running, or failed.");
+        if (request.OccurredAt == default || request.Error?.Length > 1_000 ||
+            (status == "failed" && string.IsNullOrWhiteSpace(request.Error)) ||
+            (status != "failed" && request.Error is not null))
+            throw new PreviewOrderException("invalid-status-detail", "Status time and bounded failure detail must match the status.");
+
+        lock (sync)
+        {
+            var account = aiAccounts[request.AgentId];
+            var sameRun = string.Equals(account.RunId, request.RunId, StringComparison.Ordinal);
+            if (sameRun && string.Equals(account.Status, status, StringComparison.Ordinal) &&
+                StatusDetailsMatch(account, status, request))
+                return;
+            if (sameRun && account.Status is "succeeded" or "failed")
+                throw new PreviewOrderException("terminal-status-conflict", "A terminal fixture run cannot transition to another status.");
+            if (!sameRun && status != "queued")
+                throw new PreviewOrderException("run-status-conflict", "running and failed status must follow queued for the same runId.");
+            if (!sameRun && account.SeenRunIds.Contains(request.RunId))
+                throw new PreviewOrderException("stale-status", "A completed or superseded runId cannot become current again.");
+            if (!sameRun && account.Status is "queued" or "running")
+                throw new PreviewOrderException("active-run-conflict", "A new run cannot replace an active queued or running run.");
+            var latestAt = LatestStatusAt(account);
+            if ((!sameRun || status != account.Status) && latestAt is not null && request.OccurredAt <= latestAt)
+                throw new PreviewOrderException("stale-status", "Status events must be newer than the current lifecycle state.");
+            if (sameRun && status == "queued")
+                throw new PreviewOrderException("status-transition-conflict", "queued cannot replace an active run state.");
+            if (sameRun && account.Status == "running" && status != "failed")
+                throw new PreviewOrderException("status-transition-conflict", "running may transition only to failed or a submitted decision.");
+            if (sameRun && account.Status == "queued" && status is not ("running" or "failed"))
+                throw new PreviewOrderException("status-transition-conflict", "queued may transition only to running or failed.");
+            if (status == "queued")
+            {
+                if (account.SeenRunIds.Count >= MaximumIdempotencyEntries)
+                    throw new PreviewOrderException("run-capacity", "The fixture run capacity has been reached.");
+                account.SeenRunIds.Add(request.RunId);
+                account.RunId = request.RunId;
+                account.QueuedAt = request.OccurredAt;
+                account.StartedAt = null;
+                account.CompletedAt = null;
+                account.Error = null;
+            }
+            else if (status == "running")
+            {
+                account.StartedAt = request.OccurredAt;
+                account.Error = null;
+            }
+            else
+            {
+                account.CompletedAt = request.OccurredAt;
+                account.Error = request.Error!.Trim();
+                AddAiActivity(new(request.RunId, request.AgentId, request.ModelId, "failed", null, null,
+                    account.Error, request.OccurredAt));
+            }
+            account.Status = status;
+        }
+    }
+
+    private static bool StatusDetailsMatch(AiAccount account, string status, AiStatusRequestDto request) => status switch
+    {
+        "queued" => account.QueuedAt == request.OccurredAt && request.Error is null,
+        "running" => account.StartedAt == request.OccurredAt && request.Error is null,
+        "failed" => account.CompletedAt == request.OccurredAt &&
+            string.Equals(account.Error, request.Error?.Trim(), StringComparison.Ordinal),
+        _ => false
+    };
+
+    private static DateTimeOffset? LatestStatusAt(AiAccount account) =>
+        account.CompletedAt ?? account.StartedAt ?? account.QueuedAt;
+
+    private void AddAiActivity(AiActivityDto item)
+    {
+        aiActivity.Add(item);
+        if (aiActivity.Count > 100) aiActivity.RemoveRange(0, aiActivity.Count - 100);
     }
 
     private static void ValidateAi(AiDecisionRequestDto request)
@@ -174,12 +276,14 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             throw new PreviewOrderException("invalid-reason", "reason must contain 1-2,000 characters.");
         if (request.Confidence is < 0m or > 1m)
             throw new PreviewOrderException("invalid-confidence", "confidence must be between 0 and 1.");
-        if (request.Evidence is null || request.Evidence.Count is < 1 or > 20 || request.Evidence.Any(evidence =>
+        if (request.Evidence is null || request.Evidence.Count > 20 ||
+            (action != "hold" && request.Evidence.Count < 1) ||
+            request.Evidence.Any(evidence =>
                 !Uri.TryCreate(evidence.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
                 evidence.PublishedAt == default || string.IsNullOrWhiteSpace(evidence.ExactExcerpt) ||
                 evidence.ExactExcerpt.Length > 2_000 || !LowerSha256.IsMatch(evidence.ContentSha256 ?? string.Empty)))
-            throw new PreviewOrderException("invalid-evidence", "Provide 1-20 verified HTTPS evidence items with publication time, exact excerpt, and lowercase SHA-256.");
-        if (string.IsNullOrWhiteSpace(request.RuntimeProvider) || request.RuntimeProvider.Length > 100 ||
+            throw new PreviewOrderException("invalid-evidence", "Trades require 1-20 verified HTTPS evidence items; holds may use none when no source can be verified.");
+        if (!string.Equals(request.RuntimeProvider, "copilot", StringComparison.Ordinal) ||
             !string.Equals(request.RuntimeModel, request.ModelId, StringComparison.Ordinal) ||
             !LowerSha256.IsMatch(request.ReportSha256 ?? string.Empty) || request.CompletedAt == default)
             throw new PreviewOrderException("invalid-attestation", "Runtime provider/model, report SHA-256, and completion time are required.");
@@ -298,8 +402,14 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         public Guid AgentId { get; } = agentId;
         public string ModelId { get; } = modelId;
         public string Status { get; set; } = "pending";
+        public string? RunId { get; set; }
+        public DateTimeOffset? QueuedAt { get; set; }
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? CompletedAt { get; set; }
+        public string? Error { get; set; }
         public Account Account { get; } = new(modelId);
         public AiDecisionDto? LatestDecision { get; set; }
+        public HashSet<string> SeenRunIds { get; } = new(StringComparer.Ordinal);
     }
 }
 

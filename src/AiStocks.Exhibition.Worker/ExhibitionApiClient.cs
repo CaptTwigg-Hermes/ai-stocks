@@ -11,9 +11,14 @@ public sealed class ExhibitionApiClient(HttpClient client, ExhibitionOptions opt
     public Task<string> GetProgressAsync(CancellationToken cancellationToken) =>
         SendAsync(HttpMethod.Get, "/api/v1/ai-progress", null, null, cancellationToken);
 
+    public async Task PostStatusAsync(string json, CancellationToken cancellationToken)
+    {
+        _ = await SendAsync(HttpMethod.Post, "/internal/preview/ai-status", json, null, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task PostDecisionAsync(string runId, string json, CancellationToken cancellationToken)
     {
-        _ = await SendAsync(HttpMethod.Post, "/api/v1/internal/ai-decisions", json, runId, cancellationToken).ConfigureAwait(false);
+        _ = await SendAsync(HttpMethod.Post, "/internal/preview/ai-decisions", json, runId, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<string> SendAsync(HttpMethod method, string path, string? json, string? runId, CancellationToken cancellationToken)

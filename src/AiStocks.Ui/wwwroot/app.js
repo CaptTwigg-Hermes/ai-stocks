@@ -21,6 +21,7 @@
     leaderboardPage: byId("leaderboard-page"),
     aiRacePage: byId("ai-race-page"),
     aiParticipants: byId("ai-participants"),
+    aiActivity: byId("ai-activity"),
     aiRefresh: byId("ai-refresh"),
     aiRaceStatus: byId("ai-race-status"),
     search: byId("stock-search"),
@@ -78,7 +79,7 @@
   const exhibitionModelIds = new Set([
     "gpt-5.6-sol", "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview"
   ]);
-  const exhibitionStatuses = new Set(["pending", "running", "degraded", "failure", "success"]);
+  const exhibitionStatuses = new Set(["pending", "queued", "running", "succeeded", "failed"]);
   const clock = new Intl.DateTimeFormat("en", {
     hour: "2-digit", minute: "2-digit", second: "2-digit"
   });
@@ -510,6 +511,7 @@
       const narrative = element("div", "ai-narrative");
       narrative.append(
         detail("Status", status),
+        detail("Failure", participant.error ? String(participant.error) : "None"),
         detail("Last action", decision?.action ? String(decision.action) : "No completed decision"),
         detail("Decision time", validTime ? decisionTime.format(completedAt) : "Not available"),
         detail("Rationale", decision?.reason ? String(decision.reason) : "No rationale available"),
@@ -521,16 +523,43 @@
     ui.aiParticipants.setAttribute("aria-busy", "false");
   }
 
+  function renderAiActivity(data) {
+    ui.aiActivity.replaceChildren();
+    const activity = Array.isArray(data.activity) ? data.activity.slice(0, 20) : [];
+    if (!activity.length) {
+      ui.aiActivity.append(element("p", "muted-empty", "No autonomous runs completed yet."));
+      return;
+    }
+    activity.forEach((entry) => {
+      const row = element("div", "activity-row");
+      const description = element("div");
+      const occurredAt = new Date(entry.occurredAt);
+      const validTime = !Number.isNaN(occurredAt.valueOf());
+      const action = entry.action ? ` · ${String(entry.action).toUpperCase()}` : "";
+      description.append(
+        element("strong", "", `${String(entry.modelId || "Unknown model")} · ${String(entry.status || "unknown")}${action}`),
+        element("span", "", validTime ? clock.format(occurredAt) : "Time unavailable"),
+        element("span", entry.error ? "error" : "", String(entry.error || entry.reason || "No detail supplied"))
+      );
+      row.append(description);
+      ui.aiActivity.append(row);
+    });
+  }
+
   function exhibitionLeaderboard(data) {
     const sorted = [...data.participants].sort((left, right) =>
       safeNumber(right.portfolio?.totalValueDkk) - safeNumber(left.portfolio?.totalValueDkk));
-    return { items: sorted.map((participant, index) => ({
-      rank: index + 1,
-      displayName: participant.displayName || participant.modelId,
-      participantType: `AI · ${participant.modelId}`,
-      valueDkk: safeNumber(participant.portfolio?.totalValueDkk),
-      returnPercent: safeNumber(participant.portfolio?.returnPercent)
-    })) };
+    const values = sorted.map((participant) => safeNumber(participant.portfolio?.totalValueDkk));
+    return { items: sorted.map((participant, index) => {
+      const value = values[index];
+      return {
+        rank: values.filter((candidate) => candidate > value).length + 1,
+        displayName: participant.displayName || participant.modelId,
+        participantType: `AI · ${participant.modelId}`,
+        valueDkk: value,
+        returnPercent: safeNumber(participant.portfolio?.returnPercent)
+      };
+    }) };
   }
 
   function activateExhibition(data) {
@@ -544,6 +573,7 @@
     ui.leaderboardPage.hidden = !isLeaderboardPage;
     ui.aiRacePage.hidden = isLeaderboardPage;
     renderAiParticipants(data);
+    renderAiActivity(data);
     renderLeaderboard(exhibitionLeaderboard(data));
     ui.aiRaceStatus.textContent = "";
     ui.aiRaceStatus.classList.remove("error");
