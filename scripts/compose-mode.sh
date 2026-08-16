@@ -6,8 +6,8 @@ cd "$ROOT_DIR"
 
 mode=${1:-}
 case "$mode" in
-  contest|preview|operations) ;;
-  *) printf 'usage: %s contest|preview|operations COMPOSE_ARGS...\n' "$0" >&2; exit 64 ;;
+  contest|preview|warmup|operations) ;;
+  *) printf 'usage: %s contest|preview|warmup|operations COMPOSE_ARGS...\n' "$0" >&2; exit 64 ;;
 esac
 shift
 (($#)) || { printf 'compose-mode: a Compose command is required\n' >&2; exit 64; }
@@ -33,7 +33,7 @@ else
   exit 1
 fi
 
-if [[ "$mode" == contest || "$mode" == preview ]]; then
+if [[ "$mode" == contest || "$mode" == preview || "$mode" == warmup ]]; then
   export AISTOCKS_DEPLOYMENT_PROFILE=$mode
 fi
 
@@ -44,12 +44,25 @@ if [[ "$action" == up || "$action" == start || "$action" == restart ]]; then
     exit 1
   fi
   mapfile -t running_services <<<"$running_output"
+  for running in "${running_services[@]}"; do
+    if [[ "$mode" == contest && "$running" == warmup-collector ]]; then
+      printf 'compose-mode: warmup collector is still active; stop it before starting contest\n' >&2
+      exit 1
+    fi
+    if [[ "$mode" == warmup && "$running" == collector ]]; then
+      printf 'compose-mode: contest collector is still active; stop it before starting warmup\n' >&2
+      exit 1
+    fi
+  done
   if [[ "$mode" == contest ]]; then
     opposite_label=preview
     opposite_services=(api ui)
   elif [[ "$mode" == preview ]]; then
     opposite_label=contest
     opposite_services=(app collector worker reporter)
+  elif [[ "$mode" == warmup ]]; then
+    opposite_label=contest
+    opposite_services=(collector)
   else
     opposite_label=
     opposite_services=()

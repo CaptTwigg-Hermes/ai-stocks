@@ -30,6 +30,16 @@ services:
       AISTOCKS_DEPLOYMENT_PROFILE: ${AISTOCKS_DEPLOYMENT_PROFILE:?set to contest or preview}
     restart: "no"
 
+  warmup-guard:
+    <<: *runtime-security
+    profiles: ["warmup"]
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:operations-${AISTOCKS_IMAGE_VERSION:-latest}
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ['test "$$AISTOCKS_DEPLOYMENT_PROFILE" = "warmup"']
+    environment:
+      AISTOCKS_DEPLOYMENT_PROFILE: ${AISTOCKS_DEPLOYMENT_PROFILE:?set to contest, preview, or warmup}
+    restart: "no"
+
   app:
     <<: *runtime-security
     profiles: ["contest"]
@@ -69,6 +79,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       PREVIEW_MODE: "1"
+      AI_EXHIBITION_MODE: "1"
+      AI_EXHIBITION_KEY: ${AI_EXHIBITION_KEY:?set a random AI exhibition internal key}
       TZ: Europe/Stockholm
       UI_ORIGINS: ${PREVIEW_UI_ORIGINS:-http://192.168.50.2:3232}
     ports:
@@ -106,11 +118,72 @@ services:
       start_period: 20s
     networks: [egress]
 
+  exhibition:
+    <<: *runtime-security
+    profiles: ["preview"]
+    depends_on:
+      preview-guard:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:exhibition-${AISTOCKS_IMAGE_VERSION:-latest}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      AI_EXHIBITION_API_ORIGIN: http://api:8080
+      AI_EXHIBITION_KEY: ${AI_EXHIBITION_KEY:?set a random AI exhibition internal key}
+      AI_EXHIBITION_INTERVAL_SECONDS: ${AI_EXHIBITION_INTERVAL_SECONDS:-3600}
+      HERMES_CREDENTIAL_FILE: /run/hermes-credentials/copilot.env
+      TZ: Europe/Stockholm
+      SEQ_SERVER_URL: ${SEQ_SERVER_URL:-http://192.168.50.2:5341}
+      SEQ_API_KEY: ${SEQ_API_KEY:-}
+    volumes:
+      - ${HERMES_COPILOT_ENV_FILE:?set a mode-0600 Copilot-only Hermes env file}:/run/hermes-credentials/copilot.env:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    networks: [egress]
+
   collector:
     <<: *runtime-security
     profiles: ["contest"]
     depends_on:
       contest-guard:
+        condition: service_completed_successfully
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:collector-${AISTOCKS_IMAGE_VERSION:-latest}
+    environment:
+      APP_ENV: production
+      COLLECTOR_DATABASE_URL: ${COLLECTOR_DATABASE_URL:?set the least-privilege collector PostgreSQL URL}
+      ARCHIVE_PATH: /data/nasdaq
+      FIRDS_ACQUISITION_PLAN_PATH: /run/market-bootstrap/firds-plan.json
+      CORPORATE_ACTION_INPUT_PATH: /run/corporate-actions
+      COLLECTOR_POLL_SECONDS: ${COLLECTOR_POLL_SECONDS:-15}
+      COLLECTOR_MAX_DOWNLOADS_PER_POLL: ${COLLECTOR_MAX_DOWNLOADS_PER_POLL:-32}
+      COLLECTOR_CONFLICT_REFETCH_MINUTES: ${COLLECTOR_CONFLICT_REFETCH_MINUTES:-360}
+      TZ: Europe/Stockholm
+    volumes:
+      - ${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq
+      - ${MARKET_BOOTSTRAP_DIR:?set the reviewed FIRDS plan directory}:/run/market-bootstrap:ro
+      - ${CORPORATE_ACTION_INPUT_DIR:?set the reviewed corporate-action input directory}:/run/corporate-actions:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    networks: [egress]
+
+  warmup-collector:
+    <<: *runtime-security
+    profiles: ["warmup"]
+    depends_on:
+      warmup-guard:
         condition: service_completed_successfully
     image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:collector-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
