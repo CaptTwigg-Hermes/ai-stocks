@@ -107,3 +107,34 @@ public sealed class ApiApplicationFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Testing");
 }
+
+public sealed class AiExhibitionEndpointTests
+{
+    [Fact]
+    public async Task Exhibition_inventory_exposes_only_ai_fixture_surface()
+    {
+        await using var factory = new AiExhibitionApiFactory();
+        using var client = factory.CreateClient();
+
+        var inventory = await client.GetFromJsonAsync<EndpointInventoryItem[]>("/__endpoint-inventory");
+
+        Assert.Contains(inventory ?? [], endpoint => endpoint == new EndpointInventoryItem("GET", "/api/v1/ai-progress"));
+        Assert.Contains(inventory ?? [], endpoint => endpoint == new EndpointInventoryItem("POST", "/internal/preview/ai-decisions"));
+        Assert.DoesNotContain(inventory ?? [], endpoint => endpoint.Path is "/api/v1/portfolio" or "/api/v1/orders");
+    }
+
+    private sealed record EndpointInventoryItem(string Method, string Path);
+}
+
+internal sealed class AiExhibitionApiFactory : WebApplicationFactory<Program>
+{
+    public const string Secret = "0123456789abcdef0123456789abcdef";
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+        builder.UseSetting("PREVIEW_MODE", "1");
+        builder.UseSetting("AI_EXHIBITION_MODE", "1");
+        builder.UseSetting("AI_EXHIBITION_KEY", Secret);
+    }
+}
