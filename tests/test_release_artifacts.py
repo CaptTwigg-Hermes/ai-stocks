@@ -144,7 +144,7 @@ def test_compose_mode_preflight_fails_closed_when_status_is_unknown(tmp_path):
     fake.chmod(0o755)
     env = os.environ | {"COMPOSE": str(fake), "START_LOG": str(log)}
 
-    for mode in ("contest", "preview"):
+    for mode in ("contest", "preview", "warmup"):
         for action in ("up", "start", "restart"):
             result = subprocess.run(
                 [ROOT / "scripts/compose-mode.sh", mode, action],
@@ -362,6 +362,7 @@ def test_release_gate_and_restore_fail_closed_with_scheduled_backup():
     assert "contest stop app worker collector reporter" in readme
     assert "scripts/compose-mode.sh contest config -q" in verify
     assert "scripts/compose-mode.sh preview config -q" in verify
+    assert "scripts/compose-mode.sh warmup config -q" in verify
     assert "volatile" in readme.lower() and "fixture" in readme.lower()
     assert "restored migration checksums or contest invariants failed verification" in restore
     assert "120000" in restore

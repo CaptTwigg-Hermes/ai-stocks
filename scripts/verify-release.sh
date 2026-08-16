@@ -75,6 +75,7 @@ export DISCORD_REPORT_TARGET='discord:1534963881317896212'
 export COMPOSE="${COMPOSE_CMD[*]}"
 scripts/compose-mode.sh contest config -q
 scripts/compose-mode.sh preview config -q
+scripts/compose-mode.sh warmup config -q
 
 git diff --check
 printf 'release verification passed\n'
