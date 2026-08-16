@@ -65,3 +65,74 @@ def test_ui_keeps_accessible_minimal_interaction_contract():
     assert "overflow-wrap: anywhere" in css
     assert ".leaderboard-full .leaderboard-entry > div strong" in css
     assert ".leader-summary strong" in css
+
+
+def test_exhibition_mode_replaces_human_workspace_without_breaking_preview_fallback():
+    html = (UI / "index.html").read_text()
+    script = (UI / "app.js").read_text()
+
+    assert 'id="ai-race-page" hidden' in html
+    assert 'id="ai-participants"' in html
+    assert 'id="ai-refresh" type="button"' in html
+    assert 'api("/api/v1/ai-progress")' in script
+    assert 'data.strictContest === false' in script
+    assert 'data.isNonLive === true' in script
+    assert 'ui.tradePage.hidden = true' in script
+    assert 'ui.aiRacePage.hidden = false' in script
+    assert 'document.body.classList.add("exhibition-mode")' in script
+    assert 'if (error.status !== 404)' in script
+    assert 'startHumanPreview()' in script
+
+
+def test_exhibition_cards_are_four_defensive_safe_complete_ai_participants():
+    html = (UI / "index.html").read_text()
+    script = (UI / "app.js").read_text()
+
+    assert "const exhibitionModelIds = new Set([" in script
+    for model_id in ("gpt-5.6-sol", "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview"):
+        assert f'"{model_id}"' in script
+    assert "data.participants.length !== 4" in script
+    assert "new Set(data.participants.map((participant) => participant.modelId))" in script
+    for label in ("Status", "Last action", "Decision time", "Rationale", "Confidence", "Verified sources", "Cash", "Holdings value", "Total"):
+        assert f'"{label}"' in script
+    for status in ("pending", "running", "degraded", "failure", "success"):
+        assert f'"{status}"' in script
+    assert "renderAiHoldings" in script
+    assert "renderEvidence" in script
+    assert 'url.protocol !== "https:"' in script
+    assert "link.rel = \"noopener noreferrer\"" in script
+    assert "innerHTML" not in script
+    assert html.count("fixture-backed and non-live") >= 2
+    assert html.count("Portfolios are volatile") >= 2
+    assert html.count("not the strict 2026 contest") >= 2
+
+
+def test_exhibition_refresh_is_bounded_race_safe_and_responsive():
+    script = (UI / "app.js").read_text()
+    css = (UI / "styles.css").read_text()
+
+    assert "let aiRefreshGeneration = 0" in script
+    assert "let aiRefreshController" in script
+    assert "aiRefreshController.abort()" in script
+    assert "generation !== aiRefreshGeneration" in script
+    assert "window.setInterval(refreshAiProgress, 60000)" in script
+    assert 'ui.aiRefresh.addEventListener("click", () => refreshAiProgress(true))' in script
+    assert 'isLeaderboardPage ? "AI leaderboard refreshed." : "AI race refreshed."' in script
+    assert 'showExhibitionFailure("AI race unavailable. Human trading controls remain hidden.")' in script
+    assert ".ai-grid" in css and "repeat(2, minmax(0, 1fr))" in css
+    assert ".ai-card" in css and "min-width: 0" in css
+    assert ".ai-detail strong" in css and "overflow-wrap: anywhere" in css
+    assert "@media (max-width: 700px)" in css
+    assert "@media (max-width: 390px)" in css
+    assert "@media (max-width: 340px)" in css
+
+
+def test_exhibition_leaderboard_is_ai_only_and_uses_ai_refresh():
+    html = (UI / "index.html").read_text()
+    script = (UI / "app.js").read_text()
+
+    assert 'id="leaderboard-intro"' in html
+    assert 'id="leaderboard-mode"' in html
+    assert 'ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by total fixture portfolio value in DKK."' in script
+    assert 'ui.leaderboardMode.textContent = "AI-only fixture exhibition"' in script
+    assert 'document.body.classList.contains("exhibition-mode") ? refreshAiProgress(true) : refreshAll(true)' in script

@@ -19,6 +19,10 @@
     apiState: byId("api-state"),
     tradePage: byId("trade-page"),
     leaderboardPage: byId("leaderboard-page"),
+    aiRacePage: byId("ai-race-page"),
+    aiParticipants: byId("ai-participants"),
+    aiRefresh: byId("ai-refresh"),
+    aiRaceStatus: byId("ai-race-status"),
     search: byId("stock-search"),
     results: byId("search-results"),
     resultCount: byId("result-count"),
@@ -46,6 +50,8 @@
     leaderboardRefresh: byId("leaderboard-refresh"),
     leaderName: byId("leader-name"),
     leaderValue: byId("leader-value"),
+    leaderboardIntro: byId("leaderboard-intro"),
+    leaderboardMode: byId("leaderboard-mode"),
     activity: byId("activity-list"),
     activityStatus: byId("activity-status"),
     refresh: byId("refresh-data"),
@@ -66,6 +72,13 @@
   });
   const number = new Intl.NumberFormat("en", { maximumFractionDigits: 2 });
   const leaderboardNumber = new Intl.NumberFormat("da-DK", { maximumFractionDigits: 2 });
+  const decisionTime = new Intl.DateTimeFormat("en", {
+    dateStyle: "medium", timeStyle: "short"
+  });
+  const exhibitionModelIds = new Set([
+    "gpt-5.6-sol", "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview"
+  ]);
+  const exhibitionStatuses = new Set(["pending", "running", "degraded", "failure", "success"]);
   const clock = new Intl.DateTimeFormat("en", {
     hour: "2-digit", minute: "2-digit", second: "2-digit"
   });
@@ -80,7 +93,9 @@
     if (!response.ok) {
       let problem = null;
       try { problem = await response.json(); } catch { /* response has no JSON */ }
-      throw new Error(problem?.detail || problem?.title || `Request failed (${response.status})`);
+      const error = new Error(problem?.detail || problem?.title || `Request failed (${response.status})`);
+      error.status = response.status;
+      throw error;
     }
     return response.status === 204 ? null : response.json();
   }
@@ -393,7 +408,8 @@
   ui.quantity.addEventListener("input", updateEstimate);
   ui.form.addEventListener("submit", submitOrder);
   ui.refresh.addEventListener("click", () => refreshAll(true));
-  ui.leaderboardRefresh.addEventListener("click", () => refreshAll(true));
+  ui.leaderboardRefresh.addEventListener("click", () =>
+    document.body.classList.contains("exhibition-mode") ? refreshAiProgress(true) : refreshAll(true));
   document.querySelectorAll("[data-action]").forEach((button) =>
     button.addEventListener("click", () => setSide(button.dataset.action)));
   document.addEventListener("keydown", (event) => {
@@ -403,6 +419,213 @@
     }
   });
 
-  const initialLoad = isLeaderboardPage ? refreshAll() : Promise.all([search(), refreshAll()]);
-  initialLoad.catch(() => {});
+  function isExhibitionResponse(data) {
+    const exhibitionContract = data && data.strictContest === false && data.isNonLive === true;
+    if (!exhibitionContract || !Array.isArray(data.participants)) return false;
+    if (data.participants.length !== 4) return false;
+    const modelIds = new Set(data.participants.map((participant) => participant.modelId));
+    return modelIds.size === 4 && [...exhibitionModelIds].every((modelId) => modelIds.has(modelId));
+  }
+
+  function safeNumber(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function detail(label, value) {
+    const row = element("div", "ai-detail");
+    row.append(element("span", "", label), element("strong", "", value));
+    return row;
+  }
+
+  function renderAiHoldings(portfolio) {
+    const section = element("section", "ai-holdings");
+    section.append(element("h3", "", "Holdings"));
+    const holdings = Array.isArray(portfolio?.holdings) ? portfolio.holdings : [];
+    if (!holdings.length) {
+      section.append(element("p", "muted-empty", "No holdings."));
+      return section;
+    }
+    holdings.forEach((holding) => {
+      const row = element("div", "holding-row");
+      const identity = element("div");
+      identity.append(
+        element("strong", "", String(holding.symbol || holding.instrumentId || "Unknown instrument")),
+        element("span", "", `${safeNumber(holding.quantity)} shares`)
+      );
+      row.append(identity, element("b", "", dkk.format(safeNumber(holding.valueDkk))));
+      section.append(row);
+    });
+    return section;
+  }
+
+  function renderEvidence(decision) {
+    const section = element("section", "ai-evidence");
+    section.append(element("h3", "", "Verified sources"));
+    const list = element("ul");
+    const evidence = Array.isArray(decision?.evidence) ? decision.evidence : [];
+    evidence.forEach((source) => {
+      let url;
+      try { url = new URL(source?.url); } catch { return; }
+      if (url.protocol !== "https:") return;
+      const item = element("li");
+      const link = element("a", "", url.hostname);
+      link.href = url.href;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      item.append(link);
+      if (source.publishedAt) item.append(element("time", "", `Published ${source.publishedAt}`));
+      if (source.exactExcerpt) item.append(element("q", "", String(source.exactExcerpt)));
+      if (source.contentSha256) item.append(element("code", "", `SHA-256 ${source.contentSha256}`));
+      list.append(item);
+    });
+    if (!list.childElementCount) list.append(element("li", "muted-empty", "No verified source links supplied."));
+    section.append(list);
+    return section;
+  }
+
+  function renderAiParticipants(data) {
+    ui.aiParticipants.replaceChildren();
+    data.participants.forEach((participant) => {
+      const portfolio = participant.portfolio || {};
+      const decision = participant.latestDecision;
+      const status = exhibitionStatuses.has(String(participant.status).toLowerCase())
+        ? String(participant.status).toLowerCase() : "degraded";
+      const card = element("article", `panel ai-card status-${status}`);
+      const heading = element("header", "ai-card-heading");
+      const identity = element("div");
+      identity.append(
+        element("h2", "", String(participant.displayName || participant.modelId)),
+        element("p", "model-id", String(participant.modelId))
+      );
+      heading.append(identity, element("span", `status-badge ${status}`, status));
+      const metrics = element("div", "metrics ai-metrics");
+      metrics.append(
+        detail("Cash", dkk.format(safeNumber(portfolio.cashDkk))),
+        detail("Holdings value", dkk.format(safeNumber(portfolio.holdingsValueDkk))),
+        detail("Total", dkk.format(safeNumber(portfolio.totalValueDkk)))
+      );
+      const completedAt = decision?.completedAt ? new Date(decision.completedAt) : null;
+      const validTime = completedAt && !Number.isNaN(completedAt.valueOf());
+      const narrative = element("div", "ai-narrative");
+      narrative.append(
+        detail("Status", status),
+        detail("Last action", decision?.action ? String(decision.action) : "No completed decision"),
+        detail("Decision time", validTime ? decisionTime.format(completedAt) : "Not available"),
+        detail("Rationale", decision?.reason ? String(decision.reason) : "No rationale available"),
+        detail("Confidence", Number.isFinite(Number(decision?.confidence)) ? `${number.format(Number(decision.confidence) * 100)}%` : "Not available")
+      );
+      card.append(heading, metrics, narrative, renderAiHoldings(portfolio), renderEvidence(decision));
+      ui.aiParticipants.append(card);
+    });
+    ui.aiParticipants.setAttribute("aria-busy", "false");
+  }
+
+  function exhibitionLeaderboard(data) {
+    const sorted = [...data.participants].sort((left, right) =>
+      safeNumber(right.portfolio?.totalValueDkk) - safeNumber(left.portfolio?.totalValueDkk));
+    return { items: sorted.map((participant, index) => ({
+      rank: index + 1,
+      displayName: participant.displayName || participant.modelId,
+      participantType: `AI · ${participant.modelId}`,
+      valueDkk: safeNumber(participant.portfolio?.totalValueDkk),
+      returnPercent: safeNumber(participant.portfolio?.returnPercent)
+    })) };
+  }
+
+  function activateExhibition(data) {
+    if (!isExhibitionResponse(data)) return false;
+    document.body.classList.add("exhibition-mode");
+    document.querySelector('[data-route="trade"]').textContent = "AI Race";
+    ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by total fixture portfolio value in DKK.";
+    ui.leaderboardMode.textContent = "AI-only fixture exhibition";
+    ui.tradePage.hidden = true;
+    ui.aiRacePage.hidden = false;
+    ui.leaderboardPage.hidden = !isLeaderboardPage;
+    ui.aiRacePage.hidden = isLeaderboardPage;
+    renderAiParticipants(data);
+    renderLeaderboard(exhibitionLeaderboard(data));
+    ui.aiRaceStatus.textContent = "";
+    ui.aiRaceStatus.classList.remove("error");
+    ui.leaderboardPageStatus.textContent = "";
+    ui.leaderboardPageStatus.classList.remove("error");
+    serviceResult("ai-progress", true);
+    return true;
+  }
+
+  function showExhibitionFailure(message) {
+    document.body.classList.add("exhibition-mode");
+    ui.tradePage.hidden = true;
+    ui.aiRacePage.hidden = isLeaderboardPage;
+    ui.leaderboardPage.hidden = !isLeaderboardPage;
+    ui.aiRaceStatus.textContent = message;
+    ui.aiRaceStatus.classList.add("error");
+    ui.aiParticipants.setAttribute("aria-busy", "false");
+    ui.aiParticipants.replaceChildren(element("p", "panel empty", message));
+    ui.leaderboardPageStatus.textContent = message;
+    ui.leaderboardPageStatus.classList.add("error");
+    serviceResult("ai-progress", false);
+  }
+
+  let aiRefreshGeneration = 0;
+  let aiRefreshController;
+  let aiRefreshInterval;
+  async function refreshAiProgress(showConfirmation = false) {
+    const generation = ++aiRefreshGeneration;
+    if (aiRefreshController) aiRefreshController.abort();
+    const controller = new AbortController();
+    aiRefreshController = controller;
+    ui.aiRefresh.disabled = true;
+    ui.aiRefresh.textContent = "Refreshing…";
+    try {
+      const data = await api("/api/v1/ai-progress", { signal: controller.signal });
+      if (generation !== aiRefreshGeneration) return;
+      if (!activateExhibition(data)) throw new Error("Invalid AI exhibition response.");
+      if (!aiRefreshInterval) aiRefreshInterval = window.setInterval(refreshAiProgress, 60000);
+      if (showConfirmation) showToast(isLeaderboardPage ? "AI leaderboard refreshed." : "AI race refreshed.");
+    } catch (error) {
+      if (error.name === "AbortError" || generation !== aiRefreshGeneration) return;
+      if (!document.body.classList.contains("exhibition-mode")) {
+        showExhibitionFailure("AI race unavailable. Human trading controls remain hidden.");
+      } else {
+        const message = "Refresh failed. Showing the last loaded AI fixture snapshot.";
+        ui.aiRaceStatus.textContent = message;
+        ui.aiRaceStatus.classList.add("error");
+        ui.leaderboardPageStatus.textContent = message;
+        ui.leaderboardPageStatus.classList.add("error");
+        serviceResult("ai-progress", false);
+      }
+    } finally {
+      if (generation === aiRefreshGeneration) {
+        aiRefreshController = null;
+        ui.aiRefresh.disabled = false;
+        ui.aiRefresh.textContent = "Refresh AI race";
+      }
+    }
+  }
+
+  function startHumanPreview() {
+    return isLeaderboardPage ? refreshAll() : Promise.all([search(), refreshAll()]);
+  }
+
+  async function start() {
+    try {
+      const data = await api("/api/v1/ai-progress");
+      if (activateExhibition(data)) {
+        aiRefreshInterval = window.setInterval(refreshAiProgress, 60000);
+        return;
+      }
+      showExhibitionFailure("AI race unavailable. Human trading controls remain hidden.");
+      return;
+    } catch (error) {
+      if (error.status !== 404) {
+        showExhibitionFailure("AI race unavailable. Human trading controls remain hidden.");
+        return;
+      }
+    }
+    await startHumanPreview();
+  }
+
+  ui.aiRefresh.addEventListener("click", () => refreshAiProgress(true));
+  start().catch(() => {});
 })();

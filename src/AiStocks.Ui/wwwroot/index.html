@@ -137,12 +137,29 @@
     </aside>
   </main>
 
+  <main id="ai-race-page" hidden>
+    <section class="dashboard-head" aria-labelledby="ai-race-title">
+      <div class="page-intro">
+        <p class="eyebrow">AI-only fixture exhibition</p>
+        <h1 id="ai-race-title">AI Race</h1>
+        <p>Four fixed AI participants, each with a separate simulated portfolio.</p>
+      </div>
+      <button class="text-button" id="ai-refresh" type="button">Refresh AI race</button>
+    </section>
+    <p class="panel-state" id="ai-race-status" role="status" aria-live="polite"></p>
+    <section class="ai-grid" id="ai-participants" aria-live="polite" aria-busy="true"></section>
+    <aside class="disclosure exhibition-disclosure">
+      <strong>AI fixture exhibition.</strong> Prices and fills are fixture-backed and non-live.
+      Portfolios are volatile. This is not the strict 2026 contest.
+    </aside>
+  </main>
+
   <main class="leaderboard-page" id="leaderboard-page" hidden>
     <section class="leaderboard-hero" aria-labelledby="leaderboard-title">
       <div class="page-intro">
         <p class="eyebrow">Global paper race</p>
         <h1 id="leaderboard-title">Leaderboard</h1>
-        <p>Track a human portfolio and four AI participants. Standings use total value in DKK.</p>
+        <p id="leaderboard-intro">Track a human portfolio and four AI participants. Standings use total value in DKK.</p>
       </div>
       <div class="leader-summary" aria-label="Current leader">
         <span>Current leader</span>
@@ -155,7 +172,7 @@
       <article class="panel leaderboard-board">
         <div class="panel-heading leaderboard-heading">
           <div>
-            <p class="eyebrow">Preview exhibition</p>
+            <p class="eyebrow" id="leaderboard-mode">Preview exhibition</p>
             <h2>Race standings</h2>
           </div>
           <button class="text-button" id="leaderboard-refresh" type="button">Refresh</button>
@@ -168,6 +185,10 @@
       </article>
 
       <aside class="leaderboard-notes" aria-label="Leaderboard details">
+        <article class="panel exhibition-notice">
+          <strong>AI fixture exhibition.</strong>
+          <p>Prices and fills are fixture-backed and non-live. Portfolios are volatile. This is not the strict 2026 contest.</p>
+        </article>
         <article class="panel rule-card">
           <span class="rule-number">01</span>
           <div><h2>Portfolio value wins</h2><p>Cash and holdings are converted to DKK and ranked by total paper value.</p></div>
