@@ -11,25 +11,29 @@ PINNED_HERMES = "226b095a59df0be88e195a90fbd209f236665b7b"
 def test_dockge_compose_separates_and_hardens_services():
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     services = compose["services"]
-    assert {"api", "ui", "app", "collector", "worker"} <= set(services)
+    assert {
+        "api", "ui", "exhibition", "app", "collector", "warmup-collector", "worker"
+    } <= set(services)
     assert services["app"]["ports"] == ["${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8080"]
     assert services["ui"]["ports"] == ["${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8080"]
     assert services["api"]["ports"] == ["${API_BIND_ADDRESS:-192.168.50.2}:${API_PORT:-3233}:8080"]
     assert services["app"]["profiles"] == ["contest"]
     assert services["api"]["profiles"] == ["preview"]
     assert services["ui"]["profiles"] == ["preview"]
+    assert services["exhibition"]["profiles"] == ["preview"]
     for name in ("collector", "worker", "reporter"):
         assert services[name]["profiles"] == ["contest"]
+    assert services["warmup-collector"]["profiles"] == ["warmup"]
     assert services["contest-guard"]["profiles"] == ["contest"]
     assert services["preview-guard"]["profiles"] == ["preview"]
     assert all("profiles" in service for service in services.values())
     for name in ("app", "collector", "worker", "reporter"):
         assert services[name]["depends_on"]["contest-guard"]["condition"] == "service_completed_successfully"
-    for name in ("api", "ui"):
+    for name in ("api", "ui", "exhibition"):
         assert services[name]["depends_on"]["preview-guard"]["condition"] == "service_completed_successfully"
     assert services["api"]["environment"]["PREVIEW_MODE"] == "1"
     assert services["api"]["environment"]["ASPNETCORE_ENVIRONMENT"] == "Development"
-    for name in ("api", "ui", "app", "collector", "worker"):
+    for name in ("api", "ui", "exhibition", "app", "collector", "warmup-collector", "worker"):
         service = services[name]
         assert service["read_only"] is True
         assert service["cap_drop"] == ["ALL"]
@@ -44,7 +48,9 @@ def test_dockge_compose_separates_and_hardens_services():
         "api": "api",
         "app": "app",
         "ui": "ui",
+        "exhibition": "exhibition",
         "collector": "collector",
+        "warmup-collector": "collector",
         "worker": "worker",
         "reporter": "reporter",
         "migrate": "operations",
@@ -78,6 +84,7 @@ def test_dockge_compose_separates_and_hardens_services():
     assert services["ui"]["healthcheck"]["test"] == expected_health
     assert services["app"]["healthcheck"]["test"] == expected_health
     assert services["worker"]["healthcheck"]["test"] == expected_health
+    assert services["exhibition"]["healthcheck"]["test"] == expected_health
     expected_health[-1] = "http://127.0.0.1:8080/readyz"
     assert services["collector"]["healthcheck"]["test"] == expected_health
 
@@ -298,7 +305,7 @@ def test_github_publishes_every_dockge_image_target():
         assert role in bootstrap
     assert "uv run pytest -q" in verify_steps
     assert "uv run python scripts/prove_no_broker.py" in verify_steps
-    assert targets == ["api", "ui", "app", "collector", "worker", "reporter", "operations", "backup-operations"]
+    assert targets == ["api", "ui", "exhibition", "app", "collector", "worker", "reporter", "operations", "backup-operations"]
     build = workflow["jobs"]["publish"]["steps"][-1]
     assert build["with"]["target"] == "${{ matrix.target }}"
     assert build["with"]["push"] is True

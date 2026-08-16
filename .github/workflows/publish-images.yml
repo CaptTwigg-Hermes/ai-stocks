@@ -61,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [api, ui, app, collector, worker, reporter, operations, backup-operations]
+        target: [api, ui, exhibition, app, collector, worker, reporter, operations, backup-operations]
     steps:
       - name: Check out exact source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
