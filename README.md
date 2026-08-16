@@ -91,8 +91,8 @@ chown -R 10001:10001 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DI
 chmod 700 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR" "$CORPORATE_ACTION_INPUT_DIR"
 ```
 
-`HERMES_COPILOT_ENV_FILE` must be a mode-0600 file containing only the
-Copilot credential variables needed by Hermes. The exhibition worker copies it
+`HERMES_COPILOT_ENV_FILE` must be a mode-0600 file containing only
+`COPILOT_GITHUB_TOKEN`. The exhibition worker copies it
 into a separate writable runtime home for each agent; never point it at the main
 Hermes home. `HERMES_AUTH_DIR` remains the strict contest runner's isolated
 credential directory. Archive and status datasets

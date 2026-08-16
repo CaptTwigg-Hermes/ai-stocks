@@ -290,9 +290,7 @@ def test_copilot_credential_export_is_minimal_and_private(tmp_path):
         check=True,
     )
 
-    assert destination.read_text() == (
-        "COPILOT_GITHUB_TOKEN=primary-secret\nGH_TOKEN=secondary-secret\n"
-    )
+    assert destination.read_text() == "COPILOT_GITHUB_TOKEN=primary-secret\n"
     assert destination.stat().st_mode & 0o777 == 0o600
     assert "secret" not in result.stdout
     assert "secret" not in result.stderr
@@ -303,7 +301,7 @@ def test_copilot_credential_export_is_minimal_and_private(tmp_path):
         capture_output=True,
     )
     assert replay.returncode != 0
-    assert destination.read_text().endswith("secondary-secret\n")
+    assert destination.read_text().endswith("primary-secret\n")
 
 
 def test_image_build_pins_hermes_source_and_frozen_lock():

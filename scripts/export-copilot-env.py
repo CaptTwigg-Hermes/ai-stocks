@@ -9,12 +9,7 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
-ALLOWED_KEYS = {
-    "COPILOT_GITHUB_TOKEN",
-    "COPILOT_TOKEN",
-    "GH_TOKEN",
-    "GITHUB_TOKEN",
-}
+ALLOWED_KEYS = {"COPILOT_GITHUB_TOKEN"}
 
 
 def fail(message: str) -> NoReturn:
