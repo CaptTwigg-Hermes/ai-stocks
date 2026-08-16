@@ -3,6 +3,7 @@
     <Project Path="src/AiStocks.Api/AiStocks.Api.csproj" />
     <Project Path="src/AiStocks.Collector/AiStocks.Collector.csproj" />
     <Project Path="src/AiStocks.Core/AiStocks.Core.csproj" />
+    <Project Path="src/AiStocks.Exhibition.Worker/AiStocks.Exhibition.Worker.csproj" />
     <Project Path="src/AiStocks.MarketData/AiStocks.MarketData.csproj" />
     <Project Path="src/AiStocks.Operations/AiStocks.Operations.csproj" />
     <Project Path="src/AiStocks.Persistence/AiStocks.Persistence.csproj" />
@@ -16,6 +17,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/AiStocks.Api.Tests/AiStocks.Api.Tests.csproj" />
     <Project Path="tests/AiStocks.Core.Tests/AiStocks.Core.Tests.csproj" />
+    <Project Path="tests/AiStocks.Exhibition.Worker.Tests/AiStocks.Exhibition.Worker.Tests.csproj" />
     <Project Path="tests/AiStocks.MarketData.Tests/AiStocks.MarketData.Tests.csproj" />
     <Project Path="tests/AiStocks.Persistence.Tests/AiStocks.Persistence.Tests.csproj" />
     <Project Path="tests/AiStocks.Research.Tests/AiStocks.Research.Tests.csproj" />
