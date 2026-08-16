@@ -1,3 +1,7 @@
+using AiStocks.Core;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+
 namespace AiStocks.Api;
 
 public sealed class PreviewRaceStore(TimeProvider clock)
@@ -5,6 +9,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
     public const decimal StartingCashDkk = 100_000m;
     public const string DataMode = "preview-fixtures";
     public const int MaximumIdempotencyEntries = 1_000;
+    private static readonly Regex LowerSha256 = new("^[0-9a-f]{64}$", RegexOptions.CultureInvariant);
 
     private static readonly InstrumentDto[] Instruments =
     [
@@ -22,6 +27,9 @@ public sealed class PreviewRaceStore(TimeProvider clock)
 
     private readonly object sync = new();
     private readonly Dictionary<string, Account> accounts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<Guid, AiAccount> aiAccounts = ContestContract.Agents
+        .ToDictionary(agent => agent.Id, agent => new AiAccount(agent.Id, agent.ModelId));
+    private readonly Dictionary<string, AiRun> aiRuns = new(StringComparer.Ordinal);
 
     public InstrumentListDto Search(string? query)
     {
@@ -75,6 +83,113 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                 .ToArray();
             return new(ranked, DataMode);
         }
+    }
+
+    public AiProgressDto AiProgress()
+    {
+        lock (sync)
+        {
+            return new(aiAccounts.Values.OrderBy(account => account.ModelId, StringComparer.Ordinal)
+                .Select(account => new AiProgressAgentDto(account.AgentId, account.ModelId, account.Status,
+                    PortfolioFor(account.Account), account.LatestDecision)).ToArray(), DataMode, false);
+        }
+    }
+
+    public PreviewLeaderboardDto AiLeaderboard()
+    {
+        lock (sync)
+        {
+            var rows = aiAccounts.Values.Select(account =>
+                (account.ModelId, TotalValueDkk: PortfolioFor(account.Account).TotalValueDkk)).ToArray();
+            var ordered = rows.OrderByDescending(row => row.TotalValueDkk)
+                .ThenBy(row => row.ModelId, StringComparer.Ordinal).ToArray();
+            return new(ordered.Select(row => new PreviewLeaderboardEntryDto(
+                1 + ordered.Count(candidate => candidate.TotalValueDkk > row.TotalValueDkk), row.ModelId, "ai",
+                row.TotalValueDkk, Percent((row.TotalValueDkk - StartingCashDkk) / StartingCashDkk * 100m))).ToArray(), DataMode);
+        }
+    }
+
+    public AiDecisionSubmission SubmitAi(AiDecisionRequestDto request)
+    {
+        ValidateAi(request);
+        var fingerprint = JsonSerializer.Serialize(request);
+        lock (sync)
+        {
+            if (aiRuns.TryGetValue(request.RunId, out var prior))
+            {
+                if (!string.Equals(prior.Fingerprint, fingerprint, StringComparison.Ordinal))
+                    throw new PreviewOrderException("run-id-conflict", "runId was already used for a different decision.");
+                return new(prior.Decision, true);
+            }
+            if (aiRuns.Count >= MaximumIdempotencyEntries)
+                throw new PreviewOrderException("run-capacity", "The fixture decision capacity has been reached.");
+
+            var account = aiAccounts[request.AgentId];
+            var action = request.Action.Trim().ToLowerInvariant();
+            InstrumentDto? instrument = null;
+            if (action is "buy" or "sell") instrument = Instruments.Single(item => item.Id == request.InstrumentId);
+            if (instrument is not null)
+            {
+                var total = Money(instrument.PriceDkk * request.Quantity);
+                account.Account.Holdings.TryGetValue(instrument.Id, out var held);
+                if (action == "buy")
+                {
+                    if (account.Account.CashDkk < total)
+                        throw new PreviewOrderException("insufficient-cash", "The AI fixture account has insufficient cash.");
+                    account.Account.CashDkk = Money(account.Account.CashDkk - total);
+                    account.Account.Holdings[instrument.Id] = held + request.Quantity;
+                }
+                else
+                {
+                    if (held < request.Quantity)
+                        throw new PreviewOrderException("insufficient-holdings", "The AI fixture account has insufficient holdings.");
+                    account.Account.CashDkk = Money(account.Account.CashDkk + total);
+                    if (held == request.Quantity) account.Account.Holdings.Remove(instrument.Id);
+                    else account.Account.Holdings[instrument.Id] = held - request.Quantity;
+                }
+                account.Account.Orders.Add(new(Guid.NewGuid(), action, instrument.Id, instrument.Symbol, request.Quantity,
+                    instrument.PriceDkk, total, "filled", request.Reason.Trim(), request.CompletedAt));
+            }
+            var decision = new AiDecisionDto(request.RunId, action, request.InstrumentId, request.Quantity,
+                request.Reason.Trim(), request.Confidence, request.Evidence,
+                new(request.RuntimeProvider, request.RuntimeModel, request.ReportSha256), request.CompletedAt);
+            account.Status = "succeeded";
+            account.LatestDecision = decision;
+            aiRuns.Add(request.RunId, new(fingerprint, decision));
+            return new(decision, false);
+        }
+    }
+
+    private static void ValidateAi(AiDecisionRequestDto request)
+    {
+        if (request.RunId is null || request.RunId.Length is < 8 or > 128 ||
+            request.RunId.Any(character => character is < '!' or > '~'))
+            throw new PreviewOrderException("invalid-run-id", "runId must contain 8-128 visible ASCII characters.");
+        if (!ContestContract.IsExactAgent(request.AgentId, request.ModelId))
+            throw new PreviewOrderException("agent-model-mismatch", "agentId and modelId must exactly match ContestContract.Agents.");
+        var action = request.Action?.Trim().ToLowerInvariant();
+        if (action is not ("buy" or "sell" or "hold"))
+            throw new PreviewOrderException("invalid-action", "action must be buy, sell, or hold.");
+        if (request.Reason is null || request.Reason.Trim().Length is < 1 or > 2_000)
+            throw new PreviewOrderException("invalid-reason", "reason must contain 1-2,000 characters.");
+        if (request.Confidence is < 0m or > 1m)
+            throw new PreviewOrderException("invalid-confidence", "confidence must be between 0 and 1.");
+        if (request.Evidence is null || request.Evidence.Count is < 1 or > 20 || request.Evidence.Any(evidence =>
+                !Uri.TryCreate(evidence.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
+                evidence.PublishedAt == default || string.IsNullOrWhiteSpace(evidence.ExactExcerpt) ||
+                evidence.ExactExcerpt.Length > 2_000 || !LowerSha256.IsMatch(evidence.ContentSha256 ?? string.Empty)))
+            throw new PreviewOrderException("invalid-evidence", "Provide 1-20 verified HTTPS evidence items with publication time, exact excerpt, and lowercase SHA-256.");
+        if (string.IsNullOrWhiteSpace(request.RuntimeProvider) || request.RuntimeProvider.Length > 100 ||
+            !string.Equals(request.RuntimeModel, request.ModelId, StringComparison.Ordinal) ||
+            !LowerSha256.IsMatch(request.ReportSha256 ?? string.Empty) || request.CompletedAt == default)
+            throw new PreviewOrderException("invalid-attestation", "Runtime provider/model, report SHA-256, and completion time are required.");
+        if (action == "hold")
+        {
+            if (request.InstrumentId is not null || request.Quantity != 0)
+                throw new PreviewOrderException("invalid-hold", "hold requires null instrumentId and zero quantity.");
+        }
+        else if (request.Quantity <= 0 || !Instruments.Any(instrument => instrument.Id == request.InstrumentId))
+            throw new PreviewOrderException("invalid-trade", "buy/sell requires a fixture instrument and positive quantity.");
     }
 
     public PreviewSubmission Submit(string identity, string idempotencyKey, HumanOrderRequestDto request)
@@ -176,9 +291,20 @@ public sealed class PreviewRaceStore(TimeProvider clock)
     }
 
     private sealed record IdempotencyEntry(string Fingerprint, PreviewOrderDto Order);
+    private sealed record AiRun(string Fingerprint, AiDecisionDto Decision);
+
+    private sealed class AiAccount(Guid agentId, string modelId)
+    {
+        public Guid AgentId { get; } = agentId;
+        public string ModelId { get; } = modelId;
+        public string Status { get; set; } = "pending";
+        public Account Account { get; } = new(modelId);
+        public AiDecisionDto? LatestDecision { get; set; }
+    }
 }
 
 public sealed record PreviewSubmission(PreviewOrderDto Order, bool Replayed);
+public sealed record AiDecisionSubmission(AiDecisionDto Decision, bool Replayed);
 
 public sealed class PreviewOrderException(string code, string message) : InvalidOperationException(message)
 {

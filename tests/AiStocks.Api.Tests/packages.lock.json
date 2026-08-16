@@ -407,8 +407,12 @@
       "aistocks.api": {
         "type": "Project",
         "dependencies": {
+          "AiStocks.Core": "[1.0.0, )",
           "AiStocks.Security": "[1.0.0, )"
         }
+      },
+      "aistocks.core": {
+        "type": "Project"
       },
       "aistocks.security": {
         "type": "Project"

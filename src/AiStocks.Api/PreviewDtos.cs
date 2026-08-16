@@ -66,3 +66,52 @@ public sealed record PreviewLeaderboardEntryDto(
 public sealed record PreviewLeaderboardDto(
     [property: JsonPropertyName("items")] IReadOnlyList<PreviewLeaderboardEntryDto> Items,
     [property: JsonPropertyName("dataMode")] string DataMode);
+
+public sealed record AiProgressDto(
+    [property: JsonPropertyName("agents")] IReadOnlyList<AiProgressAgentDto> Agents,
+    [property: JsonPropertyName("dataMode")] string DataMode,
+    [property: JsonPropertyName("isLive")] bool IsLive);
+
+public sealed record AiProgressAgentDto(
+    [property: JsonPropertyName("agentId")] Guid AgentId,
+    [property: JsonPropertyName("modelId")] string ModelId,
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("portfolio")] PreviewPortfolioDto Portfolio,
+    [property: JsonPropertyName("latestDecision")] AiDecisionDto? LatestDecision);
+
+public sealed record AiDecisionDto(
+    [property: JsonPropertyName("runId")] string RunId,
+    [property: JsonPropertyName("action")] string Action,
+    [property: JsonPropertyName("instrumentId")] string? InstrumentId,
+    [property: JsonPropertyName("quantity")] int Quantity,
+    [property: JsonPropertyName("reason")] string Reason,
+    [property: JsonPropertyName("confidence")] decimal Confidence,
+    [property: JsonPropertyName("evidence")] IReadOnlyList<AiEvidenceDto> Evidence,
+    [property: JsonPropertyName("attestation")] AiAttestationDto Attestation,
+    [property: JsonPropertyName("completedAt")] DateTimeOffset CompletedAt);
+
+public sealed record AiEvidenceDto(
+    [property: JsonPropertyName("url")] string Url,
+    [property: JsonPropertyName("publishedAt")] DateTimeOffset PublishedAt,
+    [property: JsonPropertyName("exactExcerpt")] string ExactExcerpt,
+    [property: JsonPropertyName("contentSha256")] string ContentSha256);
+
+public sealed record AiAttestationDto(
+    [property: JsonPropertyName("runtimeProvider")] string RuntimeProvider,
+    [property: JsonPropertyName("runtimeModel")] string RuntimeModel,
+    [property: JsonPropertyName("reportSha256")] string ReportSha256);
+
+public sealed record AiDecisionRequestDto(
+    [property: JsonPropertyName("runId")] string RunId,
+    [property: JsonPropertyName("agentId")] Guid AgentId,
+    [property: JsonPropertyName("modelId")] string ModelId,
+    [property: JsonPropertyName("action")] string Action,
+    [property: JsonPropertyName("instrumentId")] string? InstrumentId,
+    [property: JsonPropertyName("quantity")] int Quantity,
+    [property: JsonPropertyName("reason")] string Reason,
+    [property: JsonPropertyName("confidence")] decimal Confidence,
+    [property: JsonPropertyName("evidence")] IReadOnlyList<AiEvidenceDto> Evidence,
+    [property: JsonPropertyName("runtimeProvider")] string RuntimeProvider,
+    [property: JsonPropertyName("runtimeModel")] string RuntimeModel,
+    [property: JsonPropertyName("reportSha256")] string ReportSha256,
+    [property: JsonPropertyName("completedAt")] DateTimeOffset CompletedAt);

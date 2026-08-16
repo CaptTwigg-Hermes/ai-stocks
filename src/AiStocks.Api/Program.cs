@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.RateLimiting;
@@ -17,9 +19,15 @@ builder.Services.Configure<JsonOptions>(options =>
 });
 
 var previewMode = builder.Configuration["PREVIEW_MODE"] == "1";
+var aiExhibitionMode = builder.Configuration["AI_EXHIBITION_MODE"] == "1";
 var localAuth = builder.Environment.IsEnvironment("Testing") || (builder.Environment.IsDevelopment() && previewMode);
 if (previewMode && !localAuth)
     throw new InvalidOperationException("PREVIEW_MODE is permitted only in Development or Testing.");
+if (aiExhibitionMode && (!previewMode || !localAuth))
+    throw new InvalidOperationException("AI_EXHIBITION_MODE requires PREVIEW_MODE in Development or Testing.");
+var aiExhibitionKey = aiExhibitionMode ? Required("AI_EXHIBITION_KEY") : null;
+if (aiExhibitionKey is not null && aiExhibitionKey.Length < 32)
+    throw new InvalidOperationException("AI_EXHIBITION_KEY must contain at least 32 characters.");
 
 var uiOrigins = (builder.Configuration["UI_ORIGINS"] ?? (localAuth
         ? "http://192.168.50.2:3232,https://stocks.example.com"
@@ -117,31 +125,53 @@ api.MapGet("/me", (ClaimsPrincipal user) => Results.Ok(new IdentityDto(Identity(
 if (localAuth)
 {
     api.MapGet("/instruments", (string? query, PreviewRaceStore store) => Results.Ok(store.Search(query)));
-    api.MapGet("/portfolio", (ClaimsPrincipal user, PreviewRaceStore store) => Results.Ok(store.Portfolio(Identity(user))));
-    api.MapGet("/leaderboard", (ClaimsPrincipal user, PreviewRaceStore store) => Results.Ok(store.Leaderboard(Identity(user))));
-    api.MapGet("/orders", (ClaimsPrincipal user, PreviewRaceStore store) => Results.Ok(store.Orders(Identity(user))));
-    api.MapPost("/orders", (ClaimsPrincipal user, HumanOrderRequestDto request, PreviewRaceStore store, HttpContext context) =>
+    api.MapGet("/leaderboard", (ClaimsPrincipal user, PreviewRaceStore store) =>
+        Results.Ok(aiExhibitionMode ? store.AiLeaderboard() : store.Leaderboard(Identity(user))));
+    if (aiExhibitionMode)
     {
-        if (!builder.Environment.IsEnvironment("Testing") && !ExactOrigin(context, uiOrigins))
-            return ApiEndpointResults.Problem("origin-rejected", "Origin rejected", StatusCodes.Status403Forbidden, context,
-                "Paper orders require an exact configured UI origin.");
-        if (!context.Request.Headers.TryGetValue("Idempotency-Key", out var keys) || keys.Count != 1)
-            return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
-                StatusCodes.Status400BadRequest, context, "Send exactly one Idempotency-Key header.");
-        try
+        api.MapGet("/ai-progress", (PreviewRaceStore store) => Results.Ok(store.AiProgress()));
+        app.MapPost("/internal/preview/ai-decisions", (AiDecisionRequestDto request, PreviewRaceStore store, HttpContext context) =>
         {
-            var submission = store.Submit(Identity(user), keys.ToString(), request);
-            context.Response.Headers["Idempotency-Replayed"] = submission.Replayed ? "true" : "false";
-            return submission.Replayed
-                ? Results.Ok(submission.Order)
-                : Results.Created($"/api/v1/orders/{submission.Order.Id}", submission.Order);
-        }
-        catch (PreviewOrderException exception)
+            if (!ValidSecret(context, aiExhibitionKey!)) return Results.Unauthorized();
+            try
+            {
+                var submission = store.SubmitAi(request);
+                return submission.Replayed ? Results.Ok(submission.Decision) : Results.Created("/api/v1/ai-progress", submission.Decision);
+            }
+            catch (PreviewOrderException exception)
+            {
+                return ApiEndpointResults.Problem(exception.Code, "AI fixture decision rejected",
+                    StatusCodes.Status400BadRequest, context, exception.Message);
+            }
+        }).WithMetadata(new Microsoft.AspNetCore.Cors.DisableCorsAttribute());
+    }
+    else
+    {
+        api.MapGet("/portfolio", (ClaimsPrincipal user, PreviewRaceStore store) => Results.Ok(store.Portfolio(Identity(user))));
+        api.MapGet("/orders", (ClaimsPrincipal user, PreviewRaceStore store) => Results.Ok(store.Orders(Identity(user))));
+        api.MapPost("/orders", (ClaimsPrincipal user, HumanOrderRequestDto request, PreviewRaceStore store, HttpContext context) =>
         {
-            return ApiEndpointResults.Problem(exception.Code, "Paper order rejected",
-                StatusCodes.Status400BadRequest, context, exception.Message);
-        }
-    }).RequireAuthorization("Trade").RequireRateLimiting("orders");
+            if (!builder.Environment.IsEnvironment("Testing") && !ExactOrigin(context, uiOrigins))
+                return ApiEndpointResults.Problem("origin-rejected", "Origin rejected", StatusCodes.Status403Forbidden, context,
+                    "Paper orders require an exact configured UI origin.");
+            if (!context.Request.Headers.TryGetValue("Idempotency-Key", out var keys) || keys.Count != 1)
+                return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
+                    StatusCodes.Status400BadRequest, context, "Send exactly one Idempotency-Key header.");
+            try
+            {
+                var submission = store.Submit(Identity(user), keys.ToString(), request);
+                context.Response.Headers["Idempotency-Replayed"] = submission.Replayed ? "true" : "false";
+                return submission.Replayed
+                    ? Results.Ok(submission.Order)
+                    : Results.Created($"/api/v1/orders/{submission.Order.Id}", submission.Order);
+            }
+            catch (PreviewOrderException exception)
+            {
+                return ApiEndpointResults.Problem(exception.Code, "Paper order rejected",
+                    StatusCodes.Status400BadRequest, context, exception.Message);
+            }
+        }).RequireAuthorization("Trade").RequireRateLimiting("orders");
+    }
 }
 
 if (app.Environment.IsEnvironment("Testing"))
@@ -187,6 +217,13 @@ static bool ExactOrigin(HttpContext context, IReadOnlyCollection<string> allowed
 {
     if (!context.Request.Headers.TryGetValue("Origin", out var origins) || origins.Count != 1) return false;
     return allowed.Contains(origins.ToString(), StringComparer.Ordinal);
+}
+static bool ValidSecret(HttpContext context, string expected)
+{
+    if (!context.Request.Headers.TryGetValue("X-AI-Exhibition-Key", out var values) || values.Count != 1) return false;
+    var actualHash = SHA256.HashData(Encoding.UTF8.GetBytes(values.ToString()));
+    var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expected));
+    return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
 }
 static string Identity(ClaimsPrincipal user) =>
     user.FindFirstValue(ClaimTypes.Email) ?? throw new InvalidOperationException("Authenticated identity lacks email.");
