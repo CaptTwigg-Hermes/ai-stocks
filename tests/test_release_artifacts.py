@@ -337,6 +337,18 @@ def test_github_publishes_every_dockge_image_target():
         assert role in bootstrap
     assert "uv run pytest -q" in verify_steps
     assert "uv run python scripts/prove_no_broker.py" in verify_steps
+    setup_index = next(
+        index for index, step in enumerate(verify_job["steps"])
+        if step.get("uses", "").startswith("actions/setup-dotnet@")
+    )
+    negative_capability_index = next(
+        index for index, step in enumerate(verify_job["steps"])
+        if "uv run python scripts/prove_no_broker.py" in step.get("run", "")
+    )
+    setup = verify_job["steps"][setup_index]
+    assert setup["uses"] == "actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1"
+    assert setup["with"]["dotnet-version"] == "10.0.x"
+    assert setup_index < negative_capability_index
     assert targets == ["api", "ui", "exhibition", "app", "collector", "worker", "reporter", "operations", "backup-operations"]
     build = workflow["jobs"]["publish"]["steps"][-1]
     assert build["with"]["target"] == "${{ matrix.target }}"
