@@ -272,6 +272,40 @@ def test_backup_and_restore_handoff_exports_libpq_urls():
     assert '--dbname="$BACKUP_DATABASE_URL"' in backup
 
 
+def test_copilot_credential_export_is_minimal_and_private(tmp_path):
+    source = tmp_path / "hermes.env"
+    destination = tmp_path / "secrets" / "copilot.env"
+    source.write_text(
+        "COPILOT_GITHUB_TOKEN=primary-secret\n"
+        "GH_TOKEN=secondary-secret\n"
+        "OPENAI_API_KEY=must-not-copy\n"
+        "UNRELATED=value\n"
+    )
+
+    result = subprocess.run(
+        ["python3", ROOT / "scripts/export-copilot-env.py", source, destination],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert destination.read_text() == (
+        "COPILOT_GITHUB_TOKEN=primary-secret\nGH_TOKEN=secondary-secret\n"
+    )
+    assert destination.stat().st_mode & 0o777 == 0o600
+    assert "secret" not in result.stdout
+    assert "secret" not in result.stderr
+    replay = subprocess.run(
+        ["python3", ROOT / "scripts/export-copilot-env.py", source, destination],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    assert replay.returncode != 0
+    assert destination.read_text().endswith("secondary-secret\n")
+
+
 def test_image_build_pins_hermes_source_and_frozen_lock():
     dockerfile = (ROOT / "Dockerfile").read_text()
     assert PINNED_HERMES in dockerfile

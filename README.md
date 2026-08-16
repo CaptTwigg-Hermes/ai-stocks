@@ -19,23 +19,31 @@ broker integration and cannot place real orders.
 - `migrate` and `backup-tools` are one-shot services under the
   `operations` profile.
 
-The separate `api` and `ui` services are an explicit **local preview** under
-the `preview` profile. They provide fixture-priced global search and volatile
-in-memory human paper trading with 100,000 DKK. Preview state resets on API
-restart, has no broker/provider connection, is not the contest ledger, and must
-not be routed through the production Cloudflare hostname. The preview profile
-reuses port 3232, so never enable `contest` and `preview` together.
+The separate `api`, `ui`, and least-privilege `exhibition` worker are an
+explicit **local AI exhibition** under the `preview` profile. Four pinned
+Copilot models research independently and submit validated paper-only decisions
+against clearly labelled, non-live fixture prices. Each starts with 100,000 DKK.
+Human search and trading routes are not exposed in this mode. Exhibition state
+resets on API restart, has no broker/provider connection, is not the strict
+contest ledger, and must not be routed through the production Cloudflare
+hostname. The preview profile reuses port 3232, so never enable `contest` and
+`preview` together.
+
+The `warmup` profile runs only `warmup-collector`. It may run beside the local
+AI exhibition to accumulate the strict contest's 20 verified sessions. It must
+not run beside the contest `collector`.
 
 Do not start the contest until every release gate in
 `docs/acceptance-contract.md` has passed.
 
 ## Dockge preparation
 
-Pushes to `main` publish eight target-specific images to
+Pushes to `main` publish nine target-specific images to
 `ghcr.io/capttwigg-hermes/ai-stocks`. The Compose stack pulls
-`app-latest`, `api-latest`, `ui-latest`, `collector-latest`, `worker-latest`,
-`reporter-latest`, `operations-latest`, and `backup-operations-latest`; Dockge no longer
-needs a local source checkout or Docker build context. Set
+`app-latest`, `api-latest`, `ui-latest`, `exhibition-latest`,
+`collector-latest`, `worker-latest`, `reporter-latest`, `operations-latest`, and
+`backup-operations-latest`; Dockge no longer needs a local source checkout or
+Docker build context. Set
 `AISTOCKS_IMAGE_VERSION` to a full Git commit SHA instead of `latest`
 when an immutable rollback target is required.
 
@@ -66,7 +74,13 @@ chmod 600 secrets/backup-passphrase
 
 Replace every placeholder in `.env`. Never commit `.env`,
 `secrets/`, backups, database credentials, the Cloudflare Access
-AUD, or Hermes credentials.
+AUD, or Hermes credentials. Export a least-privilege Copilot-only file from the
+active Hermes home before starting the exhibition; the exporter creates a new
+mode-0600 file and refuses to overwrite an existing destination:
+
+```bash
+python3 scripts/export-copilot-env.py /opt/data/.env "$HERMES_COPILOT_ENV_FILE"
+```
 
 Create the host datasets from `.env` before opening the stack
 in Dockge:
@@ -77,8 +91,11 @@ chown -R 10001:10001 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DI
 chmod 700 "$HERMES_AUTH_DIR" "$NASDAQ_ARCHIVE_DIR" "$NASDAQ_STATUS_DIR" "$CORPORATE_ACTION_INPUT_DIR"
 ```
 
-`HERMES_AUTH_DIR` must contain only the credentials/configuration
-needed by the isolated Hermes runner. Archive and status datasets
+`HERMES_COPILOT_ENV_FILE` must be a mode-0600 file containing only the
+Copilot credential variables needed by Hermes. The exhibition worker copies it
+into a separate writable runtime home for each agent; never point it at the main
+Hermes home. `HERMES_AUTH_DIR` remains the strict contest runner's isolated
+credential directory. Archive and status datasets
 must be writable by UID/GID 10001. The app and worker mount market
 data read-only.
 
@@ -152,14 +169,22 @@ scripts/compose-mode.sh contest ps
 scripts/compose-mode.sh contest logs --tail=100 app worker collector reporter
 ```
 
-To run only the local volatile human preview at the same LAN address, stop all
+To run the local volatile AI exhibition at the same LAN address, stop all
 contest runtimes first. The preflight refuses to start either runtime mode while
 the other is active and forbids additive `--profile` arguments:
 
 ```bash
 scripts/compose-mode.sh contest stop app worker collector reporter
-scripts/compose-mode.sh preview up -d api ui
+scripts/compose-mode.sh preview up -d api ui exhibition
 scripts/compose-mode.sh preview ps
+```
+
+Warm the strict market-data path without stopping the exhibition:
+
+```bash
+scripts/compose-mode.sh warmup up -d warmup-collector
+scripts/compose-mode.sh warmup ps
+scripts/compose-mode.sh warmup logs --tail=100 warmup-collector
 ```
 
 The migration runner applies checksum-locked SQL migrations. Those
