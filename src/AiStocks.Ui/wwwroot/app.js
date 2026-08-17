@@ -559,10 +559,10 @@
   function activateExhibition(data) {
     if (!isExhibitionResponse(data)) return false;
     document.body.classList.add("exhibition-mode");
-    ui.dataBadge.textContent = "Official Nasdaq XSTO · 15-minute delayed · non-live · paper-only · HOLD-only";
+    ui.dataBadge.textContent = "ASSUMED FILLS · Official Nasdaq XSTO · delayed · non-live · paper-only";
     document.querySelector('[data-route="trade"]').textContent = "AI Race";
-    ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by total delayed-data paper portfolio value in DKK.";
-    ui.leaderboardMode.textContent = "AI-only delayed-data exhibition";
+    ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by assumed-fill paper portfolio value in DKK.";
+    ui.leaderboardMode.textContent = "ASSUMED FILLS · AI-only non-live exhibition";
     ui.tradePage.hidden = true;
     ui.aiRacePage.hidden = false;
     ui.leaderboardPage.hidden = !isLeaderboardPage;

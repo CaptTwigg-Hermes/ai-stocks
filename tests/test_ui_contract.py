@@ -85,6 +85,10 @@ def test_exhibition_mode_replaces_human_workspace_without_breaking_preview_fallb
     assert 'api("/api/v1/ai-progress")' in script
     assert "data.strictContest !== false" in contract
     assert "data.isNonLive !== true" in contract
+    assert "data.holdOnly !== false" in contract
+    assert "data.assumedFills !== true" in contract
+    assert "data.assumedSekToDkk !== 0.65" in contract
+    assert "data.assumedSlippagePercent !== 1" in contract
     assert 'ui.tradePage.hidden = true' in script
     assert 'ui.aiRacePage.hidden = false' in script
     assert 'document.body.classList.add("exhibition-mode")' in script
@@ -113,12 +117,15 @@ def test_exhibition_cards_are_four_defensive_safe_complete_ai_participants():
     assert "link.rel = \"noopener noreferrer\"" in script
     assert "innerHTML" not in script
     assert 'id="data-badge"' in html
-    assert 'ui.dataBadge.textContent = "Official Nasdaq XSTO · 15-minute delayed · non-live · paper-only · HOLD-only"' in script
+    assert 'ui.dataBadge.textContent = "ASSUMED FILLS · Official Nasdaq XSTO · delayed · non-live · paper-only"' in script
     assert html.count("official Nasdaq XSTO") >= 2
     assert html.count("15-minute delayed") >= 2
     assert html.count("non-live") >= 2
     assert html.count("paper-only") >= 2
-    assert html.count("HOLD-only") >= 2
+    assert html.count("ASSUMED FILLS") >= 2
+    assert html.count("0.65 DKK/SEK") >= 2
+    assert html.count("1% adverse slippage") >= 2
+    assert "HOLD-only" not in html
     assert "fixture-backed" not in html
     assert html.count("Portfolios are volatile") >= 2
     assert html.count("not the strict 2026 contest") >= 2
@@ -151,39 +158,51 @@ def test_exhibition_leaderboard_is_ai_only_and_uses_ai_refresh():
 
     assert 'id="leaderboard-intro"' in html
     assert 'id="leaderboard-mode"' in html
-    assert 'ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by total delayed-data paper portfolio value in DKK."' in script
-    assert 'ui.leaderboardMode.textContent = "AI-only delayed-data exhibition"' in script
+    assert 'ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by assumed-fill paper portfolio value in DKK."' in script
+    assert 'ui.leaderboardMode.textContent = "ASSUMED FILLS · AI-only non-live exhibition"' in script
     assert 'src="/exhibition-contract.js" defer' in html
     assert 'data.dataMode !== dataMode' in contract
-    assert 'data.holdOnly !== true' in contract
+    assert 'data.executionMode !== executionMode' in contract
+    assert 'data.holdOnly !== false' in contract
     assert 'participant.portfolio?.dataMode === dataMode' in contract
+    assert 'participant.portfolio?.executionMode === executionMode' in contract
     assert "window.aiStocksExhibitionContract?.isResponse(data) === true" in script
     assert 'document.body.classList.contains("exhibition-mode") ? refreshAiProgress(true) : refreshAll(true)' in script
 
 
-def test_exhibition_contract_rejects_missing_wrong_and_mixed_portfolio_modes():
+def test_exhibition_contract_rejects_missing_wrong_and_mixed_execution_provenance():
     contract_path = UI / "exhibition-contract.js"
     probe = r"""
 global.window = {};
 require(process.argv[1]);
 const contract = window.aiStocksExhibitionContract;
 const models = ["gpt-5.6-sol", "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview"];
-function payload(modes) {
+function payload(dataModes, executionModes) {
   return {
     dataMode: contract.dataMode,
+    executionMode: contract.executionMode,
     strictContest: false,
     isNonLive: true,
-    holdOnly: true,
+    holdOnly: false,
+    assumedFills: true,
+    assumedSekToDkk: 0.65,
+    assumedSlippagePercent: 1,
     participants: models.map((modelId, index) => ({
       modelId,
-      portfolio: modes[index] === undefined ? {} : { dataMode: modes[index] }
+      portfolio: dataModes[index] === undefined ? {} : {
+        dataMode: dataModes[index],
+        executionMode: executionModes[index]
+      }
     }))
   };
 }
 const exact = [contract.dataMode, contract.dataMode, contract.dataMode, contract.dataMode];
-if (!contract.isResponse(payload(exact))) process.exit(10);
-if (contract.isResponse(payload([undefined, ...exact.slice(1)]))) process.exit(11);
-if (contract.isResponse(payload(["preview-fixtures", ...exact.slice(1)]))) process.exit(12);
-if (contract.isResponse(payload([contract.dataMode, "preview-fixtures", ...exact.slice(2)]))) process.exit(13);
+const executions = [contract.executionMode, contract.executionMode, contract.executionMode, contract.executionMode];
+if (!contract.isResponse(payload(exact, executions))) process.exit(10);
+if (contract.isResponse(payload([undefined, ...exact.slice(1)], executions))) process.exit(11);
+if (contract.isResponse(payload(["preview-fixtures", ...exact.slice(1)], executions))) process.exit(12);
+if (contract.isResponse(payload(exact, [undefined, ...executions.slice(1)]))) process.exit(13);
+if (contract.isResponse(payload(exact, ["strict-contest", ...executions.slice(1)]))) process.exit(14);
+if (contract.isResponse(payload(exact, [contract.executionMode, "strict-contest", ...executions.slice(2)]))) process.exit(15);
 """
     subprocess.run(["node", "-e", probe, str(contract_path)], check=True)

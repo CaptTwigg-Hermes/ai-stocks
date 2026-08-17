@@ -17,10 +17,16 @@ public static class ExhibitionPromptBuilder
         if (progress.RootElement.ValueKind != JsonValueKind.Object ||
             !progress.RootElement.TryGetProperty("participants", out var agents) || agents.ValueKind != JsonValueKind.Array ||
             !progress.RootElement.TryGetProperty("dataMode", out var progressDataMode) || progressDataMode.GetString() != ExhibitionDataContract.DataMode ||
-            !progress.RootElement.TryGetProperty("isNonLive", out var isNonLive) || !isNonLive.GetBoolean() ||
-            !progress.RootElement.TryGetProperty("strictContest", out var strictContest) || strictContest.GetBoolean() ||
-            !progress.RootElement.TryGetProperty("holdOnly", out var holdOnly) || !holdOnly.GetBoolean())
-            throw new InvalidOperationException("AI progress response must contain an exact HOLD-only delayed-data snapshot.");
+            !progress.RootElement.TryGetProperty("executionMode", out var executionMode) || executionMode.GetString() != ExhibitionDataContract.ExecutionMode ||
+            !progress.RootElement.TryGetProperty("isNonLive", out var isNonLive) || isNonLive.ValueKind != JsonValueKind.True ||
+            !progress.RootElement.TryGetProperty("strictContest", out var strictContest) || strictContest.ValueKind != JsonValueKind.False ||
+            !progress.RootElement.TryGetProperty("holdOnly", out var holdOnly) || holdOnly.ValueKind != JsonValueKind.False ||
+            !progress.RootElement.TryGetProperty("assumedFills", out var assumedFills) || assumedFills.ValueKind != JsonValueKind.True ||
+            !progress.RootElement.TryGetProperty("assumedSekToDkk", out var assumedSekToDkk) ||
+            !assumedSekToDkk.TryGetDecimal(out var fx) || fx != ExhibitionDataContract.AssumedSekToDkk ||
+            !progress.RootElement.TryGetProperty("assumedSlippagePercent", out var assumedSlippage) ||
+            !assumedSlippage.TryGetDecimal(out var slippage) || slippage != ExhibitionDataContract.AssumedSlippagePercent)
+            throw new InvalidOperationException("AI progress response must contain the exact assumed-fill exhibition contract.");
         var participants = agents.EnumerateArray().ToArray();
         if (participants.Any(item =>
                 item.ValueKind != JsonValueKind.Object ||
@@ -28,8 +34,11 @@ public static class ExhibitionPromptBuilder
                 participantPortfolio.ValueKind != JsonValueKind.Object ||
                 !participantPortfolio.TryGetProperty("dataMode", out var portfolioDataMode) ||
                 portfolioDataMode.ValueKind != JsonValueKind.String ||
-                portfolioDataMode.GetString() != ExhibitionDataContract.DataMode))
-            throw new InvalidOperationException("Every AI portfolio must use the exact delayed-data mode.");
+                portfolioDataMode.GetString() != ExhibitionDataContract.DataMode ||
+                !participantPortfolio.TryGetProperty("executionMode", out var portfolioExecutionMode) ||
+                portfolioExecutionMode.ValueKind != JsonValueKind.String ||
+                portfolioExecutionMode.GetString() != ExhibitionDataContract.ExecutionMode))
+            throw new InvalidOperationException("Every AI portfolio must use the exact delayed-data and assumed-fill execution modes.");
         var matches = participants.Where(item =>
             item.TryGetProperty("agentId", out var id) && id.ValueKind == JsonValueKind.String &&
             StringComparer.Ordinal.Equals(id.GetString(), agent.Id.ToString("D"))).ToArray();
@@ -37,20 +46,21 @@ public static class ExhibitionPromptBuilder
             throw new InvalidOperationException("AI progress must contain exactly one portfolio for the requested fixed agent.");
 
         return $$"""
-            OFFICIAL NASDAQ XSTO DELAYED-DATA EXHIBITION. Data is official Nasdaq XSTO, at least 15-minute delayed, non-live, paper-only, and HOLD-only. No brokerage, real orders, or real money.
+            OFFICIAL NASDAQ XSTO DELAYED-DATA ASSUMED-FILL EXHIBITION. Inputs are official Nasdaq XSTO observations, at least 15-minute delayed and non-live. This is a separate assumed-fill paper exhibition, not the strict contest. No brokerage or real orders exist; no real money is used.
             You are fixed agent {{agent.Id:D}} using exact model {{agent.ModelId}} via provider copilot. No fallback or substitution is allowed.
             Immutable idempotent run ID: {{runId}}
             You may research only public HTTPS web sources. Do not seek rival state. The only portfolio context below is your own.
+            Paper execution assumptions: fixed 0.65 DKK/SEK conversion and 1% adverse slippage. A buy order may cost at most 10,000 DKK after assumed FX/slippage. A marked position may be at most 25,000 DKK after the buy.
 
-            OFFICIAL DELAYED INSTRUMENT OBSERVATIONS (context only; they are not tradable):
+            OFFICIAL DELAYED INSTRUMENT OBSERVATIONS (eligible only for assumed paper fills):
             {{instrumentItems.GetRawText()}}
 
             YOUR OWN PORTFOLIO:
             {{portfolio.GetRawText()}}
 
             Return exactly one JSON object and no markdown or commentary. It must have exactly these properties and types:
-            {"agentId":"exact fixed GUID","modelId":"exact fixed model ID","action":"hold","instrumentId":null,"quantity":0,"reason":"non-empty string","confidence":0.0,"evidence":[{"url":"absolute HTTPS URL","publishedAt":"offset-bearing ISO-8601 timestamp","exactExcerpt":"exact visible source text"}]}
-            Rules: action must be hold, instrumentId must be null, and quantity must be 0. Any other action is rejected before API submission. hold may use an empty evidence array when no source can be independently verified. confidence is 0..1. Every supplied evidence claim will be independently fetched and verified; fabrication rejects the decision. Prefer a truthful hold with [] over invented, inaccessible, or unverifiable evidence.
+            {"agentId":"exact fixed GUID","modelId":"exact fixed model ID","action":"buy|sell|hold","instrumentId":"current instrument ID or null","quantity":1,"reason":"non-empty string","confidence":0.0,"evidence":[{"url":"absolute HTTPS URL","publishedAt":"offset-bearing ISO-8601 timestamp","exactExcerpt":"exact visible source text"}]}
+            Rules: action must be exactly lower-case buy, sell, or hold. BUY/SELL must use a current instrument ID from the observations, a whole positive quantity, and at least one independently verifiable HTTPS evidence item published no later than that selected observation's availableAt. HOLD requires null instrumentId and quantity 0 and may use an empty evidence array. confidence is 0..1. Every supplied evidence claim will be independently fetched and verified; fabrication rejects the decision. Prefer a truthful hold with [] over invented, inaccessible, or unverifiable evidence.
             Example shape only (replace identity and values with the required real values):
             {"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"No independently verified delayed-data opportunity","confidence":0.5,"evidence":[]}
             """;
@@ -60,7 +70,10 @@ public static class ExhibitionPromptBuilder
 internal static class ExhibitionDataContract
 {
     internal const string DataMode = "official-nasdaq-xsto-15m-delayed";
+    internal const string ExecutionMode = "assumed-delayed-paper-fills-v1";
     internal const string Source = "Nasdaq Nordic MiFID II delayed post-trade";
+    internal const decimal AssumedSekToDkk = 0.65m;
+    internal const decimal AssumedSlippagePercent = 1m;
 }
 
 internal static class StrictJson

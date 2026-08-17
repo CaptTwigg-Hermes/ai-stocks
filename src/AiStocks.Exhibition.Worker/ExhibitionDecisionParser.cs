@@ -25,7 +25,22 @@ public sealed class ExhibitionDecisionParser
         ["agentId", "modelId", "action", "instrumentId", "quantity", "reason", "confidence", "evidence"];
     private static readonly HashSet<string> EvidenceNames = ["url", "publishedAt", "exactExcerpt"];
 
-    public ExhibitionDecision Parse(string json, AgentDefinition expectedAgent, IReadOnlySet<string> fixtureInstrumentIds)
+    public ExhibitionDecision Parse(
+        string json,
+        AgentDefinition expectedAgent,
+        IReadOnlyDictionary<string, DateTimeOffset> currentObservations)
+    {
+        var decision = ParseKnown(json, expectedAgent,
+            currentObservations.Keys.ToHashSet(StringComparer.Ordinal));
+        if (decision.Action != ExhibitionAction.Hold &&
+            decision.InstrumentId is not null &&
+            currentObservations.TryGetValue(decision.InstrumentId, out var availableAt) &&
+            decision.Evidence.Any(item => item.PublishedAt > availableAt))
+            throw Invalid("Trade evidence cannot be published after the selected observation was available.");
+        return decision;
+    }
+
+    private static ExhibitionDecision ParseKnown(string json, AgentDefinition expectedAgent, IReadOnlySet<string> fixtureInstrumentIds)
     {
         ArgumentNullException.ThrowIfNull(json);
         var bytes = new UTF8Encoding(false, true).GetBytes(json);
@@ -45,9 +60,14 @@ public sealed class ExhibitionDecisionParser
             if (!Guid.TryParseExact(agentIdText, "D", out var agentId) || agentId != expectedAgent.Id ||
                 !StringComparer.Ordinal.Equals(String(root, "modelId", 128), expectedAgent.ModelId))
                 throw Invalid("Decision identity does not exactly match the fixed agent/model.");
-            var action = String(root, "action", 8) == "hold"
-                ? ExhibitionAction.Hold
-                : throw Invalid("action must be hold in the HOLD-only delayed-data exhibition.");
+            var actionText = String(root, "action", 8);
+            var action = actionText switch
+            {
+                "buy" => ExhibitionAction.Buy,
+                "sell" => ExhibitionAction.Sell,
+                "hold" => ExhibitionAction.Hold,
+                _ => throw Invalid("action must be exactly buy, sell, or hold.")
+            };
             var instrument = NullableString(root.GetProperty("instrumentId"), "instrumentId", 128);
             if (!root.GetProperty("quantity").TryGetInt32(out var quantity) || quantity is < 0 or > 10_000_000)
                 throw Invalid("quantity is outside its safe bound.");
@@ -56,7 +76,13 @@ public sealed class ExhibitionDecisionParser
             if (!root.GetProperty("confidence").TryGetDecimal(out var confidence) || confidence is < 0m or > 1m)
                 throw Invalid("confidence must be between zero and one.");
             var evidence = ParseEvidence(root.GetProperty("evidence"));
-            if (instrument is not null || quantity != 0) throw Invalid("hold requires null instrumentId and zero quantity.");
+            if (action == ExhibitionAction.Hold)
+            {
+                if (instrument is not null || quantity != 0)
+                    throw Invalid("hold requires null instrumentId and zero quantity.");
+            }
+            else if (instrument is null || !fixtureInstrumentIds.Contains(instrument) || quantity <= 0 || evidence.Count == 0)
+                throw Invalid("buy and sell require a current instrumentId, positive whole quantity, and verified evidence.");
             return new ExhibitionDecision(agentId, expectedAgent.ModelId, action, instrument, quantity, reason, confidence, evidence);
         }
         catch (ExhibitionDecisionException) { throw; }

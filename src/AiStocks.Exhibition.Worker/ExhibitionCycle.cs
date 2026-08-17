@@ -55,7 +55,7 @@ public sealed class ExhibitionCycle(
     {
         var instrumentsJson = await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
         var progressJson = await api.GetProgressAsync(cancellationToken).ConfigureAwait(false);
-        var instrumentIds = ReadDelayedInstrumentIds(instrumentsJson);
+        var observations = ReadDelayedObservations(instrumentsJson);
         var failures = new List<ExhibitionAgentFailure>();
         var succeeded = 0;
         foreach (var agent in ContestContract.Agents)
@@ -69,9 +69,7 @@ public sealed class ExhibitionCycle(
                     .ConfigureAwait(false);
                 var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson);
                 var execution = await invoker.InvokeAsync(agent, prompt, cancellationToken).ConfigureAwait(false);
-                var decision = new ExhibitionDecisionParser().Parse(execution.StandardOutput, agent, instrumentIds);
-                if (decision.Action != ExhibitionAction.Hold)
-                    throw new InvalidOperationException("Non-HOLD decisions are forbidden before API submission.");
+                var decision = new ExhibitionDecisionParser().Parse(execution.StandardOutput, agent, observations);
                 var verified = new List<VerifiedEvidence>(decision.Evidence.Count);
                 foreach (var claim in decision.Evidence)
                     verified.Add(await evidenceVerifier.VerifyAsync(claim, cancellationToken).ConfigureAwait(false));
@@ -153,18 +151,20 @@ public sealed class ExhibitionCycle(
     private static string StatusJson(string runId, AgentDefinition agent, string status, string? error, DateTimeOffset occurredAt) =>
         JsonSerializer.Serialize(new { runId, agentId = agent.Id, modelId = agent.ModelId, status, error, occurredAt }, JsonOptions);
 
-    private static HashSet<string> ReadDelayedInstrumentIds(string json)
+    private static Dictionary<string, DateTimeOffset> ReadDelayedObservations(string json)
     {
         using var document = StrictJson.Parse(json, 2 * 1024 * 1024);
         if (document.RootElement.ValueKind != JsonValueKind.Object ||
             !document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array ||
             !document.RootElement.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != ExhibitionDataContract.DataMode)
             throw new InvalidOperationException("Instrument response must contain official delayed Nasdaq XSTO data.");
-        var result = new HashSet<string>(StringComparer.Ordinal);
+        var result = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
         foreach (var item in items.EnumerateArray())
         {
             if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("id", out var id) || id.ValueKind != JsonValueKind.String ||
-                string.IsNullOrWhiteSpace(id.GetString()) || !result.Add(id.GetString()!) ||
+                string.IsNullOrWhiteSpace(id.GetString()) || result.ContainsKey(id.GetString()!) ||
+                !item.TryGetProperty("price", out var priceElement) ||
+                !priceElement.TryGetDecimal(out var price) || price <= 0m ||
                 !item.TryGetProperty("executedAt", out var executedElement) || !executedElement.TryGetDateTimeOffset(out var executedAt) ||
                 !item.TryGetProperty("availableAt", out var availableElement) || !availableElement.TryGetDateTimeOffset(out var availableAt) ||
                 availableAt < executedAt.AddMinutes(15) ||
@@ -174,8 +174,10 @@ public sealed class ExhibitionCycle(
                 item.TryGetProperty("priceDkk", out var priceDkk) && priceDkk.ValueKind != JsonValueKind.Null ||
                 !item.TryGetProperty("source", out var source) || source.GetString() != ExhibitionDataContract.Source ||
                 !item.TryGetProperty("delayMinutes", out var delayMinutes) || !delayMinutes.TryGetInt32(out var delay) || delay != 15 ||
-                !item.TryGetProperty("tradable", out var tradable) || tradable.ValueKind != JsonValueKind.False)
-                throw new InvalidOperationException("Every delayed instrument must have exact non-tradable Nasdaq metadata and a unique non-empty id.");
+                !item.TryGetProperty("tradable", out var tradable) || tradable.ValueKind != JsonValueKind.False ||
+                !item.TryGetProperty("paperTradable", out var paperTradable) || paperTradable.ValueKind != JsonValueKind.True)
+                throw new InvalidOperationException("Every delayed instrument must have a positive price, timestamps, and exact assumed-fill Nasdaq metadata.");
+            result.Add(id.GetString()!, availableAt);
         }
         if (result.Count == 0) throw new InvalidOperationException("Delayed instrument response cannot be empty.");
         return result;
@@ -187,9 +189,15 @@ public sealed class ExhibitionCycle(
         var root = document.RootElement;
         if (root.ValueKind != JsonValueKind.Object ||
             !root.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != ExhibitionDataContract.DataMode ||
+            !root.TryGetProperty("executionMode", out var executionMode) || executionMode.GetString() != ExhibitionDataContract.ExecutionMode ||
             !root.TryGetProperty("isNonLive", out var isNonLive) || isNonLive.ValueKind != JsonValueKind.True ||
             !root.TryGetProperty("strictContest", out var strictContest) || strictContest.ValueKind != JsonValueKind.False ||
-            !root.TryGetProperty("holdOnly", out var holdOnly) || holdOnly.ValueKind != JsonValueKind.True ||
+            !root.TryGetProperty("holdOnly", out var holdOnly) || holdOnly.ValueKind != JsonValueKind.False ||
+            !root.TryGetProperty("assumedFills", out var assumedFills) || assumedFills.ValueKind != JsonValueKind.True ||
+            !root.TryGetProperty("assumedSekToDkk", out var assumedSekToDkk) ||
+            !assumedSekToDkk.TryGetDecimal(out var fx) || fx != ExhibitionDataContract.AssumedSekToDkk ||
+            !root.TryGetProperty("assumedSlippagePercent", out var assumedSlippage) ||
+            !assumedSlippage.TryGetDecimal(out var slippage) || slippage != ExhibitionDataContract.AssumedSlippagePercent ||
             !root.TryGetProperty("participants", out var participants) || participants.ValueKind != JsonValueKind.Array)
             return false;
         var matchingParticipants = 0;
@@ -199,7 +207,9 @@ public sealed class ExhibitionCycle(
             if (participant.ValueKind != JsonValueKind.Object ||
                 !participant.TryGetProperty("portfolio", out var portfolio) || portfolio.ValueKind != JsonValueKind.Object ||
                 !portfolio.TryGetProperty("dataMode", out var portfolioDataMode) ||
-                portfolioDataMode.GetString() != ExhibitionDataContract.DataMode)
+                portfolioDataMode.GetString() != ExhibitionDataContract.DataMode ||
+                !portfolio.TryGetProperty("executionMode", out var portfolioExecutionMode) ||
+                portfolioExecutionMode.GetString() != ExhibitionDataContract.ExecutionMode)
                 return false;
             if (!participant.TryGetProperty("agentId", out var agentId) || !agentId.TryGetGuid(out var parsedAgentId) ||
                 parsedAgentId != agent.Id)
@@ -218,12 +228,29 @@ public sealed class ExhibitionCycle(
                 !participant.TryGetProperty("latestDecision", out var decision) || decision.ValueKind != JsonValueKind.Object ||
                 !decision.TryGetProperty("runId", out var decisionRunId) || decisionRunId.GetString() != runId ||
                 !decision.TryGetProperty("completedAt", out var decisionCompletedAtElement) ||
-                !decisionCompletedAtElement.TryGetDateTimeOffset(out var decisionCompletedAt) || decisionCompletedAt != completedAt)
+                !decisionCompletedAtElement.TryGetDateTimeOffset(out var decisionCompletedAt) || decisionCompletedAt != completedAt ||
+                !HasValidDecisionAudit(decision))
                 continue;
             matchingParticipants++;
             if (matchingParticipants > 1) return false;
         }
         return matchingParticipants == 1;
+    }
+
+    private static bool HasValidDecisionAudit(JsonElement decision)
+    {
+        if (!decision.TryGetProperty("action", out var actionElement) || actionElement.ValueKind != JsonValueKind.String)
+            return false;
+        var action = actionElement.GetString();
+        if (!decision.TryGetProperty("instrumentId", out var instrument) ||
+            !decision.TryGetProperty("quantity", out var quantityElement) || !quantityElement.TryGetInt32(out var quantity))
+            return false;
+        if (action == "hold") return instrument.ValueKind == JsonValueKind.Null && quantity == 0;
+        if (action is not ("buy" or "sell") || instrument.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(instrument.GetString()) || quantity <= 0 ||
+            !decision.TryGetProperty("evidence", out var evidence) || evidence.ValueKind != JsonValueKind.Array)
+            return false;
+        return evidence.EnumerateArray().Any();
     }
 
     private static string CreateRunId(DateTimeOffset scheduledAt, AgentDefinition agent)

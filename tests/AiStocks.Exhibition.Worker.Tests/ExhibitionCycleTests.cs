@@ -152,6 +152,20 @@ public sealed class ExhibitionCycleTests
             cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None));
     }
 
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(-1, true)]
+    [InlineData(100, false)]
+    public async Task RunAsync_RejectsNonPositivePriceOrMissingPaperTradable(decimal price, bool paperTradable)
+    {
+        var api = new FakeApi { InstrumentPrice = price, InstrumentPaperTradable = paperTradable };
+        var cycle = new ExhibitionCycle(api, new FakeInvoker { FailingAgentId = null }, new FakeVerifier(),
+            new ExhibitionHealthState(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None));
+    }
+
     [Fact]
     public async Task RunAsync_RecordsOneFailureButRunsAndPostsAttestedResultsForOtherAgents()
     {
@@ -180,6 +194,49 @@ public sealed class ExhibitionCycleTests
         Assert.StartsWith("20260816T120000Z-", posted.RootElement.GetProperty("runId").GetString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task RunAsync_PostsValidBuyAfterIndependentParserAndEvidenceValidation()
+    {
+        var api = new FakeApi();
+        var invoker = new FakeInvoker { FailingAgentId = null, Action = "buy" };
+        var verifier = new FakeVerifier();
+        var cycle = new ExhibitionCycle(api, invoker, verifier, new ExhibitionHealthState(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(4, result.Succeeded);
+        Assert.Empty(result.Failures);
+        Assert.Equal(4, verifier.Calls);
+        Assert.All(api.Posts, json =>
+        {
+            using var posted = JsonDocument.Parse(json);
+            Assert.Equal("buy", posted.RootElement.GetProperty("action").GetString());
+            Assert.Equal("SE0000115446", posted.RootElement.GetProperty("instrumentId").GetString());
+            Assert.Equal(1, posted.RootElement.GetProperty("quantity").GetInt32());
+        });
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task RunAsync_FailsClosedOnMissingRootOrMixedPortfolioExecutionMode(
+        bool omitRootExecutionMode, bool wrongPortfolioExecutionMode)
+    {
+        var api = new FakeApi
+        {
+            OmitRootExecutionMode = omitRootExecutionMode,
+            WrongPortfolioExecutionMode = wrongPortfolioExecutionMode
+        };
+        var cycle = new ExhibitionCycle(api, new FakeInvoker { FailingAgentId = null }, new FakeVerifier(),
+            new ExhibitionHealthState(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(0, result.Succeeded);
+        Assert.Equal(4, result.Failures.Count);
+    }
+
     private sealed class FakeApi : IExhibitionApi
     {
         public Guid? FailQueuedAgentId { get; init; }
@@ -195,6 +252,10 @@ public sealed class ExhibitionCycleTests
         public string InstrumentCurrency { get; init; } = "SEK";
         public bool InstrumentIsPreviewPrice { get; init; }
         public bool IncludeInstrumentPriceDkk { get; init; }
+        public decimal InstrumentPrice { get; init; } = 100m;
+        public bool InstrumentPaperTradable { get; init; } = true;
+        public bool OmitRootExecutionMode { get; init; }
+        public bool WrongPortfolioExecutionMode { get; init; }
         private string? committedDecision;
         public List<string> Posts { get; } = [];
         public List<string> Statuses { get; } = [];
@@ -204,7 +265,9 @@ public sealed class ExhibitionCycleTests
             return Task.FromResult("{\"items\":[{\"id\":\"SE0000115446\",\"exchange\":\"" + InstrumentExchange +
                 "\",\"currency\":\"" + InstrumentCurrency + "\",\"isPreviewPrice\":" +
                 InstrumentIsPreviewPrice.ToString().ToLowerInvariant() + priceDkk +
-                ",\"executedAt\":\"2026-08-16T10:00:00Z\",\"availableAt\":\"2026-08-16T10:15:00Z\",\"source\":\"Nasdaq Nordic MiFID II delayed post-trade\",\"delayMinutes\":15,\"tradable\":false}],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\"}");
+                ",\"price\":" + InstrumentPrice.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ",\"executedAt\":\"2026-08-16T10:00:00Z\",\"availableAt\":\"2026-08-16T10:15:00Z\",\"source\":\"Nasdaq Nordic MiFID II delayed post-trade\",\"delayMinutes\":15,\"tradable\":false,\"paperTradable\":" +
+                InstrumentPaperTradable.ToString().ToLowerInvariant() + "}],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\"}");
         }
         public Task<string> GetProgressAsync(CancellationToken cancellationToken)
         {
@@ -224,7 +287,15 @@ public sealed class ExhibitionCycleTests
                     ["latestDecision"] = new
                     {
                         runId = root.GetProperty("runId").GetString(),
-                        completedAt = OmitReconciliationTimestamps ? (DateTimeOffset?)null : DateTimeOffset.Parse("2026-08-16T12:00:01Z")
+                        completedAt = OmitReconciliationTimestamps ? (DateTimeOffset?)null : DateTimeOffset.Parse("2026-08-16T12:00:01Z"),
+                        action = root.GetProperty("action").GetString(),
+                        instrumentId = root.GetProperty("instrumentId").ValueKind == JsonValueKind.Null
+                            ? null : root.GetProperty("instrumentId").GetString(),
+                        quantity = root.GetProperty("quantity").GetInt32(),
+                        evidence = root.GetProperty("evidence").EnumerateArray().Select(item => new
+                        {
+                            url = item.GetProperty("url").GetString()
+                        }).ToArray()
                     }
                 };
                 if (!OmitReconciliationPortfolio)
@@ -232,7 +303,8 @@ public sealed class ExhibitionCycleTests
                     {
                         dataMode = FixtureReconciliationPortfolio
                             ? "preview-fixtures"
-                            : "official-nasdaq-xsto-15m-delayed"
+                            : "official-nasdaq-xsto-15m-delayed",
+                        executionMode = "assumed-delayed-paper-fills-v1"
                     };
                 var snapshotParticipants = DuplicateReconciliationParticipant
                     ? new List<Dictionary<string, object?>> { participant, participant }
@@ -247,18 +319,25 @@ public sealed class ExhibitionCycleTests
                     snapshotParticipants.Add(new Dictionary<string, object?>
                     {
                         ["agentId"] = ContestContract.Agents[1].Id,
-                        ["portfolio"] = new { dataMode = "preview-fixtures" }
+                        ["portfolio"] = new { dataMode = "preview-fixtures", executionMode = "assumed-delayed-paper-fills-v1" }
                     });
-                return Task.FromResult(JsonSerializer.Serialize(new
+                var snapshot = new Dictionary<string, object?>
                 {
-                    participants = snapshotParticipants,
-                    dataMode = "official-nasdaq-xsto-15m-delayed",
-                    isNonLive = true,
-                    strictContest = false,
-                    holdOnly = true
-                }));
+                    ["participants"] = snapshotParticipants,
+                    ["dataMode"] = "official-nasdaq-xsto-15m-delayed",
+                    ["executionMode"] = "assumed-delayed-paper-fills-v1",
+                    ["isNonLive"] = true,
+                    ["strictContest"] = false,
+                    ["holdOnly"] = false,
+                    ["assumedFills"] = true,
+                    ["assumedSekToDkk"] = 0.65m,
+                    ["assumedSlippagePercent"] = 1m
+                };
+                return Task.FromResult(JsonSerializer.Serialize(snapshot));
             }
-            return Task.FromResult("{\"participants\":[" + string.Join(',', ContestContract.Agents.Select(a => "{\"agentId\":\"" + a.Id.ToString("D") + "\",\"portfolio\":{\"cashDkk\":100000,\"holdings\":[],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\"}}")) + "],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\",\"isNonLive\":true,\"strictContest\":false,\"holdOnly\":true}");
+            var executionMode = WrongPortfolioExecutionMode ? "wrong" : "assumed-delayed-paper-fills-v1";
+            var rootExecutionMode = OmitRootExecutionMode ? string.Empty : ",\"executionMode\":\"assumed-delayed-paper-fills-v1\"";
+            return Task.FromResult("{\"participants\":[" + string.Join(',', ContestContract.Agents.Select(a => "{\"agentId\":\"" + a.Id.ToString("D") + "\",\"portfolio\":{\"cashDkk\":100000,\"holdings\":[],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\",\"executionMode\":\"" + executionMode + "\"}}")) + "],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\"" + rootExecutionMode + ",\"isNonLive\":true,\"strictContest\":false,\"holdOnly\":false,\"assumedFills\":true,\"assumedSekToDkk\":0.65,\"assumedSlippagePercent\":1}");
         }
         public Task PostDecisionAsync(string runId, string json, CancellationToken cancellationToken)
         {
@@ -285,12 +364,15 @@ public sealed class ExhibitionCycleTests
     private sealed class FakeInvoker : IExhibitionModelInvoker
     {
         public Guid? FailingAgentId { get; init; } = ContestContract.Agents[0].Id;
+        public string Action { get; init; } = "hold";
         public List<Guid> Agents { get; } = [];
         public Task<ResearchExecutionResult> InvokeAsync(AgentDefinition agent, string prompt, CancellationToken cancellationToken)
         {
             Agents.Add(agent.Id);
             if (agent.Id == FailingAgentId) throw new InvalidOperationException("outage");
-            var output = $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"Delayed data is HOLD-only","confidence":0.5,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}""";
+            var instrument = Action == "hold" ? "null" : "\"SE0000115446\"";
+            var quantity = Action == "hold" ? 0 : 1;
+            var output = $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"{{Action}}","instrumentId":{{instrument}},"quantity":{{quantity}},"reason":"Assumed-fill paper decision","confidence":0.5,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}""";
             return Task.FromResult(new ResearchExecutionResult(output, string.Empty, new InvocationProvenance
             {
                 AgentId = agent.Id,
