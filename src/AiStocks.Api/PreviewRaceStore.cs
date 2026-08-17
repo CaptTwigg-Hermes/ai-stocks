@@ -8,6 +8,11 @@ public sealed class PreviewRaceStore(TimeProvider clock)
 {
     public const decimal StartingCashDkk = 100_000m;
     public const string DataMode = "preview-fixtures";
+    public const string AssumedExecutionMode = "assumed-delayed-paper-fills-v1";
+    public const decimal AssumedSekToDkk = 0.65m;
+    public const decimal AssumedSlippagePercent = 1m;
+    public const decimal MaximumAssumedOrderDkk = 10_000m;
+    public const decimal MaximumAssumedPositionDkk = 25_000m;
     public const int MaximumIdempotencyEntries = 1_000;
     private static readonly Regex LowerSha256 = new("^[0-9a-f]{64}$", RegexOptions.CultureInvariant);
 
@@ -99,6 +104,21 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         }
     }
 
+    public AiProgressDto AiProgress(InstrumentListDto snapshot)
+    {
+        var instruments = Snapshot(snapshot);
+        lock (sync)
+        {
+            return new(aiAccounts.Values.OrderBy(account => account.ModelId, StringComparer.Ordinal)
+                .Select(account => new AiProgressAgentDto(account.AgentId, account.ModelId, account.ModelId,
+                    account.Status, account.RunId, account.QueuedAt, account.StartedAt, account.CompletedAt,
+                    account.Error, PortfolioFor(account.Account, snapshot.DataMode, instruments), account.LatestDecision)).ToArray(),
+                aiActivity.OrderByDescending(item => item.OccurredAt).Take(100).ToArray(), snapshot.DataMode,
+                IsNonLive: true, StrictContest: false, HoldOnly: false, AssumedExecutionMode,
+                AssumedFills: true, AssumedSekToDkk, AssumedSlippagePercent);
+        }
+    }
+
     public PreviewLeaderboardDto AiLeaderboard(string dataMode = DataMode)
     {
         lock (sync)
@@ -113,9 +133,27 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         }
     }
 
+    public PreviewLeaderboardDto AiLeaderboard(InstrumentListDto snapshot)
+    {
+        var instruments = Snapshot(snapshot);
+        lock (sync)
+        {
+            var rows = aiAccounts.Values.Select(account =>
+                (account.ModelId, TotalValueDkk: PortfolioFor(account.Account, snapshot.DataMode, instruments).TotalValueDkk)).ToArray();
+            var ordered = rows.OrderByDescending(row => row.TotalValueDkk)
+                .ThenBy(row => row.ModelId, StringComparer.Ordinal).ToArray();
+            return new(ordered.Select(row => new PreviewLeaderboardEntryDto(
+                1 + ordered.Count(candidate => candidate.TotalValueDkk > row.TotalValueDkk), row.ModelId, "ai",
+                row.TotalValueDkk, Percent((row.TotalValueDkk - StartingCashDkk) / StartingCashDkk * 100m))).ToArray(),
+                snapshot.DataMode);
+        }
+    }
+
     public AiDecisionSubmission SubmitAi(AiDecisionRequestDto request)
     {
         ValidateAi(request);
+        if (!string.Equals(request.Action.Trim(), "hold", StringComparison.OrdinalIgnoreCase))
+            throw new PreviewOrderException("delayed-snapshot-required", "Trades require one immutable current delayed snapshot.");
         var fingerprint = JsonSerializer.Serialize(request);
         lock (sync)
         {
@@ -150,6 +188,76 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             AddAiActivity(new(request.RunId, request.AgentId, request.ModelId, "succeeded", action,
                 request.Reason.Trim(), null, request.CompletedAt));
             aiRuns.Add(request.RunId, new(fingerprint, decision));
+            return new(decision, false);
+        }
+    }
+
+    public AiDecisionSubmission SubmitAi(AiDecisionRequestDto request, InstrumentListDto snapshot)
+    {
+        ValidateAi(request);
+        var instruments = Snapshot(snapshot);
+        var fingerprint = JsonSerializer.Serialize(request);
+        lock (sync)
+        {
+            if (aiRuns.TryGetValue(request.RunId, out var prior))
+            {
+                if (!string.Equals(prior.Fingerprint, fingerprint, StringComparison.Ordinal))
+                    throw new PreviewOrderException("run-id-conflict", "runId was already used for a different decision.");
+                return new(prior.Decision, true);
+            }
+            if (aiRuns.Count >= MaximumIdempotencyEntries)
+                throw new PreviewOrderException("run-capacity", "The fixture decision capacity has been reached.");
+
+            var account = aiAccounts[request.AgentId];
+            ValidateCurrentRun(account, request);
+            var action = request.Action.Trim().ToLowerInvariant();
+            AiAssumedPaperFillDto? fill = null;
+            if (action != "hold")
+            {
+                var matches = instruments.Where(item => string.Equals(item.Id, request.InstrumentId, StringComparison.Ordinal)).ToArray();
+                if (matches.Length != 1)
+                    throw new PreviewOrderException("instrument-not-found", "Instrument must be one exact current delayed item.");
+                var instrument = matches[0];
+                if (instrument.Currency != "SEK" || instrument.Exchange != "XSTO" || instrument.Tradable != false ||
+                    instrument.PaperTradable != true || instrument.ExecutedAt is null || instrument.AvailableAt is null ||
+                    instrument.Price <= 0m || string.IsNullOrWhiteSpace(instrument.Source))
+                    throw new PreviewOrderException("invalid-observation", "Instrument is not a verified delayed XSTO observation.");
+                if (request.CompletedAt < instrument.AvailableAt.Value)
+                    throw new PreviewOrderException("observation-not-available", "The delayed observation was not available when the decision completed.");
+                if (request.Evidence.Any(item => item.PublishedAt > instrument.AvailableAt.Value))
+                    throw new PreviewOrderException("evidence-lookahead", "Trade evidence cannot postdate the selected observation's availability.");
+
+                account.Account.Holdings.TryGetValue(instrument.Id, out var held);
+                var fillPrice = Money(instrument.Price * AssumedSekToDkk * (action == "buy" ? 1.01m : 0.99m));
+                var total = Money(fillPrice * request.Quantity);
+                if (action == "buy" && total > MaximumAssumedOrderDkk)
+                    throw new PreviewOrderException("maximum-order-total", "Assumed buy order total cannot exceed DKK 10,000.");
+                if (action == "buy")
+                {
+                    if (account.Account.CashDkk < total)
+                        throw new PreviewOrderException("insufficient-cash", "The paper account has insufficient DKK cash.");
+                    if (Money((held + request.Quantity) * instrument.Price * AssumedSekToDkk) > MaximumAssumedPositionDkk)
+                        throw new PreviewOrderException("maximum-position-value", "The resulting marked position cannot exceed DKK 25,000.");
+                    account.Account.CashDkk = Money(account.Account.CashDkk - total);
+                    account.Account.Holdings[instrument.Id] = held + request.Quantity;
+                }
+                else
+                {
+                    if (held < request.Quantity)
+                        throw new PreviewOrderException("insufficient-holdings", "The paper account does not hold enough shares.");
+                    account.Account.CashDkk = Money(account.Account.CashDkk + total);
+                    if (held == request.Quantity) account.Account.Holdings.Remove(instrument.Id);
+                    else account.Account.Holdings[instrument.Id] = held - request.Quantity;
+                }
+                account.Account.Marks[instrument.Id] = instrument;
+                fill = new(instrument.Price, AssumedSekToDkk, AssumedSlippagePercent, fillPrice, total,
+                    instrument.ExecutedAt.Value, instrument.AvailableAt.Value, clock.GetUtcNow(), AssumedExecutionMode);
+            }
+
+            var decision = new AiDecisionDto(request.RunId, action, request.InstrumentId, request.Quantity,
+                request.Reason.Trim(), request.Confidence, request.Evidence,
+                new(request.RuntimeProvider, request.RuntimeModel, request.ReportSha256), request.CompletedAt, fill);
+            CompleteAiDecision(account, request, decision, fingerprint, action);
             return new(decision, false);
         }
     }
@@ -220,6 +328,39 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         }
     }
 
+    private static void ValidateCurrentRun(AiAccount account, AiDecisionRequestDto request)
+    {
+        if (!string.Equals(account.RunId, request.RunId, StringComparison.Ordinal))
+            throw new PreviewOrderException("run-decision-conflict", "The decision runId must match the agent's current run.");
+        if (account.Status != "running")
+            throw new PreviewOrderException("decision-status-conflict", "A fixture decision may complete only a running run.");
+        if (account.StartedAt is null || request.CompletedAt <= account.StartedAt)
+            throw new PreviewOrderException("stale-decision", "Decision completion must follow the current run's start time.");
+    }
+
+    private void CompleteAiDecision(AiAccount account, AiDecisionRequestDto request, AiDecisionDto decision,
+        string fingerprint, string action)
+    {
+        account.Status = "succeeded";
+        account.RunId = request.RunId;
+        account.QueuedAt ??= request.CompletedAt;
+        account.StartedAt ??= request.CompletedAt;
+        account.CompletedAt = request.CompletedAt;
+        account.Error = null;
+        account.LatestDecision = decision;
+        account.SeenRunIds.Add(request.RunId);
+        AddAiActivity(new(request.RunId, request.AgentId, request.ModelId, "succeeded", action,
+            request.Reason.Trim(), null, request.CompletedAt));
+        aiRuns.Add(request.RunId, new(fingerprint, decision));
+    }
+
+    private static InstrumentDto[] Snapshot(InstrumentListDto snapshot)
+    {
+        if (snapshot.DataMode != DelayedNasdaqInstrumentStore.DataMode)
+            throw new PreviewOrderException("invalid-data-mode", "Assumed fills require the official delayed Nasdaq data mode.");
+        return snapshot.Items?.ToArray() ?? throw new PreviewOrderException("invalid-snapshot", "A current delayed snapshot is required.");
+    }
+
     private static bool StatusDetailsMatch(AiAccount account, string status, AiStatusRequestDto request) => status switch
     {
         "queued" => account.QueuedAt == request.OccurredAt && request.Error is null,
@@ -246,24 +387,27 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         if (!ContestContract.IsExactAgent(request.AgentId, request.ModelId))
             throw new PreviewOrderException("agent-model-mismatch", "agentId and modelId must exactly match ContestContract.Agents.");
         var action = request.Action?.Trim().ToLowerInvariant();
-        if (action != "hold")
-            throw new PreviewOrderException("hold-only", "AI exhibition decisions must be HOLD.");
+        if (action is not ("buy" or "sell" or "hold"))
+            throw new PreviewOrderException("invalid-action", "action must be buy, sell, or hold.");
         if (request.Reason is null || request.Reason.Trim().Length is < 1 or > 2_000)
             throw new PreviewOrderException("invalid-reason", "reason must contain 1-2,000 characters.");
         if (request.Confidence is < 0m or > 1m)
             throw new PreviewOrderException("invalid-confidence", "confidence must be between 0 and 1.");
         if (request.Evidence is null || request.Evidence.Count > 20 ||
+            (action is "buy" or "sell" && request.Evidence.Count < 1) ||
             request.Evidence.Any(evidence =>
                 !Uri.TryCreate(evidence.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
                 evidence.PublishedAt == default || string.IsNullOrWhiteSpace(evidence.ExactExcerpt) ||
                 evidence.ExactExcerpt.Length > 2_000 || !LowerSha256.IsMatch(evidence.ContentSha256 ?? string.Empty)))
-            throw new PreviewOrderException("invalid-evidence", "Holds may include up to 20 verified HTTPS evidence items.");
+            throw new PreviewOrderException("invalid-evidence", "Trades require 1-20 and holds allow 0-20 verified HTTPS evidence items.");
         if (!string.Equals(request.RuntimeProvider, "copilot", StringComparison.Ordinal) ||
             !string.Equals(request.RuntimeModel, request.ModelId, StringComparison.Ordinal) ||
             !LowerSha256.IsMatch(request.ReportSha256 ?? string.Empty) || request.CompletedAt == default)
             throw new PreviewOrderException("invalid-attestation", "Runtime provider/model, report SHA-256, and completion time are required.");
-        if (request.InstrumentId is not null || request.Quantity != 0)
+        if (action == "hold" && (request.InstrumentId is not null || request.Quantity != 0))
             throw new PreviewOrderException("invalid-hold", "hold requires null instrumentId and zero quantity.");
+        if (action is "buy" or "sell" && (string.IsNullOrWhiteSpace(request.InstrumentId) || request.Quantity is < 1 or > 100_000))
+            throw new PreviewOrderException("invalid-trade", "buy and sell require an instrumentId and quantity between 1 and 100,000.");
     }
 
     public PreviewSubmission Submit(string identity, string idempotencyKey, HumanOrderRequestDto request)
@@ -346,6 +490,24 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             Percent((total - StartingCashDkk) / StartingCashDkk * 100m), holdings, dataMode);
     }
 
+    private static PreviewPortfolioDto PortfolioFor(Account account, string dataMode,
+        IReadOnlyCollection<InstrumentDto> current)
+    {
+        var holdings = account.Holdings.OrderBy(item => item.Key, StringComparer.Ordinal)
+            .Select(item =>
+            {
+                var instrument = current.SingleOrDefault(candidate => candidate.Id == item.Key)
+                    ?? account.Marks[item.Key];
+                var priceDkk = Money(instrument.Price * AssumedSekToDkk);
+                return new PreviewHoldingDto(instrument.Id, instrument.Symbol, instrument.Name, item.Value,
+                    priceDkk, Money(priceDkk * item.Value));
+            }).ToArray();
+        var holdingsValue = Money(holdings.Sum(item => item.ValueDkk));
+        var total = Money(account.CashDkk + holdingsValue);
+        return new(account.DisplayName, StartingCashDkk, account.CashDkk, holdingsValue, total,
+            Percent((total - StartingCashDkk) / StartingCashDkk * 100m), holdings, dataMode);
+    }
+
     private static InstrumentDto Instrument(string id, string symbol, string name, string exchange,
         string country, string currency, decimal price, decimal fxToDkk) =>
         new(id, symbol, name, exchange, country, currency, price, Money(price * fxToDkk), true);
@@ -360,6 +522,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         public string DisplayName { get; } = displayName;
         public decimal CashDkk { get; set; } = StartingCashDkk;
         public Dictionary<string, int> Holdings { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, InstrumentDto> Marks { get; } = new(StringComparer.Ordinal);
         public List<PreviewOrderDto> Orders { get; } = [];
         public Dictionary<string, IdempotencyEntry> Idempotency { get; } = new(StringComparer.Ordinal);
     }

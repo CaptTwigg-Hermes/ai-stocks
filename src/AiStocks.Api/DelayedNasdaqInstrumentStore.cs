@@ -77,7 +77,7 @@ public sealed class DelayedNasdaqInstrumentStore
             .Select(item => new InstrumentDto(item.Instrument.Isin, item.Instrument.OrderBookId,
                 item.Instrument.Name, "XSTO", "Sweden", "SEK", item.Trade.Price, PriceDkk: null,
                 IsPreviewPrice: false, item.Trade.ExecutedAt, item.Trade.AvailableAt, item.Source,
-                DelayMinutes: 15, Tradable: false))
+                DelayMinutes: 15, Tradable: false, PaperTradable: true))
             .ToArray();
         return new(items, DataMode);
     }

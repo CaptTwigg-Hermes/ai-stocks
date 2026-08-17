@@ -21,7 +21,11 @@ public sealed class AiExhibitionFlowTests
         Assert.Equal(DelayedNasdaqInstrumentStore.DataMode, json.RootElement.GetProperty("dataMode").GetString());
         Assert.True(json.RootElement.GetProperty("isNonLive").GetBoolean());
         Assert.False(json.RootElement.GetProperty("strictContest").GetBoolean());
-        Assert.True(json.RootElement.GetProperty("holdOnly").GetBoolean());
+        Assert.False(json.RootElement.GetProperty("holdOnly").GetBoolean());
+        Assert.True(json.RootElement.GetProperty("assumedFills").GetBoolean());
+        Assert.Equal("assumed-delayed-paper-fills-v1", json.RootElement.GetProperty("executionMode").GetString());
+        Assert.Equal(0.65m, json.RootElement.GetProperty("assumedSekToDkk").GetDecimal());
+        Assert.Equal(1m, json.RootElement.GetProperty("assumedSlippagePercent").GetDecimal());
         var agents = json.RootElement.GetProperty("participants").EnumerateArray().ToArray();
         Assert.Equal(4, agents.Length);
         Assert.Equal(new[] { "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview", "gpt-5.6-sol" },
@@ -35,7 +39,7 @@ public sealed class AiExhibitionFlowTests
     }
 
     [Fact]
-    public async Task Trade_is_rejected_without_mutation_in_hold_only_exhibition()
+    public async Task Unknown_trade_is_rejected_without_mutation_in_assumed_fill_exhibition()
     {
         await using var factory = new AiExhibitionApiFactory();
         using var client = factory.CreateClient();
@@ -47,7 +51,7 @@ public sealed class AiExhibitionFlowTests
 
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, rejected.StatusCode);
         using var problem = await JsonDocument.ParseAsync(await rejected.Content.ReadAsStreamAsync());
-        Assert.Equal("hold-only", problem.RootElement.GetProperty("code").GetString());
+        Assert.Equal("instrument-not-found", problem.RootElement.GetProperty("code").GetString());
         client.DefaultRequestHeaders.Remove("X-AI-Exhibition-Key");
         client.DefaultRequestHeaders.Add("X-Test-User-Email", "viewer@example.com");
         using var progress = await client.GetFromJsonAsync<JsonDocument>("/api/v1/ai-progress");

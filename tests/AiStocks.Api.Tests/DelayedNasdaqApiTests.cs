@@ -36,6 +36,7 @@ public sealed class DelayedNasdaqApiTests
         Assert.Equal("Nasdaq Nordic MiFID II delayed post-trade", item.GetProperty("source").GetString());
         Assert.Equal(15, item.GetProperty("delayMinutes").GetInt32());
         Assert.False(item.GetProperty("tradable").GetBoolean());
+        Assert.True(item.GetProperty("paperTradable").GetBoolean());
     }
 
     [Fact]
@@ -69,7 +70,7 @@ public sealed class DelayedNasdaqApiTests
     }
 
     [Fact]
-    public async Task Exhibition_progress_declares_hold_only_and_trade_submission_cannot_mutate_portfolio()
+    public async Task Exhibition_route_executes_assumed_fill_from_its_current_delayed_snapshot()
     {
         using var data = DelayedNasdaqFixture.Create();
         await using var factory = new DelayedNasdaqApiFactory(data.Path);
@@ -90,31 +91,32 @@ public sealed class DelayedNasdaqApiTests
             agentId,
             modelId = "gpt-5.6-sol",
             action = "buy",
-            instrumentId = "aapl-us",
+            instrumentId = "SE0000108656",
             quantity = 1,
             reason = "Must be rejected without mutation.",
             confidence = 0.5m,
-            evidence = new[] { new { url = "https://example.com/research", publishedAt = completedAt.AddMinutes(-1), exactExcerpt = "Evidence", contentSha256 = new string('a', 64) } },
+            evidence = new[] { new { url = "https://example.com/research", publishedAt = DateTimeOffset.Parse("2026-08-16T10:16:00Z"), exactExcerpt = "Evidence", contentSha256 = new string('a', 64) } },
             runtimeProvider = "copilot",
             runtimeModel = "gpt-5.6-sol",
             reportSha256 = new string('b', 64),
             completedAt
         });
 
-        Assert.Equal(System.Net.HttpStatusCode.BadRequest, rejected.StatusCode);
-        var problem = await rejected.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("hold-only", problem.GetProperty("code").GetString());
+        Assert.Equal(System.Net.HttpStatusCode.Created, rejected.StatusCode);
+        var decision = await rejected.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(59.91m, decision.GetProperty("assumedPaperFill").GetProperty("totalDkk").GetDecimal());
         client.DefaultRequestHeaders.Remove("X-AI-Exhibition-Key");
         client.DefaultRequestHeaders.Add("X-Test-User-Email", "viewer@example.com");
         var progress = await client.GetFromJsonAsync<JsonElement>("/api/v1/ai-progress");
         Assert.Equal(DelayedNasdaqInstrumentStore.DataMode, progress.GetProperty("dataMode").GetString());
-        Assert.True(progress.GetProperty("holdOnly").GetBoolean());
+        Assert.False(progress.GetProperty("holdOnly").GetBoolean());
+        Assert.True(progress.GetProperty("assumedFills").GetBoolean());
         var participant = progress.GetProperty("participants").EnumerateArray()
             .Single(item => item.GetProperty("agentId").GetGuid() == agentId);
         var portfolio = participant.GetProperty("portfolio");
         Assert.Equal(DelayedNasdaqInstrumentStore.DataMode, portfolio.GetProperty("dataMode").GetString());
-        Assert.Equal(100_000m, portfolio.GetProperty("cashDkk").GetDecimal());
-        Assert.Empty(portfolio.GetProperty("holdings").EnumerateArray());
+        Assert.Equal(99_940.09m, portfolio.GetProperty("cashDkk").GetDecimal());
+        Assert.Equal(1, Assert.Single(portfolio.GetProperty("holdings").EnumerateArray()).GetProperty("quantity").GetInt32());
 
         var leaderboard = await client.GetFromJsonAsync<JsonElement>("/api/v1/leaderboard");
         Assert.Equal(DelayedNasdaqInstrumentStore.DataMode, leaderboard.GetProperty("dataMode").GetString());

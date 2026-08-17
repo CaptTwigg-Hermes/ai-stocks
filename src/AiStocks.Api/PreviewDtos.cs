@@ -16,7 +16,8 @@ public sealed record InstrumentDto(
     [property: JsonPropertyName("availableAt"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? AvailableAt = null,
     [property: JsonPropertyName("source"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Source = null,
     [property: JsonPropertyName("delayMinutes"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? DelayMinutes = null,
-    [property: JsonPropertyName("tradable"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Tradable = null);
+    [property: JsonPropertyName("tradable"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Tradable = null,
+    [property: JsonPropertyName("paperTradable"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PaperTradable = null);
 
 public sealed record InstrumentListDto(
     [property: JsonPropertyName("items")] IReadOnlyList<InstrumentDto> Items,
@@ -78,7 +79,11 @@ public sealed record AiProgressDto(
     [property: JsonPropertyName("dataMode")] string DataMode,
     [property: JsonPropertyName("isNonLive")] bool IsNonLive,
     [property: JsonPropertyName("strictContest")] bool StrictContest,
-    [property: JsonPropertyName("holdOnly")] bool HoldOnly);
+    [property: JsonPropertyName("holdOnly")] bool HoldOnly,
+    [property: JsonPropertyName("executionMode")] string? ExecutionMode = null,
+    [property: JsonPropertyName("assumedFills")] bool AssumedFills = false,
+    [property: JsonPropertyName("assumedSekToDkk")] decimal? AssumedSekToDkk = null,
+    [property: JsonPropertyName("assumedSlippagePercent")] decimal? AssumedSlippagePercent = null);
 
 public sealed record AiProgressAgentDto(
     [property: JsonPropertyName("agentId")] Guid AgentId,
@@ -120,7 +125,19 @@ public sealed record AiDecisionDto(
     [property: JsonPropertyName("confidence")] decimal Confidence,
     [property: JsonPropertyName("evidence")] IReadOnlyList<AiEvidenceDto> Evidence,
     [property: JsonPropertyName("attestation")] AiAttestationDto Attestation,
-    [property: JsonPropertyName("completedAt")] DateTimeOffset CompletedAt);
+    [property: JsonPropertyName("completedAt")] DateTimeOffset CompletedAt,
+    [property: JsonPropertyName("assumedPaperFill")] AiAssumedPaperFillDto? AssumedPaperFill = null);
+
+public sealed record AiAssumedPaperFillDto(
+    [property: JsonPropertyName("observedPriceSek")] decimal ObservedPriceSek,
+    [property: JsonPropertyName("assumedSekToDkk")] decimal AssumedSekToDkk,
+    [property: JsonPropertyName("assumedSlippagePercent")] decimal AssumedSlippagePercent,
+    [property: JsonPropertyName("fillPriceDkk")] decimal FillPriceDkk,
+    [property: JsonPropertyName("totalDkk")] decimal TotalDkk,
+    [property: JsonPropertyName("observationExecutedAt")] DateTimeOffset ObservationExecutedAt,
+    [property: JsonPropertyName("observationAvailableAt")] DateTimeOffset ObservationAvailableAt,
+    [property: JsonPropertyName("filledAt")] DateTimeOffset FilledAt,
+    [property: JsonPropertyName("executionMode")] string ExecutionMode);
 
 public sealed record AiEvidenceDto(
     [property: JsonPropertyName("url")] string Url,

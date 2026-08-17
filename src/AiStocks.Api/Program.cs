@@ -132,14 +132,22 @@ if (localAuth)
         api.MapGet("/instruments", (string? query, DelayedNasdaqInstrumentStore store) => Results.Ok(store.Search(query)));
     else
         api.MapGet("/instruments", (string? query, PreviewRaceStore store) => Results.Ok(store.Search(query)));
-    api.MapGet("/leaderboard", (ClaimsPrincipal user, PreviewRaceStore store) =>
-        Results.Ok(aiExhibitionMode
-            ? store.AiLeaderboard(DelayedNasdaqInstrumentStore.DataMode)
-            : store.Leaderboard(Identity(user))));
+    if (aiExhibitionMode)
+        api.MapGet("/leaderboard", (PreviewRaceStore store, DelayedNasdaqInstrumentStore market) =>
+        {
+            var snapshot = market.Search(null);
+            return Results.Ok(store.AiLeaderboard(snapshot));
+        });
+    else
+        api.MapGet("/leaderboard", (ClaimsPrincipal user, PreviewRaceStore store) =>
+            Results.Ok(store.Leaderboard(Identity(user))));
     if (aiExhibitionMode)
     {
-        api.MapGet("/ai-progress", (PreviewRaceStore store) =>
-            Results.Ok(store.AiProgress(DelayedNasdaqInstrumentStore.DataMode)));
+        api.MapGet("/ai-progress", (PreviewRaceStore store, DelayedNasdaqInstrumentStore market) =>
+        {
+            var snapshot = market.Search(null);
+            return Results.Ok(store.AiProgress(snapshot));
+        });
         app.MapPost("/internal/preview/ai-status", (AiStatusRequestDto request, PreviewRaceStore store, HttpContext context) =>
         {
             if (!ValidSecret(context, aiExhibitionKey!)) return Results.Unauthorized();
@@ -154,12 +162,14 @@ if (localAuth)
                     StatusCodes.Status400BadRequest, context, exception.Message);
             }
         }).WithMetadata(new Microsoft.AspNetCore.Cors.DisableCorsAttribute());
-        app.MapPost("/internal/preview/ai-decisions", (AiDecisionRequestDto request, PreviewRaceStore store, HttpContext context) =>
+        app.MapPost("/internal/preview/ai-decisions", (AiDecisionRequestDto request, PreviewRaceStore store,
+            DelayedNasdaqInstrumentStore market, HttpContext context) =>
         {
             if (!ValidSecret(context, aiExhibitionKey!)) return Results.Unauthorized();
             try
             {
-                var submission = store.SubmitAi(request);
+                var snapshot = market.Search(null);
+                var submission = store.SubmitAi(request, snapshot);
                 return submission.Replayed ? Results.Ok(submission.Decision) : Results.Created("/api/v1/ai-progress", submission.Decision);
             }
             catch (PreviewOrderException exception)
