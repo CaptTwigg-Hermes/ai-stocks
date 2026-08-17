@@ -18,9 +18,10 @@ public sealed class AiExhibitionFlowTests
         using var response = await client.GetAsync("/api/v1/ai-progress");
         using var json = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
 
-        Assert.Equal("preview-fixtures", json.RootElement.GetProperty("dataMode").GetString());
+        Assert.Equal(DelayedNasdaqInstrumentStore.DataMode, json.RootElement.GetProperty("dataMode").GetString());
         Assert.True(json.RootElement.GetProperty("isNonLive").GetBoolean());
         Assert.False(json.RootElement.GetProperty("strictContest").GetBoolean());
+        Assert.True(json.RootElement.GetProperty("holdOnly").GetBoolean());
         var agents = json.RootElement.GetProperty("participants").EnumerateArray().ToArray();
         Assert.Equal(4, agents.Length);
         Assert.Equal(new[] { "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview", "gpt-5.6-sol" },
@@ -34,7 +35,7 @@ public sealed class AiExhibitionFlowTests
     }
 
     [Fact]
-    public async Task Verified_buy_fills_only_named_agent_and_exact_replay_is_idempotent()
+    public async Task Trade_is_rejected_without_mutation_in_hold_only_exhibition()
     {
         await using var factory = new AiExhibitionApiFactory();
         using var client = factory.CreateClient();
@@ -42,24 +43,20 @@ public sealed class AiExhibitionFlowTests
         var payload = Decision("run-valid-0001", "11111111-1111-1111-1111-111111111111", "gpt-5.6-sol", "buy", "aapl-us", 2);
         await StartRun(client, "run-valid-0001", ContestContract.Agents[0], DateTimeOffset.Parse("2026-08-16T10:01:00Z"));
 
-        using var created = await client.PostAsJsonAsync("/internal/preview/ai-decisions", payload);
-        using var replay = await client.PostAsJsonAsync("/internal/preview/ai-decisions", payload);
+        using var rejected = await client.PostAsJsonAsync("/internal/preview/ai-decisions", payload);
 
-        Assert.Equal(System.Net.HttpStatusCode.Created, created.StatusCode);
-        Assert.Equal(System.Net.HttpStatusCode.OK, replay.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, rejected.StatusCode);
+        using var problem = await JsonDocument.ParseAsync(await rejected.Content.ReadAsStreamAsync());
+        Assert.Equal("hold-only", problem.RootElement.GetProperty("code").GetString());
         client.DefaultRequestHeaders.Remove("X-AI-Exhibition-Key");
         client.DefaultRequestHeaders.Add("X-Test-User-Email", "viewer@example.com");
         using var progress = await client.GetFromJsonAsync<JsonDocument>("/api/v1/ai-progress");
         var agents = progress!.RootElement.GetProperty("participants").EnumerateArray().ToArray();
-        var buyer = agents.Single(agent => agent.GetProperty("modelId").GetString() == "gpt-5.6-sol");
-        Assert.Equal("succeeded", buyer.GetProperty("status").GetString());
-        Assert.Equal(97_196.18m, buyer.GetProperty("portfolio").GetProperty("cashDkk").GetDecimal());
-        Assert.Single(buyer.GetProperty("portfolio").GetProperty("holdings").EnumerateArray());
-        Assert.Contains(progress.RootElement.GetProperty("activity").EnumerateArray(),
-            item => item.GetProperty("runId").GetString() == "run-valid-0001" &&
-                    item.GetProperty("status").GetString() == "succeeded");
-        Assert.All(agents.Where(agent => agent.GetProperty("modelId").GetString() != "gpt-5.6-sol"),
-            agent => Assert.Equal(100_000m, agent.GetProperty("portfolio").GetProperty("cashDkk").GetDecimal()));
+        var participant = agents.Single(agent => agent.GetProperty("modelId").GetString() == "gpt-5.6-sol");
+        Assert.Equal("running", participant.GetProperty("status").GetString());
+        Assert.Equal(100_000m, participant.GetProperty("portfolio").GetProperty("cashDkk").GetDecimal());
+        Assert.Empty(participant.GetProperty("portfolio").GetProperty("holdings").EnumerateArray());
+        Assert.Empty(progress.RootElement.GetProperty("activity").EnumerateArray());
     }
 
     [Fact]

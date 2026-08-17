@@ -1,3 +1,4 @@
+import subprocess
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -75,14 +76,15 @@ def test_exhibition_leaderboard_uses_shared_rank_semantics():
 def test_exhibition_mode_replaces_human_workspace_without_breaking_preview_fallback():
     html = (UI / "index.html").read_text()
     script = (UI / "app.js").read_text()
+    contract = (UI / "exhibition-contract.js").read_text()
 
     assert 'id="ai-race-page" hidden' in html
     assert 'id="ai-participants"' in html
     assert 'id="ai-activity"' in html
     assert 'id="ai-refresh" type="button"' in html
     assert 'api("/api/v1/ai-progress")' in script
-    assert 'data.strictContest === false' in script
-    assert 'data.isNonLive === true' in script
+    assert "data.strictContest !== false" in contract
+    assert "data.isNonLive !== true" in contract
     assert 'ui.tradePage.hidden = true' in script
     assert 'ui.aiRacePage.hidden = false' in script
     assert 'document.body.classList.add("exhibition-mode")' in script
@@ -93,12 +95,13 @@ def test_exhibition_mode_replaces_human_workspace_without_breaking_preview_fallb
 def test_exhibition_cards_are_four_defensive_safe_complete_ai_participants():
     html = (UI / "index.html").read_text()
     script = (UI / "app.js").read_text()
+    contract = (UI / "exhibition-contract.js").read_text()
 
-    assert "const exhibitionModelIds = new Set([" in script
+    assert "const modelIds = new Set([" in contract
     for model_id in ("gpt-5.6-sol", "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview"):
-        assert f'"{model_id}"' in script
-    assert "data.participants.length !== 4" in script
-    assert "new Set(data.participants.map((participant) => participant.modelId))" in script
+        assert f'"{model_id}"' in contract
+    assert "data.participants.length !== 4" in contract
+    assert "new Set(data.participants.map((participant) => participant.modelId))" in contract
     for label in ("Status", "Failure", "Last action", "Decision time", "Rationale", "Confidence", "Verified sources", "Cash", "Holdings value", "Total"):
         assert f'"{label}"' in script
     for status in ("pending", "queued", "running", "succeeded", "failed"):
@@ -109,7 +112,14 @@ def test_exhibition_cards_are_four_defensive_safe_complete_ai_participants():
     assert 'url.protocol !== "https:"' in script
     assert "link.rel = \"noopener noreferrer\"" in script
     assert "innerHTML" not in script
-    assert html.count("fixture-backed and non-live") >= 2
+    assert 'id="data-badge"' in html
+    assert 'ui.dataBadge.textContent = "Official Nasdaq XSTO · 15-minute delayed · non-live · paper-only · HOLD-only"' in script
+    assert html.count("official Nasdaq XSTO") >= 2
+    assert html.count("15-minute delayed") >= 2
+    assert html.count("non-live") >= 2
+    assert html.count("paper-only") >= 2
+    assert html.count("HOLD-only") >= 2
+    assert "fixture-backed" not in html
     assert html.count("Portfolios are volatile") >= 2
     assert html.count("not the strict 2026 contest") >= 2
 
@@ -137,9 +147,43 @@ def test_exhibition_refresh_is_bounded_race_safe_and_responsive():
 def test_exhibition_leaderboard_is_ai_only_and_uses_ai_refresh():
     html = (UI / "index.html").read_text()
     script = (UI / "app.js").read_text()
+    contract = (UI / "exhibition-contract.js").read_text()
 
     assert 'id="leaderboard-intro"' in html
     assert 'id="leaderboard-mode"' in html
-    assert 'ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by total fixture portfolio value in DKK."' in script
-    assert 'ui.leaderboardMode.textContent = "AI-only fixture exhibition"' in script
+    assert 'ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by total delayed-data paper portfolio value in DKK."' in script
+    assert 'ui.leaderboardMode.textContent = "AI-only delayed-data exhibition"' in script
+    assert 'src="/exhibition-contract.js" defer' in html
+    assert 'data.dataMode !== dataMode' in contract
+    assert 'data.holdOnly !== true' in contract
+    assert 'participant.portfolio?.dataMode === dataMode' in contract
+    assert "window.aiStocksExhibitionContract?.isResponse(data) === true" in script
     assert 'document.body.classList.contains("exhibition-mode") ? refreshAiProgress(true) : refreshAll(true)' in script
+
+
+def test_exhibition_contract_rejects_missing_wrong_and_mixed_portfolio_modes():
+    contract_path = UI / "exhibition-contract.js"
+    probe = r"""
+global.window = {};
+require(process.argv[1]);
+const contract = window.aiStocksExhibitionContract;
+const models = ["gpt-5.6-sol", "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview"];
+function payload(modes) {
+  return {
+    dataMode: contract.dataMode,
+    strictContest: false,
+    isNonLive: true,
+    holdOnly: true,
+    participants: models.map((modelId, index) => ({
+      modelId,
+      portfolio: modes[index] === undefined ? {} : { dataMode: modes[index] }
+    }))
+  };
+}
+const exact = [contract.dataMode, contract.dataMode, contract.dataMode, contract.dataMode];
+if (!contract.isResponse(payload(exact))) process.exit(10);
+if (contract.isResponse(payload([undefined, ...exact.slice(1)]))) process.exit(11);
+if (contract.isResponse(payload(["preview-fixtures", ...exact.slice(1)]))) process.exit(12);
+if (contract.isResponse(payload([contract.dataMode, "preview-fixtures", ...exact.slice(2)]))) process.exit(13);
+"""
+    subprocess.run(["node", "-e", probe, str(contract_path)], check=True)

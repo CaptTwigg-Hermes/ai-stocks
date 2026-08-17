@@ -10,8 +10,13 @@ public sealed record InstrumentDto(
     [property: JsonPropertyName("country")] string Country,
     [property: JsonPropertyName("currency")] string Currency,
     [property: JsonPropertyName("price")] decimal Price,
-    [property: JsonPropertyName("priceDkk")] decimal PriceDkk,
-    [property: JsonPropertyName("isPreviewPrice")] bool IsPreviewPrice);
+    [property: JsonPropertyName("priceDkk"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? PriceDkk,
+    [property: JsonPropertyName("isPreviewPrice")] bool IsPreviewPrice,
+    [property: JsonPropertyName("executedAt"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? ExecutedAt = null,
+    [property: JsonPropertyName("availableAt"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? AvailableAt = null,
+    [property: JsonPropertyName("source"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Source = null,
+    [property: JsonPropertyName("delayMinutes"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? DelayMinutes = null,
+    [property: JsonPropertyName("tradable"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Tradable = null);
 
 public sealed record InstrumentListDto(
     [property: JsonPropertyName("items")] IReadOnlyList<InstrumentDto> Items,
@@ -72,7 +77,8 @@ public sealed record AiProgressDto(
     [property: JsonPropertyName("activity")] IReadOnlyList<AiActivityDto> Activity,
     [property: JsonPropertyName("dataMode")] string DataMode,
     [property: JsonPropertyName("isNonLive")] bool IsNonLive,
-    [property: JsonPropertyName("strictContest")] bool StrictContest);
+    [property: JsonPropertyName("strictContest")] bool StrictContest,
+    [property: JsonPropertyName("holdOnly")] bool HoldOnly);
 
 public sealed record AiProgressAgentDto(
     [property: JsonPropertyName("agentId")] Guid AgentId,

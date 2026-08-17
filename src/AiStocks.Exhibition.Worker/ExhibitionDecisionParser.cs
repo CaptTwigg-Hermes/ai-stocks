@@ -45,13 +45,9 @@ public sealed class ExhibitionDecisionParser
             if (!Guid.TryParseExact(agentIdText, "D", out var agentId) || agentId != expectedAgent.Id ||
                 !StringComparer.Ordinal.Equals(String(root, "modelId", 128), expectedAgent.ModelId))
                 throw Invalid("Decision identity does not exactly match the fixed agent/model.");
-            var action = String(root, "action", 8) switch
-            {
-                "buy" => ExhibitionAction.Buy,
-                "sell" => ExhibitionAction.Sell,
-                "hold" => ExhibitionAction.Hold,
-                _ => throw Invalid("action must be buy, sell, or hold.")
-            };
+            var action = String(root, "action", 8) == "hold"
+                ? ExhibitionAction.Hold
+                : throw Invalid("action must be hold in the HOLD-only delayed-data exhibition.");
             var instrument = NullableString(root.GetProperty("instrumentId"), "instrumentId", 128);
             if (!root.GetProperty("quantity").TryGetInt32(out var quantity) || quantity is < 0 or > 10_000_000)
                 throw Invalid("quantity is outside its safe bound.");
@@ -60,14 +56,7 @@ public sealed class ExhibitionDecisionParser
             if (!root.GetProperty("confidence").TryGetDecimal(out var confidence) || confidence is < 0m or > 1m)
                 throw Invalid("confidence must be between zero and one.");
             var evidence = ParseEvidence(root.GetProperty("evidence"));
-            if (action == ExhibitionAction.Hold)
-            {
-                if (instrument is not null || quantity != 0) throw Invalid("hold requires null instrumentId and zero quantity.");
-            }
-            else if (instrument is null || quantity <= 0 || !fixtureInstrumentIds.Contains(instrument) || evidence.Count == 0)
-            {
-                throw Invalid("buy/sell requires a fixture instrument, positive quantity, and evidence.");
-            }
+            if (instrument is not null || quantity != 0) throw Invalid("hold requires null instrumentId and zero quantity.");
             return new ExhibitionDecision(agentId, expectedAgent.ModelId, action, instrument, quantity, reason, confidence, evidence);
         }
         catch (ExhibitionDecisionException) { throw; }

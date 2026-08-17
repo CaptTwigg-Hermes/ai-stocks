@@ -17,6 +17,7 @@
   const byId = (id) => document.getElementById(id);
   const ui = {
     apiState: byId("api-state"),
+    dataBadge: byId("data-badge"),
     tradePage: byId("trade-page"),
     leaderboardPage: byId("leaderboard-page"),
     aiRacePage: byId("ai-race-page"),
@@ -76,9 +77,6 @@
   const decisionTime = new Intl.DateTimeFormat("en", {
     dateStyle: "medium", timeStyle: "short"
   });
-  const exhibitionModelIds = new Set([
-    "gpt-5.6-sol", "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview"
-  ]);
   const exhibitionStatuses = new Set(["pending", "queued", "running", "succeeded", "failed"]);
   const clock = new Intl.DateTimeFormat("en", {
     hour: "2-digit", minute: "2-digit", second: "2-digit"
@@ -421,11 +419,7 @@
   });
 
   function isExhibitionResponse(data) {
-    const exhibitionContract = data && data.strictContest === false && data.isNonLive === true;
-    if (!exhibitionContract || !Array.isArray(data.participants)) return false;
-    if (data.participants.length !== 4) return false;
-    const modelIds = new Set(data.participants.map((participant) => participant.modelId));
-    return modelIds.size === 4 && [...exhibitionModelIds].every((modelId) => modelIds.has(modelId));
+    return window.aiStocksExhibitionContract?.isResponse(data) === true;
   }
 
   function safeNumber(value) {
@@ -565,9 +559,10 @@
   function activateExhibition(data) {
     if (!isExhibitionResponse(data)) return false;
     document.body.classList.add("exhibition-mode");
+    ui.dataBadge.textContent = "Official Nasdaq XSTO · 15-minute delayed · non-live · paper-only · HOLD-only";
     document.querySelector('[data-route="trade"]').textContent = "AI Race";
-    ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by total fixture portfolio value in DKK.";
-    ui.leaderboardMode.textContent = "AI-only fixture exhibition";
+    ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by total delayed-data paper portfolio value in DKK.";
+    ui.leaderboardMode.textContent = "AI-only delayed-data exhibition";
     ui.tradePage.hidden = true;
     ui.aiRacePage.hidden = false;
     ui.leaderboardPage.hidden = !isLeaderboardPage;
@@ -618,7 +613,7 @@
       if (!document.body.classList.contains("exhibition-mode")) {
         showExhibitionFailure("AI race unavailable. Human trading controls remain hidden.");
       } else {
-        const message = "Refresh failed. Showing the last loaded AI fixture snapshot.";
+        const message = "Refresh failed. Showing the last loaded AI delayed-data snapshot.";
         ui.aiRaceStatus.textContent = message;
         ui.aiRaceStatus.classList.add("error");
         ui.leaderboardPageStatus.textContent = message;

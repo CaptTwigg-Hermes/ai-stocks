@@ -8,17 +8,14 @@ public sealed class ExhibitionDecisionParserTests
     private static readonly AgentDefinition Agent = ContestContract.Agents[0];
 
     [Fact]
-    public void Parse_AcceptsExactBoundedTradeDecision()
+    public void Parse_RejectsNonHoldDecisionEvenForKnownInstrument()
     {
         var json = $$"""
             {"agentId":"{{Agent.Id:D}}","modelId":"{{Agent.ModelId}}","action":"buy","instrumentId":"SE0000115446","quantity":2,"reason":"Fixture-only paper decision","confidence":0.75,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}
             """;
 
-        var decision = new ExhibitionDecisionParser().Parse(json, Agent, new HashSet<string>(StringComparer.Ordinal) { "SE0000115446" });
-
-        Assert.Equal(ExhibitionAction.Buy, decision.Action);
-        Assert.Equal(2, decision.Quantity);
-        Assert.Single(decision.Evidence);
+        Assert.Throws<ExhibitionDecisionException>(() =>
+            new ExhibitionDecisionParser().Parse(json, Agent, new HashSet<string>(StringComparer.Ordinal) { "SE0000115446" }));
     }
 
     [Fact]

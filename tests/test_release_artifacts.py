@@ -193,6 +193,8 @@ def test_ai_exhibition_and_market_warmup_have_explicit_isolated_services():
     ]
     assert services["api"]["environment"]["AI_EXHIBITION_MODE"] == "1"
     assert services["api"]["environment"]["AI_EXHIBITION_KEY"].startswith("${AI_EXHIBITION_KEY:?")
+    assert services["api"]["environment"]["AI_EXHIBITION_ARCHIVE_PATH"] == "/data/nasdaq"
+    assert "${NASDAQ_ARCHIVE_DIR:?set the Nasdaq archive dataset}:/data/nasdaq:ro" in services["api"]["volumes"]
 
     assert services["warmup-guard"]["profiles"] == ["warmup"]
     warmup = services["warmup-collector"]

@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using AiStocks.Api;
+using AiStocks.MarketData;
 using AiStocks.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http.Json;
@@ -26,6 +27,7 @@ if (previewMode && !localAuth)
 if (aiExhibitionMode && (!previewMode || !localAuth))
     throw new InvalidOperationException("AI_EXHIBITION_MODE requires PREVIEW_MODE in Development or Testing.");
 var aiExhibitionKey = aiExhibitionMode ? Required("AI_EXHIBITION_KEY") : null;
+var aiExhibitionArchivePath = aiExhibitionMode ? Required("AI_EXHIBITION_ARCHIVE_PATH") : null;
 if (aiExhibitionKey is not null && aiExhibitionKey.Length < 32)
     throw new InvalidOperationException("AI_EXHIBITION_KEY must contain at least 32 characters.");
 
@@ -101,6 +103,8 @@ builder.Services.AddRateLimiter(options =>
 });
 builder.Services.AddSingleton(TimeProvider.System);
 if (localAuth) builder.Services.AddSingleton<PreviewRaceStore>();
+if (aiExhibitionArchivePath is not null)
+    builder.Services.AddSingleton(new DelayedNasdaqInstrumentStore(aiExhibitionArchivePath, TimeProvider.System));
 
 var app = builder.Build();
 if (!localAuth) _ = app.Services.GetRequiredService<IAccessAssertionValidator>();
@@ -118,18 +122,24 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapGet("/healthz", () => Results.Ok(new HealthResponse("ready", localAuth ? "preview" : "access",
-    localAuth ? PreviewRaceStore.DataMode : "disabled")));
+    aiExhibitionMode ? DelayedNasdaqInstrumentStore.DataMode : localAuth ? PreviewRaceStore.DataMode : "disabled")));
 
 var api = app.MapGroup("/api/v1").RequireAuthorization();
 api.MapGet("/me", (ClaimsPrincipal user) => Results.Ok(new IdentityDto(Identity(user), Role(user))));
 if (localAuth)
 {
-    api.MapGet("/instruments", (string? query, PreviewRaceStore store) => Results.Ok(store.Search(query)));
+    if (aiExhibitionMode)
+        api.MapGet("/instruments", (string? query, DelayedNasdaqInstrumentStore store) => Results.Ok(store.Search(query)));
+    else
+        api.MapGet("/instruments", (string? query, PreviewRaceStore store) => Results.Ok(store.Search(query)));
     api.MapGet("/leaderboard", (ClaimsPrincipal user, PreviewRaceStore store) =>
-        Results.Ok(aiExhibitionMode ? store.AiLeaderboard() : store.Leaderboard(Identity(user))));
+        Results.Ok(aiExhibitionMode
+            ? store.AiLeaderboard(DelayedNasdaqInstrumentStore.DataMode)
+            : store.Leaderboard(Identity(user))));
     if (aiExhibitionMode)
     {
-        api.MapGet("/ai-progress", (PreviewRaceStore store) => Results.Ok(store.AiProgress()));
+        api.MapGet("/ai-progress", (PreviewRaceStore store) =>
+            Results.Ok(store.AiProgress(DelayedNasdaqInstrumentStore.DataMode)));
         app.MapPost("/internal/preview/ai-status", (AiStatusRequestDto request, PreviewRaceStore store, HttpContext context) =>
         {
             if (!ValidSecret(context, aiExhibitionKey!)) return Results.Unauthorized();

@@ -55,8 +55,8 @@
     "semantic_hash": ""
   },
   "pyproject.toml": {
-    "mtime": 1786902094.967108,
-    "ast_hash": "f5da0d189babc7a50a5fc50d74208445",
+    "mtime": 1786908336.2311926,
+    "ast_hash": "68eebcd62cd4de3fbd620a8368775d8d",
     "semantic_hash": ""
   },
   "scripts/backup.sh": {
@@ -100,8 +100,8 @@
     "semantic_hash": ""
   },
   "compose.yaml": {
-    "mtime": 1786902447.8301976,
-    "ast_hash": "2d2d7ee4b8085f423c391811959bf1bd",
+    "mtime": 1786985758.954796,
+    "ast_hash": "183bf5a7bd0345ff95dfc824b9783da7",
     "semantic_hash": ""
   },
   "docs/acceptance-contract.md": {
@@ -155,8 +155,8 @@
     "semantic_hash": ""
   },
   "scripts/prove_no_broker.py": {
-    "mtime": 1786904704.6507492,
-    "ast_hash": "a8c4f9dbfa0c1b1dd0a08edaab3cfa60",
+    "mtime": 1786982966.0761075,
+    "ast_hash": "aa97988dc99aa6cd2acf5da90172a5cd",
     "semantic_hash": ""
   },
   "tests/test_auth.py": {
@@ -895,13 +895,13 @@
     "semantic_hash": ""
   },
   ".github/workflows/publish-images.yml": {
-    "mtime": 1786902552.6402745,
-    "ast_hash": "1f10da53a20dcff28bd09d8cd8c7aea5",
+    "mtime": 1786908287.24622,
+    "ast_hash": "d01afa4f1c56534aa4145e5f13fa920c",
     "semantic_hash": ""
   },
   "tests/test_release_artifacts.py": {
-    "mtime": 1786902983.2567573,
-    "ast_hash": "cf8bf54cca2a3b1a9dec01665b13e1e2",
+    "mtime": 1786985758.954796,
+    "ast_hash": "1f7ca1b32c76bb2078f3fd483475145f",
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/009_operations_bootstrap_privileges.sql": {
@@ -960,8 +960,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Api/AiStocks.Api.csproj": {
-    "mtime": 1786903062.2303102,
-    "ast_hash": "fdf67aa404f7367d0ebaa7142af98d43",
+    "mtime": 1786986563.5905547,
+    "ast_hash": "f3ecd0557149bdfa98610ce007e8c49a",
     "semantic_hash": ""
   },
   "src/AiStocks.Api/ApiEndpointResults.cs": {
@@ -975,13 +975,13 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Api/PreviewDtos.cs": {
-    "mtime": 1786903691.1266775,
-    "ast_hash": "b94cb9129e9504c293407a319ba0c85d",
+    "mtime": 1786986037.492251,
+    "ast_hash": "34c7830b8d378384ac75280942b8747f",
     "semantic_hash": ""
   },
   "src/AiStocks.Api/PreviewRaceStore.cs": {
-    "mtime": 1786906667.805697,
-    "ast_hash": "45fac7aff1139c8ac49a30397282117d",
+    "mtime": 1786986080.5650945,
+    "ast_hash": "8cee50a33aa84547e32aef095405bc74",
     "semantic_hash": ""
   },
   "src/AiStocks.Api/ProblemDtos.cs": {
@@ -990,13 +990,13 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Api/Program.cs": {
-    "mtime": 1786903559.1960828,
-    "ast_hash": "9254d878fc01a5e938bfcfcfded755dd",
+    "mtime": 1786985988.9713006,
+    "ast_hash": "bc26a7ce2debd4e5cc537f746343ea01",
     "semantic_hash": ""
   },
   "src/AiStocks.Api/packages.lock.json": {
-    "mtime": 1786903062.2303102,
-    "ast_hash": "b9ed8a385d92b9f54f2fa3b812fa486b",
+    "mtime": 1786985732.802284,
+    "ast_hash": "9fb3b1374629102bd1de908b3f325119",
     "semantic_hash": ""
   },
   "src/AiStocks.Security/AccessAuthentication.cs": {
@@ -1030,13 +1030,13 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Ui/wwwroot/app.js": {
-    "mtime": 1786907142.57125,
-    "ast_hash": "1c32e1996ccef8fbf60d41a27d1226a2",
+    "mtime": 1786987048.4400537,
+    "ast_hash": "b53ec1433248396d4e50cc075d59e4dc",
     "semantic_hash": ""
   },
   "tests/AiStocks.Api.Tests/AiExhibitionFlowTests.cs": {
-    "mtime": 1786906589.5081415,
-    "ast_hash": "941a08e5a9c727296484f5ba0397db38",
+    "mtime": 1786986102.1535172,
+    "ast_hash": "5c16fe93fde423b3250955cda13ca412",
     "semantic_hash": ""
   },
   "tests/AiStocks.Api.Tests/AiStocks.Api.Tests.csproj": {
@@ -1050,8 +1050,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Api.Tests/ApiEndpointInventoryTests.cs": {
-    "mtime": 1786903062.21431,
-    "ast_hash": "c04df926806561f5e000b611ae932849",
+    "mtime": 1786985732.802284,
+    "ast_hash": "1d21ff0442ac0fe7b3031abf82958b61",
     "semantic_hash": ""
   },
   "tests/AiStocks.Api.Tests/PreviewTradingFlowTests.cs": {
@@ -1065,8 +1065,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Api.Tests/packages.lock.json": {
-    "mtime": 1786903062.2303102,
-    "ast_hash": "37e06fa633ed78084b3850b0da9477e0",
+    "mtime": 1786985732.802284,
+    "ast_hash": "3ff6dfa408f76485b3174632bcb92f1f",
     "semantic_hash": ""
   },
   "tests/postgres/bootstrap.sql": {
@@ -1075,8 +1075,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Ui/wwwroot/index.html": {
-    "mtime": 1786903691.290681,
-    "ast_hash": "1ddb1c64d7a3b6e67b0883ec3870a7e4",
+    "mtime": 1786987060.7962956,
+    "ast_hash": "d13bd6837722a405bf4515e5aff23e77",
     "semantic_hash": ""
   },
   "scripts/export-copilot-env.py": {
@@ -1100,13 +1100,13 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionCycle.cs": {
-    "mtime": 1786907511.3187041,
-    "ast_hash": "7c90a4e9aec8ef4207b76914737592ab",
+    "mtime": 1786987462.8001716,
+    "ast_hash": "ae7388d1274d0d954c854d9a3362a902",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionDecisionParser.cs": {
-    "mtime": 1786904150.5237753,
-    "ast_hash": "f8a1393217796b1c9fbc86b0af1ee993",
+    "mtime": 1786985758.954796,
+    "ast_hash": "89f418bb343e3ea3630530d37e9174f3",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionOptions.cs": {
@@ -1115,8 +1115,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionPromptBuilder.cs": {
-    "mtime": 1786904150.7517798,
-    "ast_hash": "350ea3e42471fa79b5a41a2bbcaa87e1",
+    "mtime": 1786987462.8721728,
+    "ast_hash": "7fe043cee440d71edc50a870f2a1c48e",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionSchedulerService.cs": {
@@ -1155,13 +1155,13 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionCycleTests.cs": {
-    "mtime": 1786907488.0222332,
-    "ast_hash": "c7e619ec65c137b58ce54fac99f15251",
+    "mtime": 1786987555.102043,
+    "ast_hash": "80bfd5da1f2b5604818db5c6b579bfeb",
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionDecisionParserTests.cs": {
-    "mtime": 1786904150.8237813,
-    "ast_hash": "e63ecb692fce7752f533372c160ea2b3",
+    "mtime": 1786985758.954796,
+    "ast_hash": "7591053ab4fbc0f21d2e327a96d03df9",
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionOptionsTests.cs": {
@@ -1170,8 +1170,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionPromptBuilderTests.cs": {
-    "mtime": 1786904164.8600593,
-    "ast_hash": "ef093561e160b86eeccca9841b8e60e1",
+    "mtime": 1786987474.3124027,
+    "ast_hash": "75e490f36e8774ef17e0571639b843ce",
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/packages.lock.json": {
@@ -1182,6 +1182,21 @@
   "tests/test_no_broker_capability.py": {
     "mtime": 1786907217.0967565,
     "ast_hash": "6d50155535a43aed4935f83d1ea2388f",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Api/DelayedNasdaqInstrumentStore.cs": {
+    "mtime": 1786986556.914424,
+    "ast_hash": "96a17b67ec655f20b4cda2c6faba005c",
+    "semantic_hash": ""
+  },
+  "tests/AiStocks.Api.Tests/DelayedNasdaqApiTests.cs": {
+    "mtime": 1786986655.584357,
+    "ast_hash": "bc355feb57b4940d635fc0f865d37e31",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Ui/wwwroot/exhibition-contract.js": {
+    "mtime": 1786987015.943417,
+    "ast_hash": "73f3dc1d90e614f48878978a690b401b",
     "semantic_hash": ""
   }
 }

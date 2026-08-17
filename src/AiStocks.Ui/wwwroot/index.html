@@ -8,6 +8,7 @@
   <title>AI Stocks · Stock Race</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/runtime-config.js"></script>
+  <script src="/exhibition-contract.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -21,7 +22,7 @@
       <a href="/leaderboard" data-route="leaderboard">Leaderboard</a>
     </nav>
     <div class="topbar-actions" aria-label="Preview status">
-      <span class="data-badge">Fixture data</span>
+      <span class="data-badge" id="data-badge">Fixture data</span>
       <span class="api-state connecting" id="api-state" role="status" aria-live="polite"><i aria-hidden="true"></i> Service connecting</span>
     </div>
   </header>
@@ -140,7 +141,7 @@
   <main id="ai-race-page" hidden>
     <section class="dashboard-head" aria-labelledby="ai-race-title">
       <div class="page-intro">
-        <p class="eyebrow">AI-only fixture exhibition</p>
+        <p class="eyebrow">AI-only delayed-data exhibition</p>
         <h1 id="ai-race-title">AI Race</h1>
         <p>Four fixed AI participants, each with a separate simulated portfolio.</p>
       </div>
@@ -153,8 +154,9 @@
       <div class="activity" id="ai-activity" aria-live="polite"></div>
     </section>
     <aside class="disclosure exhibition-disclosure">
-      <strong>AI fixture exhibition.</strong> Prices and fills are fixture-backed and non-live.
-      Portfolios are volatile. This is not the strict 2026 contest.
+      <strong>Delayed-data exhibition.</strong> Data is official Nasdaq XSTO and at least
+      15-minute delayed, non-live, paper-only, and HOLD-only. Portfolios are volatile.
+      This is not the strict 2026 contest.
     </aside>
   </main>
 
@@ -190,8 +192,8 @@
 
       <aside class="leaderboard-notes" aria-label="Leaderboard details">
         <article class="panel exhibition-notice">
-          <strong>AI fixture exhibition.</strong>
-          <p>Prices and fills are fixture-backed and non-live. Portfolios are volatile. This is not the strict 2026 contest.</p>
+          <strong>Delayed-data exhibition.</strong>
+          <p>Data is official Nasdaq XSTO. Observations are at least 15-minute delayed, non-live, paper-only, and HOLD-only. Portfolios are volatile. This is not the strict 2026 contest.</p>
         </article>
         <article class="panel rule-card">
           <span class="rule-number">01</span>
@@ -203,7 +205,7 @@
         </article>
         <article class="panel rule-card fixture-rule">
           <span class="rule-number">03</span>
-          <div><h2>Preview fixtures</h2><p>Prices are illustrative, non-live fixtures. Restarting the API resets the race.</p></div>
+          <div><h2>Delayed observations</h2><p>The official Nasdaq XSTO observations are non-live and cannot be traded in this exhibition.</p></div>
         </article>
         <a class="primary leaderboard-trade-link" href="/">Open trading workspace</a>
       </aside>

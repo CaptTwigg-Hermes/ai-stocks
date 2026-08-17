@@ -55,7 +55,7 @@ public sealed class ExhibitionCycle(
     {
         var instrumentsJson = await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
         var progressJson = await api.GetProgressAsync(cancellationToken).ConfigureAwait(false);
-        var instrumentIds = ReadFixtureInstrumentIds(instrumentsJson);
+        var instrumentIds = ReadDelayedInstrumentIds(instrumentsJson);
         var failures = new List<ExhibitionAgentFailure>();
         var succeeded = 0;
         foreach (var agent in ContestContract.Agents)
@@ -70,6 +70,8 @@ public sealed class ExhibitionCycle(
                 var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson);
                 var execution = await invoker.InvokeAsync(agent, prompt, cancellationToken).ConfigureAwait(false);
                 var decision = new ExhibitionDecisionParser().Parse(execution.StandardOutput, agent, instrumentIds);
+                if (decision.Action != ExhibitionAction.Hold)
+                    throw new InvalidOperationException("Non-HOLD decisions are forbidden before API submission.");
                 var verified = new List<VerifiedEvidence>(decision.Evidence.Count);
                 foreach (var claim in decision.Evidence)
                     verified.Add(await evidenceVerifier.VerifyAsync(claim, cancellationToken).ConfigureAwait(false));
@@ -151,21 +153,31 @@ public sealed class ExhibitionCycle(
     private static string StatusJson(string runId, AgentDefinition agent, string status, string? error, DateTimeOffset occurredAt) =>
         JsonSerializer.Serialize(new { runId, agentId = agent.Id, modelId = agent.ModelId, status, error, occurredAt }, JsonOptions);
 
-    private static HashSet<string> ReadFixtureInstrumentIds(string json)
+    private static HashSet<string> ReadDelayedInstrumentIds(string json)
     {
         using var document = StrictJson.Parse(json, 2 * 1024 * 1024);
         if (document.RootElement.ValueKind != JsonValueKind.Object ||
             !document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array ||
-            !document.RootElement.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != "preview-fixtures")
-            throw new InvalidOperationException("Instrument response must be a preview-fixtures object.");
+            !document.RootElement.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != ExhibitionDataContract.DataMode)
+            throw new InvalidOperationException("Instrument response must contain official delayed Nasdaq XSTO data.");
         var result = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in items.EnumerateArray())
         {
             if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("id", out var id) || id.ValueKind != JsonValueKind.String ||
-                string.IsNullOrWhiteSpace(id.GetString()) || !result.Add(id.GetString()!))
-                throw new InvalidOperationException("Every fixture instrument must have a unique non-empty id.");
+                string.IsNullOrWhiteSpace(id.GetString()) || !result.Add(id.GetString()!) ||
+                !item.TryGetProperty("executedAt", out var executedElement) || !executedElement.TryGetDateTimeOffset(out var executedAt) ||
+                !item.TryGetProperty("availableAt", out var availableElement) || !availableElement.TryGetDateTimeOffset(out var availableAt) ||
+                availableAt < executedAt.AddMinutes(15) ||
+                !item.TryGetProperty("exchange", out var exchange) || exchange.GetString() != "XSTO" ||
+                !item.TryGetProperty("currency", out var currency) || currency.GetString() != "SEK" ||
+                !item.TryGetProperty("isPreviewPrice", out var isPreviewPrice) || isPreviewPrice.ValueKind != JsonValueKind.False ||
+                item.TryGetProperty("priceDkk", out var priceDkk) && priceDkk.ValueKind != JsonValueKind.Null ||
+                !item.TryGetProperty("source", out var source) || source.GetString() != ExhibitionDataContract.Source ||
+                !item.TryGetProperty("delayMinutes", out var delayMinutes) || !delayMinutes.TryGetInt32(out var delay) || delay != 15 ||
+                !item.TryGetProperty("tradable", out var tradable) || tradable.ValueKind != JsonValueKind.False)
+                throw new InvalidOperationException("Every delayed instrument must have exact non-tradable Nasdaq metadata and a unique non-empty id.");
         }
-        if (result.Count == 0) throw new InvalidOperationException("Fixture instrument response cannot be empty.");
+        if (result.Count == 0) throw new InvalidOperationException("Delayed instrument response cannot be empty.");
         return result;
     }
 
@@ -174,9 +186,10 @@ public sealed class ExhibitionCycle(
         using var document = StrictJson.Parse(json, 2 * 1024 * 1024);
         var root = document.RootElement;
         if (root.ValueKind != JsonValueKind.Object ||
-            !root.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != "preview-fixtures" ||
+            !root.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != ExhibitionDataContract.DataMode ||
             !root.TryGetProperty("isNonLive", out var isNonLive) || isNonLive.ValueKind != JsonValueKind.True ||
             !root.TryGetProperty("strictContest", out var strictContest) || strictContest.ValueKind != JsonValueKind.False ||
+            !root.TryGetProperty("holdOnly", out var holdOnly) || holdOnly.ValueKind != JsonValueKind.True ||
             !root.TryGetProperty("participants", out var participants) || participants.ValueKind != JsonValueKind.Array)
             return false;
         var matchingParticipants = 0;
@@ -184,7 +197,11 @@ public sealed class ExhibitionCycle(
         foreach (var participant in participants.EnumerateArray())
         {
             if (participant.ValueKind != JsonValueKind.Object ||
-                !participant.TryGetProperty("agentId", out var agentId) || !agentId.TryGetGuid(out var parsedAgentId) ||
+                !participant.TryGetProperty("portfolio", out var portfolio) || portfolio.ValueKind != JsonValueKind.Object ||
+                !portfolio.TryGetProperty("dataMode", out var portfolioDataMode) ||
+                portfolioDataMode.GetString() != ExhibitionDataContract.DataMode)
+                return false;
+            if (!participant.TryGetProperty("agentId", out var agentId) || !agentId.TryGetGuid(out var parsedAgentId) ||
                 parsedAgentId != agent.Id)
                 continue;
             targetIdentityCount++;

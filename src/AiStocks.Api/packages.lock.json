@@ -5,6 +5,12 @@
       "aistocks.core": {
         "type": "Project"
       },
+      "aistocks.marketdata": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )"
+        }
+      },
       "aistocks.security": {
         "type": "Project"
       }

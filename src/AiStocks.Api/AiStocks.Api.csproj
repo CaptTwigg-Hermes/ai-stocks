@@ -8,7 +8,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AiStocks.Core\AiStocks.Core.csproj" />
+    <ProjectReference Include="..\AiStocks.MarketData\AiStocks.MarketData.csproj" />
     <ProjectReference Include="..\AiStocks.Security\AiStocks.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AiStocks.Api.Tests" />
   </ItemGroup>
 
 </Project>

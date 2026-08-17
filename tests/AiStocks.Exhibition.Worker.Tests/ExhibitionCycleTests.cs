@@ -105,6 +105,53 @@ public sealed class ExhibitionCycleTests
         Assert.Equal(affectedAgent.Id, result.Failures[0].AgentId);
     }
 
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public async Task RunAsync_ReconciliationRejectsMissingFixtureOrMixedPortfolioProvenance(
+        bool omitPortfolio, bool fixturePortfolio, bool mixedPortfolio)
+    {
+        var affectedAgent = ContestContract.Agents[0];
+        var api = new FakeApi
+        {
+            LoseDecisionResponseAgentId = affectedAgent.Id,
+            OmitReconciliationPortfolio = omitPortfolio,
+            FixtureReconciliationPortfolio = fixturePortfolio,
+            MixedReconciliationPortfolio = mixedPortfolio
+        };
+        var cycle = new ExhibitionCycle(api, new FakeInvoker { FailingAgentId = null }, new FakeVerifier(),
+            new ExhibitionHealthState(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(3, result.Succeeded);
+        Assert.Single(result.Failures);
+        Assert.Equal(affectedAgent.Id, result.Failures[0].AgentId);
+    }
+
+    [Theory]
+    [InlineData("XNAS", "SEK", false, false)]
+    [InlineData("XSTO", "DKK", false, false)]
+    [InlineData("XSTO", "SEK", true, false)]
+    [InlineData("XSTO", "SEK", false, true)]
+    public async Task RunAsync_RejectsWrongVenueCurrencyPreviewOrDkkInstrumentMetadata(
+        string exchange, string currency, bool isPreviewPrice, bool includePriceDkk)
+    {
+        var api = new FakeApi
+        {
+            InstrumentExchange = exchange,
+            InstrumentCurrency = currency,
+            InstrumentIsPreviewPrice = isPreviewPrice,
+            IncludeInstrumentPriceDkk = includePriceDkk
+        };
+        var cycle = new ExhibitionCycle(api, new FakeInvoker { FailingAgentId = null }, new FakeVerifier(),
+            new ExhibitionHealthState(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None));
+    }
+
     [Fact]
     public async Task RunAsync_RecordsOneFailureButRunsAndPostsAttestedResultsForOtherAgents()
     {
@@ -128,8 +175,8 @@ public sealed class ExhibitionCycleTests
         var posted = JsonDocument.Parse(api.Posts[0]);
         Assert.Equal("copilot", posted.RootElement.GetProperty("runtimeProvider").GetString());
         Assert.Equal(new string('a', 64), posted.RootElement.GetProperty("reportSha256").GetString());
-        Assert.Equal("buy", posted.RootElement.GetProperty("action").GetString());
-        Assert.Equal("SE0000115446", posted.RootElement.GetProperty("instrumentId").GetString());
+        Assert.Equal("hold", posted.RootElement.GetProperty("action").GetString());
+        Assert.Equal(JsonValueKind.Null, posted.RootElement.GetProperty("instrumentId").ValueKind);
         Assert.StartsWith("20260816T120000Z-", posted.RootElement.GetProperty("runId").GetString(), StringComparison.Ordinal);
     }
 
@@ -141,10 +188,24 @@ public sealed class ExhibitionCycleTests
         public bool OmitQueuedAt { get; init; }
         public bool DuplicateReconciliationParticipant { get; init; }
         public bool AmbiguousDuplicateTargetIdentity { get; init; }
+        public bool OmitReconciliationPortfolio { get; init; }
+        public bool FixtureReconciliationPortfolio { get; init; }
+        public bool MixedReconciliationPortfolio { get; init; }
+        public string InstrumentExchange { get; init; } = "XSTO";
+        public string InstrumentCurrency { get; init; } = "SEK";
+        public bool InstrumentIsPreviewPrice { get; init; }
+        public bool IncludeInstrumentPriceDkk { get; init; }
         private string? committedDecision;
         public List<string> Posts { get; } = [];
         public List<string> Statuses { get; } = [];
-        public Task<string> GetInstrumentsAsync(CancellationToken cancellationToken) => Task.FromResult("{\"items\":[{\"id\":\"SE0000115446\",\"dataMode\":\"preview-fixtures\"}],\"dataMode\":\"preview-fixtures\"}");
+        public Task<string> GetInstrumentsAsync(CancellationToken cancellationToken)
+        {
+            var priceDkk = IncludeInstrumentPriceDkk ? ",\"priceDkk\":123.45" : string.Empty;
+            return Task.FromResult("{\"items\":[{\"id\":\"SE0000115446\",\"exchange\":\"" + InstrumentExchange +
+                "\",\"currency\":\"" + InstrumentCurrency + "\",\"isPreviewPrice\":" +
+                InstrumentIsPreviewPrice.ToString().ToLowerInvariant() + priceDkk +
+                ",\"executedAt\":\"2026-08-16T10:00:00Z\",\"availableAt\":\"2026-08-16T10:15:00Z\",\"source\":\"Nasdaq Nordic MiFID II delayed post-trade\",\"delayMinutes\":15,\"tradable\":false}],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\"}");
+        }
         public Task<string> GetProgressAsync(CancellationToken cancellationToken)
         {
             if (committedDecision is not null)
@@ -166,24 +227,38 @@ public sealed class ExhibitionCycleTests
                         completedAt = OmitReconciliationTimestamps ? (DateTimeOffset?)null : DateTimeOffset.Parse("2026-08-16T12:00:01Z")
                     }
                 };
+                if (!OmitReconciliationPortfolio)
+                    participant["portfolio"] = new
+                    {
+                        dataMode = FixtureReconciliationPortfolio
+                            ? "preview-fixtures"
+                            : "official-nasdaq-xsto-15m-delayed"
+                    };
                 var snapshotParticipants = DuplicateReconciliationParticipant
-                    ? new[] { participant, participant }
+                    ? new List<Dictionary<string, object?>> { participant, participant }
                     : AmbiguousDuplicateTargetIdentity
-                        ? new[]
+                        ? new List<Dictionary<string, object?>>
                         {
                             participant,
-                            new Dictionary<string, object?>(participant) { ["modelId"] = "wrong-model" }
+                            new(participant) { ["modelId"] = "wrong-model" }
                         }
-                        : new[] { participant };
+                        : new List<Dictionary<string, object?>> { participant };
+                if (MixedReconciliationPortfolio)
+                    snapshotParticipants.Add(new Dictionary<string, object?>
+                    {
+                        ["agentId"] = ContestContract.Agents[1].Id,
+                        ["portfolio"] = new { dataMode = "preview-fixtures" }
+                    });
                 return Task.FromResult(JsonSerializer.Serialize(new
                 {
                     participants = snapshotParticipants,
-                    dataMode = "preview-fixtures",
+                    dataMode = "official-nasdaq-xsto-15m-delayed",
                     isNonLive = true,
-                    strictContest = false
+                    strictContest = false,
+                    holdOnly = true
                 }));
             }
-            return Task.FromResult("{\"participants\":[" + string.Join(',', ContestContract.Agents.Select(a => "{\"agentId\":\"" + a.Id.ToString("D") + "\",\"portfolio\":{\"cashDkk\":100000,\"holdings\":[]}}")) + "],\"isNonLive\":true,\"strictContest\":false}");
+            return Task.FromResult("{\"participants\":[" + string.Join(',', ContestContract.Agents.Select(a => "{\"agentId\":\"" + a.Id.ToString("D") + "\",\"portfolio\":{\"cashDkk\":100000,\"holdings\":[],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\"}}")) + "],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\",\"isNonLive\":true,\"strictContest\":false,\"holdOnly\":true}");
         }
         public Task PostDecisionAsync(string runId, string json, CancellationToken cancellationToken)
         {
@@ -215,9 +290,7 @@ public sealed class ExhibitionCycleTests
         {
             Agents.Add(agent.Id);
             if (agent.Id == FailingAgentId) throw new InvalidOperationException("outage");
-            var output = agent == ContestContract.Agents[1]
-                ? $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"buy","instrumentId":"SE0000115446","quantity":1,"reason":"Verified fixture opportunity","confidence":0.5,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}"""
-                : $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"No verified opportunity","confidence":0.5,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}""";
+            var output = $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"Delayed data is HOLD-only","confidence":0.5,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}""";
             return Task.FromResult(new ResearchExecutionResult(output, string.Empty, new InvocationProvenance
             {
                 AgentId = agent.Id,

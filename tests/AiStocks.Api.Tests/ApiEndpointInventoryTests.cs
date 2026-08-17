@@ -129,6 +129,7 @@ public sealed class AiExhibitionEndpointTests
 internal sealed class AiExhibitionApiFactory : WebApplicationFactory<Program>
 {
     public const string Secret = "0123456789abcdef0123456789abcdef";
+    private static readonly DelayedNasdaqFixture Archive = DelayedNasdaqFixture.Create();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -136,5 +137,6 @@ internal sealed class AiExhibitionApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("PREVIEW_MODE", "1");
         builder.UseSetting("AI_EXHIBITION_MODE", "1");
         builder.UseSetting("AI_EXHIBITION_KEY", Secret);
+        builder.UseSetting("AI_EXHIBITION_ARCHIVE_PATH", Archive.Path);
     }
 }
