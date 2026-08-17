@@ -121,6 +121,7 @@ def runtime_endpoint_table(executable: str, findings: list[str], environment_nam
         "AI_EXHIBITION_API_ORIGIN": "https://api.example.invalid",
         "AI_EXHIBITION_KEY": "x" * 32,
         "HERMES_CREDENTIAL_FILE": str(ROOT / ".env.example"),
+        "Exhibition__HermesExecutable": shutil.which("false") or "/bin/false",
     })
     try:
         result = subprocess.run(  # noqa: S603  # nosec B603
