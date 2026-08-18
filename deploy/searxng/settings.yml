@@ -1,11 +1,13 @@
 use_default_settings:
   engines:
     keep_only:
-      - bing
+      - bing news
 
 engines:
-  - name: bing
+  - name: bing news
     disabled: false
+    categories:
+      - general
 
 server:
   bind_address: "0.0.0.0"

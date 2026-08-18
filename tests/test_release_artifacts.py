@@ -373,13 +373,20 @@ def test_preview_exhibition_has_internal_pinned_search_service():
     assert exhibition["environment"]["SEARXNG_URL"] == "http://search:8080"
     settings = yaml.safe_load((ROOT / "deploy/searxng/settings.yml").read_text())
     assert "json" in settings["search"]["formats"]
-    assert settings["use_default_settings"]["engines"]["keep_only"] == ["bing"]
+    assert settings["use_default_settings"]["engines"]["keep_only"] == ["bing news"]
     engines = {engine["name"]: engine for engine in settings["engines"]}
-    assert set(engines) == {"bing"}
-    assert all(engine["disabled"] is False for engine in engines.values())
+    assert engines == {
+        "bing news": {
+            "name": "bing news",
+            "disabled": False,
+            "categories": ["general"],
+        }
+    }
     dockerfile = (ROOT / "Dockerfile").read_text()
     assert "searxng/searxng@sha256:3aed6b4bfb4e6a2b3b94c890dafb3f35cb2588493b83818434aa260e8bdeb4d4 AS search" in dockerfile
-    assert "COPY --chown=977:977 deploy/searxng/settings.yml" in dockerfile
+    assert "COPY --chown=977:977 deploy/searxng/settings.yml /opt/ai-stocks-searxng/settings.yml" in dockerfile
+    assert "ENV SEARXNG_SETTINGS_PATH=/opt/ai-stocks-searxng/settings.yml" in dockerfile
+    assert "COPY --chown=977:977 deploy/searxng/settings.yml /etc/searxng/settings.yml" not in dockerfile
     assert "USER 977:977" in dockerfile
     workflow = (ROOT / ".github/workflows/publish-images.yml").read_text()
     assert "docker image inspect ai-stocks-search-verification" in workflow
