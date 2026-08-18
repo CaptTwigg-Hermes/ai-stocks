@@ -52,6 +52,7 @@ public sealed class ExhibitionDecisionParser
         ArgumentNullException.ThrowIfNull(json);
         var bytes = new UTF8Encoding(false, true).GetBytes(json);
         if (bytes.Length is 0 or > 256 * 1024) throw Invalid("Decision JSON is empty or oversized.");
+        bytes = ExtractSingleDecisionObject(json, bytes);
         try
         {
             using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions
@@ -97,6 +98,26 @@ public sealed class ExhibitionDecisionParser
         {
             throw Invalid("Decision JSON is malformed or contains an invalid field.", exception);
         }
+    }
+
+    private static byte[] ExtractSingleDecisionObject(string response, byte[] responseBytes)
+    {
+        var firstNonWhitespace = 0;
+        while (firstNonWhitespace < response.Length && char.IsWhiteSpace(response[firstNonWhitespace]))
+            firstNonWhitespace++;
+        if (firstNonWhitespace < response.Length && response[firstNonWhitespace] == '{')
+            return responseBytes;
+
+        var objectStart = response.IndexOf('{', StringComparison.Ordinal);
+        if (objectStart < 0) throw Invalid("Decision response does not contain a JSON object.");
+        var prefix = response.AsSpan(0, objectStart);
+        if (Encoding.UTF8.GetByteCount(prefix) > 4 * 1024 || prefix.Contains('}') ||
+            prefix.Contains('\0') || prefix.Contains('`'))
+            throw Invalid("Decision response has an invalid leading envelope.");
+        foreach (var character in prefix)
+            if (char.IsControl(character) && !char.IsWhiteSpace(character))
+                throw Invalid("Decision response has an invalid leading envelope.");
+        return new UTF8Encoding(false, true).GetBytes(response[objectStart..]);
     }
 
     private static List<EvidenceClaim> ParseEvidence(JsonElement element)

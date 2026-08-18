@@ -9,6 +9,25 @@ namespace AiStocks.Exhibition.Worker.Tests;
 public sealed class ExhibitionCycleTests
 {
     [Fact]
+    public async Task RunAsync_RetriesOneInvalidFinalResponseWithoutWeakeningParser()
+    {
+        var affected = ContestContract.Agents[1];
+        var api = new FakeApi();
+        var invoker = new FakeInvoker { FailingAgentId = null, MalformedFirstAgentId = affected.Id };
+        var cycle = new ExhibitionCycle(api, invoker, new FakeVerifier(), new ExhibitionHealthState(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(4, result.Succeeded);
+        Assert.Empty(result.Failures);
+        Assert.Equal(2, invoker.InvocationCounts[affected.Id]);
+        Assert.All(ContestContract.Agents.Where(agent => agent.Id != affected.Id),
+            agent => Assert.Equal(1, invoker.InvocationCounts[agent.Id]));
+        Assert.Contains("FINAL response must start with {", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RunAsync_QueueStatusFailureForOneAgent_DoesNotPreventOtherAgents()
     {
         var failedAgent = ContestContract.Agents[0];
@@ -367,15 +386,23 @@ public sealed class ExhibitionCycleTests
     private sealed class FakeInvoker : IExhibitionModelInvoker
     {
         public Guid? FailingAgentId { get; init; } = ContestContract.Agents[0].Id;
+        public Guid? MalformedFirstAgentId { get; init; }
         public string Action { get; init; } = "hold";
         public List<Guid> Agents { get; } = [];
+        public Dictionary<Guid, int> InvocationCounts { get; } = [];
+        public Dictionary<Guid, List<string>> Prompts { get; } = [];
         public Task<ResearchExecutionResult> InvokeAsync(AgentDefinition agent, string prompt, CancellationToken cancellationToken)
         {
             Agents.Add(agent.Id);
+            InvocationCounts[agent.Id] = InvocationCounts.GetValueOrDefault(agent.Id) + 1;
+            if (!Prompts.TryGetValue(agent.Id, out var prompts)) Prompts[agent.Id] = prompts = [];
+            prompts.Add(prompt);
             if (agent.Id == FailingAgentId) throw new InvalidOperationException("outage");
             var instrument = Action == "hold" ? "null" : "\"SE0000115446\"";
             var quantity = Action == "hold" ? 0 : 1;
-            var output = $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"{{Action}}","instrumentId":{{instrument}},"quantity":{{quantity}},"reason":"Assumed-fill paper decision","confidence":0.5,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}""";
+            var output = agent.Id == MalformedFirstAgentId && InvocationCounts[agent.Id] == 1
+                ? "Web research completed, but this is not JSON."
+                : $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"{{Action}}","instrumentId":{{instrument}},"quantity":{{quantity}},"reason":"Assumed-fill paper decision","confidence":0.5,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}""";
             return Task.FromResult(new ResearchExecutionResult(output, string.Empty, new InvocationProvenance
             {
                 AgentId = agent.Id,

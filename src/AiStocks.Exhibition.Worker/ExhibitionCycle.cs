@@ -69,8 +69,8 @@ public sealed class ExhibitionCycle(
                 await api.PostStatusAsync(StatusJson(runId, agent, "running", null, DateTimeOffset.UtcNow), cancellationToken)
                     .ConfigureAwait(false);
                 var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson);
-                var execution = await invoker.InvokeAsync(agent, prompt, cancellationToken).ConfigureAwait(false);
-                var decision = new ExhibitionDecisionParser().Parse(execution.StandardOutput, agent, observations);
+                var (execution, decision) = await InvokeValidDecisionAsync(agent, runId, prompt, observations, cancellationToken)
+                    .ConfigureAwait(false);
                 DelayedObservation? selectedObservation = null;
                 if (decision.InstrumentId is not null)
                     selectedObservation = observations[decision.InstrumentId];
@@ -152,6 +152,31 @@ public sealed class ExhibitionCycle(
         }
         health.Complete(DateTimeOffset.UtcNow, failures.Count, failures.FirstOrDefault()?.Error);
         return new ExhibitionCycleResult(scheduledAt, succeeded, failures);
+    }
+
+    private async Task<(ResearchExecutionResult Execution, ExhibitionDecision Decision)> InvokeValidDecisionAsync(
+        AgentDefinition agent,
+        string runId,
+        string prompt,
+        IReadOnlyDictionary<string, DelayedObservation> observations,
+        CancellationToken cancellationToken)
+    {
+        var parser = new ExhibitionDecisionParser();
+        var execution = await invoker.InvokeAsync(agent, prompt, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return (execution, parser.Parse(execution.StandardOutput, agent, observations));
+        }
+        catch (ExhibitionDecisionException exception)
+        {
+            logger.LogWarning(exception,
+                "Exhibition agent {AgentId} returned an invalid final response for {RunId}; retrying once with the strict parser unchanged",
+                agent.Id, runId);
+        }
+
+        var retryPrompt = ExhibitionPromptBuilder.RetryAfterInvalidFinalResponse(prompt);
+        execution = await invoker.InvokeAsync(agent, retryPrompt, cancellationToken).ConfigureAwait(false);
+        return (execution, parser.Parse(execution.StandardOutput, agent, observations));
     }
 
     private static string StatusJson(string runId, AgentDefinition agent, string status, string? error, DateTimeOffset occurredAt) =>

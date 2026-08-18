@@ -5,6 +5,28 @@ namespace AiStocks.Exhibition.Worker.Tests;
 
 public sealed class ExhibitionDecisionParserTests
 {
+    [Fact]
+    public void Parse_AcceptsOneStrictDecisionObjectAfterBoundedPlainTextLeadIn()
+    {
+        var json = "Web research found no qualifying evidence, so the decision is HOLD.\n\n" +
+            $$"""{"agentId":"{{Agent.Id:D}}","modelId":"{{Agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"No qualifying evidence","confidence":0.5,"evidence":[]}""";
+
+        var decision = new ExhibitionDecisionParser().Parse(json, Agent, Observations);
+
+        Assert.Equal(ExhibitionAction.Hold, decision.Action);
+    }
+
+    [Theory]
+    [InlineData("trailing commentary")]
+    [InlineData("{}")]
+    public void Parse_RejectsAnythingAfterTheSingleDecisionObject(string suffix)
+    {
+        var json = "Lead-in only.\n" +
+            $$"""{"agentId":"{{Agent.Id:D}}","modelId":"{{Agent.ModelId}}","action":"hold","instrumentId":null,"quantity":0,"reason":"No qualifying evidence","confidence":0.5,"evidence":[]}{{suffix}}""";
+
+        Assert.Throws<ExhibitionDecisionException>(() => new ExhibitionDecisionParser().Parse(json, Agent, Observations));
+    }
+
     private static readonly AgentDefinition Agent = ContestContract.Agents[0];
     private static readonly IReadOnlyDictionary<string, DateTimeOffset> Observations =
         new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal)

@@ -5,6 +5,11 @@ namespace AiStocks.Exhibition.Worker;
 
 public static class ExhibitionPromptBuilder
 {
+    public static string RetryAfterInvalidFinalResponse(string originalPrompt) => originalPrompt + """
+
+        RETRY: Your previous final response was rejected because it was not the exact JSON object required above. Repeat the autonomous decision. You may research again. Your FINAL response must start with {, end with }, and contain only the required JSON object—no lead-in, markdown fence, or trailing commentary. Do not invent evidence or force a trade.
+        """;
+
     public static string Build(AgentDefinition agent, string runId, string instrumentsJson, string progressJson)
     {
         if (!ContestContract.IsExactAgent(agent.Id, agent.ModelId)) throw new InvalidOperationException("Unknown contest agent.");
