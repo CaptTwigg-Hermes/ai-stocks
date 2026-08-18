@@ -550,8 +550,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Research/Execution/HermesResearchRunner.cs": {
-    "mtime": 1787082931.6313608,
-    "ast_hash": "960a862397172a441784f14e7ebe7e8a",
+    "mtime": 1787083630.2693188,
+    "ast_hash": "9d0a8521c8cc613452a8276fbe1f5c71",
     "semantic_hash": ""
   },
   "src/AiStocks.Research/packages.lock.json": {
@@ -740,8 +740,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Research.Tests/HermesResearchRunnerTests.cs": {
-    "mtime": 1787082926.3672557,
-    "ast_hash": "7511f841fd07daa72f67445ae116f979",
+    "mtime": 1787083635.8934312,
+    "ast_hash": "7c2ee07243897f8fcac31c053097f436",
     "semantic_hash": ""
   },
   "tests/AiStocks.Research.Tests/ResearchDecisionAttestorTests.cs": {
@@ -1115,8 +1115,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionPromptBuilder.cs": {
-    "mtime": 1787082699.7627306,
-    "ast_hash": "5a658ff3acaca5ae2ff9ce0aae43692c",
+    "mtime": 1787083655.9818325,
+    "ast_hash": "45c5d1c5f5ef3e7743a5536b50b5239c",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionSchedulerService.cs": {
@@ -1170,8 +1170,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionPromptBuilderTests.cs": {
-    "mtime": 1787082689.4385245,
-    "ast_hash": "6708646d3c780271abb581aaaa7c222d",
+    "mtime": 1787083642.6015651,
+    "ast_hash": "4fa0cca365673e3711f5bebe34f7a906",
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/packages.lock.json": {

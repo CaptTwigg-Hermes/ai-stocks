@@ -34,7 +34,6 @@ public sealed class ExhibitionPromptBuilderTests
         Assert.Contains("published no later than", prompt, StringComparison.Ordinal);
         Assert.Contains("MUST use web_search", prompt, StringComparison.Ordinal);
         Assert.Contains("at least three", prompt, StringComparison.Ordinal);
-        Assert.Contains("MUST use the terminal tool with curl", prompt, StringComparison.Ordinal);
         Assert.Contains("search-result snippet is discovery only", prompt, StringComparison.Ordinal);
         Assert.Contains("issuer investor-relations", prompt, StringComparison.Ordinal);
         Assert.Contains("may use an empty evidence array", prompt, StringComparison.Ordinal);

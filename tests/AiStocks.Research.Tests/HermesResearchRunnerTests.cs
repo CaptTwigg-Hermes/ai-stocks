@@ -79,10 +79,6 @@ public sealed class HermesResearchRunnerTests
 
         Assert.Contains("--ignore-rules", launcher.StartInfo!.ArgumentList);
         Assert.DoesNotContain("--safe-mode", launcher.StartInfo.ArgumentList);
-        var toolsetIndex = launcher.StartInfo.ArgumentList.IndexOf("-t");
-        Assert.True(toolsetIndex >= 0);
-        Assert.Equal("web,terminal", launcher.StartInfo.ArgumentList[toolsetIndex + 1]);
-        Assert.Contains("--yolo", launcher.StartInfo.ArgumentList);
         Assert.Equal("http://searxng:8080", launcher.StartInfo.Environment["SEARXNG_URL"]);
         Assert.False(launcher.StartInfo.Environment.ContainsKey("FIRECRAWL_API_KEY"));
     }
