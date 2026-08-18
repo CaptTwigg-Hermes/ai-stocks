@@ -1,4 +1,11 @@
-use_default_settings: true
+use_default_settings:
+  engines:
+    keep_only:
+      - bing
+
+engines:
+  - name: bing
+    disabled: false
 
 server:
   bind_address: "0.0.0.0"

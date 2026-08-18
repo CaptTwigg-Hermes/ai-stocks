@@ -900,8 +900,8 @@
     "semantic_hash": ""
   },
   "tests/test_release_artifacts.py": {
-    "mtime": 1787029004.4231527,
-    "ast_hash": "57f359fe7e6e40aa0869e8e0eedf1f1f",
+    "mtime": 1787080637.7415485,
+    "ast_hash": "beffd096c0e36a8df4cc73791498d305",
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/009_operations_bootstrap_privileges.sql": {
@@ -1210,8 +1210,8 @@
     "semantic_hash": ""
   },
   "deploy/searxng/settings.yml": {
-    "mtime": 1787028360.478434,
-    "ast_hash": "f751be8ded848b38d35dbfef799375f5",
+    "mtime": 1787080651.3978217,
+    "ast_hash": "e33f501972da2de0f619460919e047a6",
     "semantic_hash": ""
   }
 }
