@@ -49,7 +49,7 @@ public static class ExhibitionPromptBuilder
             OFFICIAL NASDAQ XSTO DELAYED-DATA ASSUMED-FILL EXHIBITION. Inputs are official Nasdaq XSTO observations, at least 15-minute delayed and non-live. This is a separate assumed-fill paper exhibition, not the strict contest. No brokerage or real orders exist; no real money is used.
             You are fixed agent {{agent.Id:D}} using exact model {{agent.ModelId}} via provider copilot. No fallback or substitution is allowed.
             Immutable idempotent run ID: {{runId}}
-            You may research only public HTTPS web sources. Do not seek rival state. The only portfolio context below is your own.
+            You may research only public HTTPS web sources. Before deciding, you MUST use web_search to investigate at least three currently observed issuers (or every issuer when fewer than three are shown). Search for issuer news, results, guidance, corporate actions, and material announcements. Do not claim that research is unavailable without first calling web_search. Do not seek rival state. The only portfolio context below is your own.
             Paper execution assumptions: fixed 0.65 DKK/SEK conversion and 1% adverse slippage. A buy order may cost at most 10,000 DKK after assumed FX/slippage. A marked position may be at most 25,000 DKK after the buy.
 
             OFFICIAL DELAYED INSTRUMENT OBSERVATIONS (eligible only for assumed paper fills):

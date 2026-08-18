@@ -32,6 +32,8 @@ public sealed class ExhibitionPromptBuilderTests
         Assert.Contains("current instrument ID", prompt, StringComparison.Ordinal);
         Assert.Contains("whole positive quantity", prompt, StringComparison.Ordinal);
         Assert.Contains("published no later than", prompt, StringComparison.Ordinal);
+        Assert.Contains("MUST use web_search", prompt, StringComparison.Ordinal);
+        Assert.Contains("at least three", prompt, StringComparison.Ordinal);
         Assert.Contains("may use an empty evidence array", prompt, StringComparison.Ordinal);
         Assert.Contains("30000", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("99999", prompt, StringComparison.Ordinal);

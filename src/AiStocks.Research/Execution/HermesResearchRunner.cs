@@ -16,6 +16,7 @@ public sealed record ResearchExecutionOptions
     public int MaximumErrorBytes { get; init; } = 256 * 1024;
     public TimeSpan Timeout { get; init; } = TimeSpan.FromMinutes(10);
     public TimeSpan DrainTimeout { get; init; } = TimeSpan.FromSeconds(10);
+    public bool AllowControlledUserConfig { get; init; }
     public string RuntimeAttestationDirectory { get; init; } =
         Path.Combine(Path.GetTempPath(), "aistocks-hermes-runtime-attestation");
     public IReadOnlyDictionary<string, string> Environment { get; init; } =
@@ -142,7 +143,8 @@ public sealed class HermesResearchRunner
     private static readonly ImmutableHashSet<string> AllowedEnvironmentVariables =
         ImmutableHashSet.Create(StringComparer.Ordinal,
             "HOME", "HERMES_HOME", "PATH", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR",
-            "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "COPILOT_TOKEN", "GH_TOKEN", "GITHUB_TOKEN");
+            "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "COPILOT_TOKEN", "GH_TOKEN", "GITHUB_TOKEN",
+            "SEARXNG_URL");
 
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly IResearchProcessLauncher _launcher;
@@ -277,7 +279,7 @@ public sealed class HermesResearchRunner
         startInfo.ArgumentList.Add("copilot");
         startInfo.ArgumentList.Add("-t");
         startInfo.ArgumentList.Add("web");
-        startInfo.ArgumentList.Add("--safe-mode");
+        startInfo.ArgumentList.Add(_options.AllowControlledUserConfig ? "--ignore-rules" : "--safe-mode");
         startInfo.ArgumentList.Add("--usage-file");
         startInfo.ArgumentList.Add(runtimeReportPath);
         startInfo.ArgumentList.Add("-z");

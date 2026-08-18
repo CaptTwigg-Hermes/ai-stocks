@@ -351,11 +351,34 @@ def test_github_publishes_every_dockge_image_target():
     assert setup["uses"] == "actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1"
     assert setup["with"]["dotnet-version"] == "10.0.x"
     assert setup_index < negative_capability_index
-    assert targets == ["api", "ui", "exhibition", "app", "collector", "worker", "reporter", "operations", "backup-operations"]
+    assert targets == ["api", "ui", "exhibition", "search", "app", "collector", "worker", "reporter", "operations", "backup-operations"]
     build = workflow["jobs"]["publish"]["steps"][-1]
     assert build["with"]["target"] == "${{ matrix.target }}"
     assert build["with"]["push"] is True
     assert "ghcr.io/capttwigg-hermes/ai-stocks:${{ matrix.target }}-latest" in build["with"]["tags"]
+
+
+def test_preview_exhibition_has_internal_pinned_search_service():
+    compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
+    search = compose["services"]["search"]
+    exhibition = compose["services"]["exhibition"]
+    assert search["profiles"] == ["preview"]
+    assert search["image"].endswith(":search-${AISTOCKS_IMAGE_VERSION:-latest}")
+    assert "ports" not in search
+    assert search["read_only"] is True
+    assert search["cap_drop"] == ["ALL"]
+    assert search["user"] == "977:977"
+    assert all("uid=977" in mount and "gid=977" in mount for mount in search["tmpfs"])
+    assert exhibition["depends_on"]["search"]["condition"] == "service_healthy"
+    assert exhibition["environment"]["SEARXNG_URL"] == "http://search:8080"
+    settings = (ROOT / "deploy/searxng/settings.yml").read_text()
+    assert "formats:" in settings and "- json" in settings
+    dockerfile = (ROOT / "Dockerfile").read_text()
+    assert "searxng/searxng@sha256:3aed6b4bfb4e6a2b3b94c890dafb3f35cb2588493b83818434aa260e8bdeb4d4 AS search" in dockerfile
+    assert "COPY --chown=977:977 deploy/searxng/settings.yml" in dockerfile
+    assert "USER 977:977" in dockerfile
+    workflow = (ROOT / ".github/workflows/publish-images.yml").read_text()
+    assert "docker image inspect ai-stocks-search-verification" in workflow
 
 
 def test_release_gate_and_restore_fail_closed_with_scheduled_backup():

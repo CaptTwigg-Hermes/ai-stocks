@@ -121,6 +121,25 @@ services:
       start_period: 20s
     networks: [egress]
 
+  search:
+    <<: *runtime-security
+    profiles: ["preview"]
+    user: "977:977"
+    depends_on:
+      preview-guard:
+        condition: service_completed_successfully
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:search-${AISTOCKS_IMAGE_VERSION:-latest}
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=977,gid=977,mode=1770
+      - /var/cache/searxng:rw,noexec,nosuid,nodev,uid=977,gid=977,mode=1770
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [egress]
+
   exhibition:
     <<: *runtime-security
     profiles: ["preview"]
@@ -129,6 +148,8 @@ services:
         condition: service_completed_successfully
       api:
         condition: service_healthy
+      search:
+        condition: service_healthy
     image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:exhibition-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -136,6 +157,7 @@ services:
       AI_EXHIBITION_KEY: ${AI_EXHIBITION_KEY:?set a random AI exhibition internal key}
       AI_EXHIBITION_INTERVAL_SECONDS: ${AI_EXHIBITION_INTERVAL_SECONDS:-3600}
       HERMES_CREDENTIAL_FILE: /run/hermes-credentials/copilot.env
+      SEARXNG_URL: http://search:8080
       TZ: Europe/Stockholm
       SEQ_SERVER_URL: ${SEQ_SERVER_URL:-http://192.168.50.2:5341}
       SEQ_API_KEY: ${SEQ_API_KEY:-}

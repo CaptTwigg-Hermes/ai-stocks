@@ -5,6 +5,7 @@ public sealed record ExhibitionOptions
     public required Uri ApiBaseUrl { get; init; }
     public required string InternalKey { get; init; }
     public required string CopilotCredentialFile { get; init; }
+    public Uri SearchBaseUrl { get; init; } = new("http://search:8080");
     public string HermesHomeRoot { get; init; } = "/dev/shm/aistocks-exhibition";
     public string HermesExecutable { get; init; } = "/opt/hermes/bin/hermes";
     public TimeSpan CycleInterval { get; init; } = TimeSpan.FromHours(1);
@@ -21,6 +22,10 @@ public sealed record ExhibitionOptions
             !Path.IsPathFullyQualified(HermesHomeRoot) ||
             !Path.IsPathFullyQualified(HermesExecutable))
             throw new InvalidOperationException("Credential, HERMES_HOME root, and executable paths must be absolute.");
+        if (!SearchBaseUrl.IsAbsoluteUri || SearchBaseUrl.Scheme is not ("http" or "https") ||
+            !string.IsNullOrEmpty(SearchBaseUrl.UserInfo) || !string.IsNullOrEmpty(SearchBaseUrl.Query) ||
+            !string.IsNullOrEmpty(SearchBaseUrl.Fragment))
+            throw new InvalidOperationException("SearchBaseUrl must be an absolute credential-free HTTP(S) origin.");
         if (CycleInterval < TimeSpan.FromMinutes(1) || CycleInterval > TimeSpan.FromHours(24))
             throw new InvalidOperationException("CycleInterval must be between one minute and 24 hours.");
         if (HttpTimeout < TimeSpan.FromSeconds(1) || HttpTimeout > TimeSpan.FromMinutes(2))

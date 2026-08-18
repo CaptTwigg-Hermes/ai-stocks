@@ -20,13 +20,15 @@ public sealed class HermesExhibitionModelInvoker(
                 ["HERMES_HOME"] = home.Path,
                 ["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? "/usr/local/bin:/usr/bin:/bin",
                 ["LANG"] = "C.UTF-8",
-                ["LC_ALL"] = "C.UTF-8"
+                ["LC_ALL"] = "C.UTF-8",
+                ["SEARXNG_URL"] = options.SearchBaseUrl.GetLeftPart(UriPartial.Authority)
             };
             var runner = new HermesResearchRunner(launcher, new ResearchExecutionOptions
             {
                 HermesExecutable = options.HermesExecutable,
                 RuntimeAttestationDirectory = attestationDirectory,
                 Environment = environment,
+                AllowControlledUserConfig = true,
                 Timeout = TimeSpan.FromMinutes(10),
                 DrainTimeout = TimeSpan.FromSeconds(10),
                 MaximumPromptBytes = 256 * 1024,

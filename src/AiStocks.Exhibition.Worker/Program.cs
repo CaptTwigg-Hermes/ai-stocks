@@ -76,6 +76,8 @@ static ExhibitionOptions LoadOptions(IConfiguration configuration)
         ApiBaseUrl = new Uri(Required(configuration, "Exhibition:ApiBaseUrl", "AI_EXHIBITION_API_ORIGIN"), UriKind.Absolute),
         InternalKey = Required(configuration, "Exhibition:InternalKey", "AI_EXHIBITION_KEY"),
         CopilotCredentialFile = Required(configuration, "Exhibition:CopilotCredentialFile", "HERMES_CREDENTIAL_FILE"),
+        SearchBaseUrl = new Uri(configuration["Exhibition:SearchBaseUrl"] ??
+            configuration["SEARXNG_URL"] ?? "http://search:8080", UriKind.Absolute),
         HermesHomeRoot = configuration["Exhibition:HermesHomeRoot"] ?? "/dev/shm/aistocks-exhibition",
         HermesExecutable = configuration["Exhibition:HermesExecutable"] ?? "/opt/hermes/bin/hermes",
         CycleInterval = TimeSpan.FromSeconds(configuration.GetValue<int?>("Exhibition:CycleIntervalSeconds") ??

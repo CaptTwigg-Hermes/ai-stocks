@@ -60,13 +60,18 @@ jobs:
           uv run pytest -q
           uv run python scripts/prove_no_broker.py
 
+      - name: Verify non-root search runtime
+        run: |
+          docker build --target search -t ai-stocks-search-verification .
+          test "$(docker image inspect ai-stocks-search-verification --format '{{.Config.User}}')" = "977:977"
+
   publish:
     needs: verify
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        target: [api, ui, exhibition, app, collector, worker, reporter, operations, backup-operations]
+        target: [api, ui, exhibition, search, app, collector, worker, reporter, operations, backup-operations]
     steps:
       - name: Check out exact source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

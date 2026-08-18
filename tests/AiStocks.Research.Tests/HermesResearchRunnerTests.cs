@@ -59,6 +59,30 @@ public sealed class HermesResearchRunnerTests
         Assert.Equal(result.Provenance.Arguments, result.Provenance.Arguments.ToImmutableArray());
     }
 
+    [Fact]
+    public async Task RunAsync_ResearchEnabledIsolation_UsesControlledConfigAndSearxngOnly()
+    {
+        var launcher = new CapturingLauncher(new FakeProcess("{}", "", 0));
+        var runner = new HermesResearchRunner(launcher, TestOptions() with
+        {
+            AllowControlledUserConfig = true,
+            Environment = new Dictionary<string, string>
+            {
+                ["HOME"] = "/isolated",
+                ["HERMES_HOME"] = "/isolated",
+                ["SEARXNG_URL"] = "http://searxng:8080",
+                ["FIRECRAWL_API_KEY"] = "must-not-pass"
+            }
+        });
+
+        await runner.RunAsync(AgentId, "gpt-5.6-sol", "prompt", CancellationToken.None);
+
+        Assert.Contains("--ignore-rules", launcher.StartInfo!.ArgumentList);
+        Assert.DoesNotContain("--safe-mode", launcher.StartInfo.ArgumentList);
+        Assert.Equal("http://searxng:8080", launcher.StartInfo.Environment["SEARXNG_URL"]);
+        Assert.False(launcher.StartInfo.Environment.ContainsKey("FIRECRAWL_API_KEY"));
+    }
+
     [Theory]
     [InlineData("gpt-5.6-sol")]
     [InlineData("claude-opus-4.8")]

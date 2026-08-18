@@ -21,4 +21,20 @@ public sealed class ExhibitionOptionsTests
 
         Assert.Contains("32", error.Message, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("file:///tmp/search")]
+    [InlineData("http://user:password@searxng:8080")]
+    public void Validate_RejectsUnsafeSearchOrigins(string value)
+    {
+        var options = new ExhibitionOptions
+        {
+            ApiBaseUrl = new Uri("https://api.example.test"),
+            InternalKey = new string('k', 32),
+            CopilotCredentialFile = "/run/secrets/copilot.json",
+            SearchBaseUrl = new Uri(value)
+        };
+
+        Assert.Throws<InvalidOperationException>(options.Validate);
+    }
 }

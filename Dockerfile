@@ -55,6 +55,11 @@ COPY --from=build --chown=aistocks:aistocks /out/ui ./
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "AiStocks.Ui.dll"]
 
+FROM searxng/searxng@sha256:3aed6b4bfb4e6a2b3b94c890dafb3f35cb2588493b83818434aa260e8bdeb4d4 AS search
+COPY --chown=977:977 deploy/searxng/settings.yml /etc/searxng/settings.yml
+RUN chown -R 977:977 /etc/searxng
+USER 977:977
+
 FROM runtime AS app
 COPY --from=build --chown=aistocks:aistocks /out/web ./
 EXPOSE 8080
