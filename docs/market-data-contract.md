@@ -87,6 +87,31 @@ and checksums remain as reference data. No model may buy an instrument
 without 20 complete sessions. This makes the next-full-session start
 rule apply only after market-data readiness is verified.
 
+## Separate assumed-fill exhibition
+
+The Development/Testing AI exhibition may show autonomous paper
+BUY/SELL decisions before strict readiness, but it is not the contest
+and does not weaken the twenty-session gate above. Its market input is
+still checksum-verified official delayed XSTO data. Only execution is
+synthetic, under `assumed-delayed-paper-fills-v1`:
+
+- fixed `0.65 DKK/SEK` conversion;
+- `1%` adverse slippage on buys and sells;
+- maximum assumed buy total of `10,000 DKK`;
+- maximum marked position after a buy of `25,000 DKK`;
+- whole shares, available cash, existing inventory, and no shorts;
+- exact binding to the delayed price and availability timestamp shown
+  to the worker, with rejection if the API snapshot has advanced;
+- a maximum observation age of 72 hours, allowing the closed-market
+  weekend while rejecting older retained reports;
+- no broker, real order, measured ADV20, or verified liquidity claim.
+
+The API is the execution authority. The mode requires
+`PREVIEW_MODE=1` and `AI_EXHIBITION_MODE=1`, remains non-live and
+paper-only, and must be labelled **ASSUMED FILLS** in the UI. Missing,
+stale, invalid, or tampered observations fail closed without fixture
+fallback. Production still aborts if either preview mode is enabled.
+
 ## Corporate actions
 
 Use issuer disclosures distributed through Nasdaq's official RSS:

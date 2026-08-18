@@ -28,14 +28,21 @@ public sealed class ExhibitionDecisionParser
     public ExhibitionDecision Parse(
         string json,
         AgentDefinition expectedAgent,
-        IReadOnlyDictionary<string, DateTimeOffset> currentObservations)
+        IReadOnlyDictionary<string, DateTimeOffset> currentObservations) =>
+        Parse(json, expectedAgent, currentObservations.ToDictionary(
+            item => item.Key, item => new DelayedObservation(0m, item.Value), StringComparer.Ordinal));
+
+    public ExhibitionDecision Parse(
+        string json,
+        AgentDefinition expectedAgent,
+        IReadOnlyDictionary<string, DelayedObservation> currentObservations)
     {
         var decision = ParseKnown(json, expectedAgent,
             currentObservations.Keys.ToHashSet(StringComparer.Ordinal));
         if (decision.Action != ExhibitionAction.Hold &&
             decision.InstrumentId is not null &&
-            currentObservations.TryGetValue(decision.InstrumentId, out var availableAt) &&
-            decision.Evidence.Any(item => item.PublishedAt > availableAt))
+            currentObservations.TryGetValue(decision.InstrumentId, out var observation) &&
+            decision.Evidence.Any(item => item.PublishedAt > observation.AvailableAt))
             throw Invalid("Trade evidence cannot be published after the selected observation was available.");
         return decision;
     }

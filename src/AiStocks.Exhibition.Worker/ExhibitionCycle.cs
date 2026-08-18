@@ -23,6 +23,7 @@ public interface IExhibitionModelInvoker
 public sealed record ExhibitionAgentFailure(Guid AgentId, string ModelId, string Error);
 public sealed record ExhibitionCycleResult(DateTimeOffset ScheduledAt, int Succeeded, IReadOnlyList<ExhibitionAgentFailure> Failures);
 public sealed record ExhibitionHealth(string Status, bool PrerequisitesReady, DateTimeOffset? LastCycleCompletedAt, int LastCycleFailures, string? LastError);
+public sealed record DelayedObservation(decimal PriceSek, DateTimeOffset AvailableAt);
 
 public sealed class ExhibitionHealthState
 {
@@ -70,6 +71,9 @@ public sealed class ExhibitionCycle(
                 var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson);
                 var execution = await invoker.InvokeAsync(agent, prompt, cancellationToken).ConfigureAwait(false);
                 var decision = new ExhibitionDecisionParser().Parse(execution.StandardOutput, agent, observations);
+                DelayedObservation? selectedObservation = null;
+                if (decision.InstrumentId is not null)
+                    selectedObservation = observations[decision.InstrumentId];
                 var verified = new List<VerifiedEvidence>(decision.Evidence.Count);
                 foreach (var claim in decision.Evidence)
                     verified.Add(await evidenceVerifier.VerifyAsync(claim, cancellationToken).ConfigureAwait(false));
@@ -104,7 +108,9 @@ public sealed class ExhibitionCycle(
                     modelMatch = provenance.ModelId == provenance.RequestedModelId,
                     reportSha256 = provenance.RuntimeReportSha256,
                     completedAt = provenance.CompletedAt,
-                    promptSha256 = provenance.PromptSha256
+                    promptSha256 = provenance.PromptSha256,
+                    observedPriceSek = selectedObservation?.PriceSek,
+                    observationAvailableAt = selectedObservation?.AvailableAt
                 }, JsonOptions);
                 await api.PostDecisionAsync(runId, payload, cancellationToken).ConfigureAwait(false);
                 succeeded++;
@@ -151,14 +157,14 @@ public sealed class ExhibitionCycle(
     private static string StatusJson(string runId, AgentDefinition agent, string status, string? error, DateTimeOffset occurredAt) =>
         JsonSerializer.Serialize(new { runId, agentId = agent.Id, modelId = agent.ModelId, status, error, occurredAt }, JsonOptions);
 
-    private static Dictionary<string, DateTimeOffset> ReadDelayedObservations(string json)
+    private static Dictionary<string, DelayedObservation> ReadDelayedObservations(string json)
     {
         using var document = StrictJson.Parse(json, 2 * 1024 * 1024);
         if (document.RootElement.ValueKind != JsonValueKind.Object ||
             !document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array ||
             !document.RootElement.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != ExhibitionDataContract.DataMode)
             throw new InvalidOperationException("Instrument response must contain official delayed Nasdaq XSTO data.");
-        var result = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
+        var result = new Dictionary<string, DelayedObservation>(StringComparer.Ordinal);
         foreach (var item in items.EnumerateArray())
         {
             if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("id", out var id) || id.ValueKind != JsonValueKind.String ||
@@ -177,7 +183,7 @@ public sealed class ExhibitionCycle(
                 !item.TryGetProperty("tradable", out var tradable) || tradable.ValueKind != JsonValueKind.False ||
                 !item.TryGetProperty("paperTradable", out var paperTradable) || paperTradable.ValueKind != JsonValueKind.True)
                 throw new InvalidOperationException("Every delayed instrument must have a positive price, timestamps, and exact assumed-fill Nasdaq metadata.");
-            result.Add(id.GetString()!, availableAt);
+            result.Add(id.GetString()!, new(price, availableAt));
         }
         if (result.Count == 0) throw new InvalidOperationException("Delayed instrument response cannot be empty.");
         return result;

@@ -222,6 +222,9 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                     instrument.PaperTradable != true || instrument.ExecutedAt is null || instrument.AvailableAt is null ||
                     instrument.Price <= 0m || string.IsNullOrWhiteSpace(instrument.Source))
                     throw new PreviewOrderException("invalid-observation", "Instrument is not a verified delayed XSTO observation.");
+                if (request.ObservedPriceSek != instrument.Price || request.ObservationAvailableAt != instrument.AvailableAt)
+                    throw new PreviewOrderException("observation-mismatch",
+                        "Trade must bind to the exact delayed observation supplied to the worker.");
                 if (request.CompletedAt < instrument.AvailableAt.Value)
                     throw new PreviewOrderException("observation-not-available", "The delayed observation was not available when the decision completed.");
                 if (request.Evidence.Any(item => item.PublishedAt > instrument.AvailableAt.Value))
@@ -497,7 +500,8 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             .Select(item =>
             {
                 var instrument = current.SingleOrDefault(candidate => candidate.Id == item.Key)
-                    ?? account.Marks[item.Key];
+                    ?? throw new PreviewOrderException("stale-portfolio-mark",
+                        "AI exhibition portfolio cannot be valued without a current delayed observation.");
                 var priceDkk = Money(instrument.Price * AssumedSekToDkk);
                 return new PreviewHoldingDto(instrument.Id, instrument.Symbol, instrument.Name, item.Value,
                     priceDkk, Money(priceDkk * item.Value));
@@ -505,7 +509,8 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         var holdingsValue = Money(holdings.Sum(item => item.ValueDkk));
         var total = Money(account.CashDkk + holdingsValue);
         return new(account.DisplayName, StartingCashDkk, account.CashDkk, holdingsValue, total,
-            Percent((total - StartingCashDkk) / StartingCashDkk * 100m), holdings, dataMode);
+            Percent((total - StartingCashDkk) / StartingCashDkk * 100m), holdings, dataMode,
+            AssumedExecutionMode);
     }
 
     private static InstrumentDto Instrument(string id, string symbol, string name, string exchange,

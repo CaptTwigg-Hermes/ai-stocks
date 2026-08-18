@@ -7,6 +7,7 @@ public sealed class DelayedNasdaqInstrumentStore
 {
     public const string DataMode = "official-nasdaq-xsto-15m-delayed";
     private const int MaximumVerifiedReports = 32;
+    private static readonly TimeSpan MaximumObservationAge = TimeSpan.FromHours(72);
     private readonly string archivePath;
     private readonly TimeProvider clock;
     private readonly Action<ArchivedReport>? afterVerification;
@@ -53,7 +54,8 @@ public sealed class DelayedNasdaqInstrumentStore
             var bytes = ReadVerifiedBytes(report);
             foreach (var trade in NasdaqCsvParser.Parse(bytes, report.FetchedAt))
             {
-                if (trade.AvailableAt > asOf || trade.Venue != "XSTO" || trade.Currency != "SEK" || trade.PriceNotation != "MONE")
+                if (trade.AvailableAt > asOf || asOf - trade.AvailableAt > MaximumObservationAge ||
+                    trade.Venue != "XSTO" || trade.Currency != "SEK" || trade.PriceNotation != "MONE")
                     continue;
                 var instrument = TradeInstrumentMapper.TryResolve(trade, firds.Instruments);
                 if (instrument is null || instrument.Currency != "SEK" || instrument.Venue != "XSTO")

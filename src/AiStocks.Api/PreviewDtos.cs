@@ -60,7 +60,8 @@ public sealed record PreviewPortfolioDto(
     [property: JsonPropertyName("totalValueDkk")] decimal TotalValueDkk,
     [property: JsonPropertyName("returnPercent")] decimal ReturnPercent,
     [property: JsonPropertyName("holdings")] IReadOnlyList<PreviewHoldingDto> Holdings,
-    [property: JsonPropertyName("dataMode")] string DataMode);
+    [property: JsonPropertyName("dataMode")] string DataMode,
+    [property: JsonPropertyName("executionMode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExecutionMode = null);
 
 public sealed record PreviewLeaderboardEntryDto(
     [property: JsonPropertyName("rank")] int Rank,
@@ -163,4 +164,6 @@ public sealed record AiDecisionRequestDto(
     [property: JsonPropertyName("runtimeProvider")] string RuntimeProvider,
     [property: JsonPropertyName("runtimeModel")] string RuntimeModel,
     [property: JsonPropertyName("reportSha256")] string ReportSha256,
-    [property: JsonPropertyName("completedAt")] DateTimeOffset CompletedAt);
+    [property: JsonPropertyName("completedAt")] DateTimeOffset CompletedAt,
+    [property: JsonPropertyName("observedPriceSek")] decimal? ObservedPriceSek = null,
+    [property: JsonPropertyName("observationAvailableAt")] DateTimeOffset? ObservationAvailableAt = null);

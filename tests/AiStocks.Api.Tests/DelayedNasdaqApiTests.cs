@@ -99,7 +99,9 @@ public sealed class DelayedNasdaqApiTests
             runtimeProvider = "copilot",
             runtimeModel = "gpt-5.6-sol",
             reportSha256 = new string('b', 64),
-            completedAt
+            completedAt,
+            observedPriceSek = 91.25m,
+            observationAvailableAt = DateTimeOffset.Parse("2026-08-16T10:16:00Z")
         });
 
         Assert.Equal(System.Net.HttpStatusCode.Created, rejected.StatusCode);
@@ -115,6 +117,7 @@ public sealed class DelayedNasdaqApiTests
             .Single(item => item.GetProperty("agentId").GetGuid() == agentId);
         var portfolio = participant.GetProperty("portfolio");
         Assert.Equal(DelayedNasdaqInstrumentStore.DataMode, portfolio.GetProperty("dataMode").GetString());
+        Assert.Equal(PreviewRaceStore.AssumedExecutionMode, portfolio.GetProperty("executionMode").GetString());
         Assert.Equal(99_940.09m, portfolio.GetProperty("cashDkk").GetDecimal());
         Assert.Equal(1, Assert.Single(portfolio.GetProperty("holdings").EnumerateArray()).GetProperty("quantity").GetInt32());
 
@@ -131,6 +134,17 @@ public sealed class DelayedNasdaqApiTests
         var response = new DelayedNasdaqInstrumentStore(data.Path, clock).Search(null);
 
         Assert.Empty(response.Items);
+    }
+
+    [Fact]
+    public void Observation_older_than_the_bounded_exhibition_window_is_hidden()
+    {
+        using var data = DelayedNasdaqFixture.Create();
+        var exactlyAtLimit = new FixedTimeProvider(DateTimeOffset.Parse("2026-08-19T10:16:00Z"));
+        var pastLimit = new FixedTimeProvider(DateTimeOffset.Parse("2026-08-19T10:16:00Z").AddTicks(1));
+
+        Assert.NotEmpty(new DelayedNasdaqInstrumentStore(data.Path, exactlyAtLimit).Search(null).Items);
+        Assert.Empty(new DelayedNasdaqInstrumentStore(data.Path, pastLimit).Search(null).Items);
     }
 
     [Fact]

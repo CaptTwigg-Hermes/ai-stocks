@@ -214,6 +214,9 @@ public sealed class ExhibitionCycleTests
             Assert.Equal("buy", posted.RootElement.GetProperty("action").GetString());
             Assert.Equal("SE0000115446", posted.RootElement.GetProperty("instrumentId").GetString());
             Assert.Equal(1, posted.RootElement.GetProperty("quantity").GetInt32());
+            Assert.Equal(100m, posted.RootElement.GetProperty("observedPriceSek").GetDecimal());
+            Assert.Equal(DateTimeOffset.Parse("2026-08-16T10:15:00Z"),
+                posted.RootElement.GetProperty("observationAvailableAt").GetDateTimeOffset());
         });
     }
 

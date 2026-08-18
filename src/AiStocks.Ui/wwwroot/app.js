@@ -21,6 +21,8 @@
     tradePage: byId("trade-page"),
     leaderboardPage: byId("leaderboard-page"),
     aiRacePage: byId("ai-race-page"),
+    exhibitionFailurePage: byId("exhibition-failure-page"),
+    exhibitionFailureMessage: byId("exhibition-failure-message"),
     aiParticipants: byId("ai-participants"),
     aiActivity: byId("ai-activity"),
     aiRefresh: byId("ai-refresh"),
@@ -559,6 +561,10 @@
   function activateExhibition(data) {
     if (!isExhibitionResponse(data)) return false;
     document.body.classList.add("exhibition-mode");
+    ui.exhibitionFailurePage.hidden = true;
+    document.querySelectorAll("[data-exhibition-only]").forEach((element) => {
+      element.hidden = false;
+    });
     ui.dataBadge.textContent = "ASSUMED FILLS · Official Nasdaq XSTO · delayed · non-live · paper-only";
     document.querySelector('[data-route="trade"]').textContent = "AI Race";
     ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by assumed-fill paper portfolio value in DKK.";
@@ -579,16 +585,11 @@
   }
 
   function showExhibitionFailure(message) {
-    document.body.classList.add("exhibition-mode");
     ui.tradePage.hidden = true;
-    ui.aiRacePage.hidden = isLeaderboardPage;
-    ui.leaderboardPage.hidden = !isLeaderboardPage;
-    ui.aiRaceStatus.textContent = message;
-    ui.aiRaceStatus.classList.add("error");
-    ui.aiParticipants.setAttribute("aria-busy", "false");
-    ui.aiParticipants.replaceChildren(element("p", "panel empty", message));
-    ui.leaderboardPageStatus.textContent = message;
-    ui.leaderboardPageStatus.classList.add("error");
+    ui.aiRacePage.hidden = true;
+    ui.leaderboardPage.hidden = true;
+    ui.exhibitionFailurePage.hidden = false;
+    ui.exhibitionFailureMessage.textContent = message;
     serviceResult("ai-progress", false);
   }
 

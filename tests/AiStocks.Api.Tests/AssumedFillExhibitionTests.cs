@@ -23,6 +23,8 @@ public sealed class AssumedFillExhibitionTests
 
         Assert.False(submission.Replayed);
         Assert.Equal("assumed-delayed-paper-fills-v1", progress.ExecutionMode);
+        Assert.All(progress.Participants,
+            item => Assert.Equal("assumed-delayed-paper-fills-v1", item.Portfolio.ExecutionMode));
         Assert.True(progress.AssumedFills);
         Assert.False(progress.HoldOnly);
         Assert.Equal(0.65m, progress.AssumedSekToDkk);
@@ -179,6 +181,35 @@ public sealed class AssumedFillExhibitionTests
         Assert.Equal(780m, store.AiLeaderboard(driftedSnapshot).Items.Single(x => x.DisplayName == Agent.ModelId).ValueDkk - 99_343.50m);
     }
 
+    [Fact]
+    public void First_submission_is_bound_to_the_exact_observation_seen_by_the_worker()
+    {
+        var store = new PreviewRaceStore(TimeProvider.System);
+        var request = Decision("observation-drift-01", "buy", "SE0000108656", 10);
+        StartRun(store, request);
+        var newerSnapshot = Snapshot(Instrument("SE0000108656", "ERIC-B", 120m,
+            ExecutedAt.AddMinutes(1), AvailableAt.AddMinutes(1)));
+
+        var error = Assert.Throws<PreviewOrderException>(() => store.SubmitAi(request, newerSnapshot));
+
+        Assert.Equal("observation-mismatch", error.Code);
+        Assert.Equal(100_000m,
+            store.AiProgress(newerSnapshot).Participants.Single(x => x.AgentId == Agent.Id).Portfolio.CashDkk);
+    }
+
+    [Fact]
+    public void Progress_fails_closed_when_a_held_instrument_has_no_current_delayed_mark()
+    {
+        var store = new PreviewRaceStore(TimeProvider.System);
+        Submit(store, Decision("stale-mark-seed-01", "buy", "SE0000108656", 1),
+            Snapshot(Instrument("SE0000108656", "ERIC-B", 100m)));
+        var currentWithoutHolding = Snapshot(Instrument("SE0000115446", "VOLV-B", 200m));
+
+        var error = Assert.Throws<PreviewOrderException>(() => store.AiProgress(currentWithoutHolding));
+
+        Assert.Equal("stale-portfolio-mark", error.Code);
+    }
+
     private static AiDecisionSubmission Submit(PreviewRaceStore store, AiDecisionRequestDto request, InstrumentListDto snapshot)
     {
         StartRun(store, request);
@@ -194,7 +225,8 @@ public sealed class AssumedFillExhibitionTests
     private static AiDecisionRequestDto Decision(string runId, string action, string? instrumentId, int quantity,
         DateTimeOffset? completedAt = null) => new(runId, Agent.Id, Agent.ModelId, action, instrumentId, quantity,
         "Verified exhibition decision.", 0.75m, [Evidence(AvailableAt)], "copilot", Agent.ModelId,
-        new string('b', 64), completedAt ?? AvailableAt.AddMinutes(2));
+        new string('b', 64), completedAt ?? AvailableAt.AddMinutes(2),
+        action == "hold" ? null : 100m, action == "hold" ? null : AvailableAt);
 
     private static AiEvidenceDto Evidence(DateTimeOffset publishedAt) =>
         new("https://example.com/research", publishedAt, "Exact verified excerpt.", new string('a', 64));

@@ -160,6 +160,13 @@ def test_exhibition_leaderboard_is_ai_only_and_uses_ai_refresh():
     assert 'id="leaderboard-mode"' in html
     assert 'ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by assumed-fill paper portfolio value in DKK."' in script
     assert 'ui.leaderboardMode.textContent = "ASSUMED FILLS · AI-only non-live exhibition"' in script
+    assert html.count('data-exhibition-only hidden') == 2
+    assert 'id="exhibition-failure-page" hidden' in html
+    assert 'id="exhibition-failure-message"' in html
+    assert 'ui.exhibitionFailurePage.hidden = false;' in script
+    assert 'ui.exhibitionFailureMessage.textContent = message;' in script
+    assert 'document.querySelectorAll("[data-exhibition-only]").forEach((element) => {' in script
+    assert 'element.hidden = false;' in script
     assert 'src="/exhibition-contract.js" defer' in html
     assert 'data.dataMode !== dataMode' in contract
     assert 'data.executionMode !== executionMode' in contract

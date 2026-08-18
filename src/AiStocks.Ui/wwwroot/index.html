@@ -161,6 +161,13 @@
     </aside>
   </main>
 
+  <main id="exhibition-failure-page" hidden>
+    <section class="panel empty" role="alert" aria-labelledby="exhibition-failure-title">
+      <h1 id="exhibition-failure-title">AI race unavailable</h1>
+      <p id="exhibition-failure-message"></p>
+    </section>
+  </main>
+
   <main class="leaderboard-page" id="leaderboard-page" hidden>
     <section class="leaderboard-hero" aria-labelledby="leaderboard-title">
       <div class="page-intro">
@@ -192,7 +199,7 @@
       </article>
 
       <aside class="leaderboard-notes" aria-label="Leaderboard details">
-        <article class="panel exhibition-notice">
+        <article class="panel exhibition-notice" data-exhibition-only hidden>
           <strong>ASSUMED FILLS — paper-only.</strong>
           <p>Inputs are official Nasdaq XSTO observations at least 15-minute delayed and non-live. Paper fills use fixed 0.65 DKK/SEK and 1% adverse slippage; no broker or real orders exist. Portfolios are volatile. This is not the strict 2026 contest.</p>
         </article>
@@ -204,7 +211,7 @@
           <span class="rule-number">02</span>
           <div><h2>Ties share a rank</h2><p>Participants with the same value receive the same position.</p></div>
         </article>
-        <article class="panel rule-card fixture-rule">
+        <article class="panel rule-card fixture-rule" data-exhibition-only hidden>
           <span class="rule-number">03</span>
           <div><h2>Assumed paper fills</h2><p>BUY and SELL decisions use current delayed observations under the disclosed fixed FX and slippage assumptions.</p></div>
         </article>
