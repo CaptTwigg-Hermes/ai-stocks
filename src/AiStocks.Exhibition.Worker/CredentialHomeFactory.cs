@@ -28,6 +28,23 @@ public sealed class CredentialHomeFactory(string root, string credentialFile)
                 4096, FileOptions.Asynchronous | FileOptions.WriteThrough))
                 await input.CopyToAsync(output, 81920, cancellationToken).ConfigureAwait(false);
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(destination, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            var config = Path.Combine(home, "config.yaml");
+            await File.WriteAllTextAsync(config,
+                """
+                mcp_servers:
+                  research:
+                    command: "/opt/hermes/.venv/bin/python"
+                    args:
+                      - "/app/public_https_fetch_mcp.py"
+                    env:
+                      HOME: "/tmp"
+                      PYTHONDONTWRITEBYTECODE: "1"
+                    timeout: 30
+                    connect_timeout: 20
+                    sampling:
+                      enabled: false
+                """, cancellationToken).ConfigureAwait(false);
+            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(config, UnixFileMode.UserRead | UnixFileMode.UserWrite);
             return new EphemeralHermesHome(home);
         }
         catch

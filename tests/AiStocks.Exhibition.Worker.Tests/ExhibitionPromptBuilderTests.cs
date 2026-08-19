@@ -35,6 +35,8 @@ public sealed class ExhibitionPromptBuilderTests
         Assert.Contains("MUST use web_search", prompt, StringComparison.Ordinal);
         Assert.Contains("at least three", prompt, StringComparison.Ordinal);
         Assert.Contains("search-result snippet is discovery only", prompt, StringComparison.Ordinal);
+        Assert.Contains("mcp_research_fetch_public_https", prompt, StringComparison.Ordinal);
+        Assert.Contains("structured_article_text", prompt, StringComparison.Ordinal);
         Assert.Contains("issuer investor-relations", prompt, StringComparison.Ordinal);
         Assert.Contains("may use an empty evidence array", prompt, StringComparison.Ordinal);
         Assert.Contains("30000", prompt, StringComparison.Ordinal);

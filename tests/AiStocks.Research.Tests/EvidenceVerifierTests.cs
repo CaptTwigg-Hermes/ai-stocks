@@ -132,6 +132,24 @@ public sealed class EvidenceVerifierTests
     }
 
     [Fact]
+    public async Task VerifyAsync_AcceptsExactNewsArticleDescriptionFromFetchedStructuredMetadata()
+    {
+        const string html = """
+            <html><head>
+            <link rel="stylesheet" href="/site.css">
+            <meta property="article:published_time" content="2026-08-08T09:00:00Z">
+            <script type="application/ld+json">
+            {"@context":"https://schema.org","@type":"NewsArticle","datePublished":"2026-08-08T09:00:00Z","description":"Exact catalyst text"}
+            </script></head><body><p class="concealed">Other text</p></body></html>
+            """;
+
+        var verified = await Verifier(Response(HttpStatusCode.OK, html)).VerifyAsync(
+            Claim("https://example.com/news", "Exact catalyst text"), CancellationToken.None);
+
+        Assert.Equal("Exact catalyst text", verified.ExactExcerpt);
+    }
+
+    [Fact]
     public async Task VerifyAsync_RejectsExcerptSpanningSeparateVisibleBlocks()
     {
         var html = ValidHtml.Replace("Exact catalyst text", "<p>Exact catalyst</p><p>text</p>");

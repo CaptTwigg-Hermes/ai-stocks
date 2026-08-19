@@ -27,6 +27,7 @@ RUN apt-get update \
  && git -C /opt/hermes fetch --depth 1 origin "$HERMES_COMMIT" \
  && git -C /opt/hermes checkout --detach "$HERMES_COMMIT" \
  && uv sync --frozen --no-dev --extra cli --extra web --project /opt/hermes --python /usr/local/bin/python \
+ && uv pip install --python /opt/hermes/.venv/bin/python "mcp==1.28.1" \
  && mkdir -p /opt/hermes/bin \
  && ln -s /opt/hermes/.venv/bin/hermes /opt/hermes/bin/hermes \
  && test "$(git -C /opt/hermes rev-parse HEAD)" = "$HERMES_COMMIT" \
@@ -105,6 +106,7 @@ ENTRYPOINT ["dotnet", "AiStocks.Worker.dll"]
 
 FROM worker AS exhibition
 COPY --from=build --chown=aistocks:aistocks /out/exhibition /app
+COPY --chown=root:root scripts/public_https_fetch_mcp.py /app/public_https_fetch_mcp.py
 ENTRYPOINT ["dotnet", "AiStocks.Exhibition.Worker.dll"]
 
 FROM worker AS reporter

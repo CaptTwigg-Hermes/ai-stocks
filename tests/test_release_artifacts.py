@@ -322,6 +322,15 @@ def test_image_build_pins_hermes_source_and_frozen_lock():
     assert "USER aistocks" in dockerfile
 
 
+def test_exhibition_image_contains_narrow_public_https_mcp_fetcher():
+    dockerfile = (ROOT / "Dockerfile").read_text()
+    assert '"mcp==1.28.1"' in dockerfile
+    assert "public_https_fetch_mcp.py" in dockerfile
+    runner = (ROOT / "src/AiStocks.Research/Execution/HermesResearchRunner.cs").read_text()
+    assert '"web,research" : "web"' in runner
+    assert '"web,terminal"' not in runner
+
+
 def test_github_publishes_every_dockge_image_target():
     workflow = yaml.safe_load((ROOT / ".github/workflows/publish-images.yml").read_text())
     assert workflow["permissions"] == {"contents": "read", "packages": "write"}

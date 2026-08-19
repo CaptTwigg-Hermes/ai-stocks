@@ -360,12 +360,19 @@ public sealed partial class EvidenceVerifier : IEvidenceVerifier
         {
             var context = BrowsingContext.New(Configuration.Default.WithCss());
             using var document = await context.OpenAsync(request => request.Content(text), cancellationToken).ConfigureAwait(false);
+            var structuredArticleText = ExtractStructuredArticleText(document);
             if (document.QuerySelectorAll("link[rel]").Any(link =>
                 (link.GetAttribute("rel") ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .Contains("stylesheet", StringComparer.OrdinalIgnoreCase)))
+            {
+                if (structuredArticleText.Count > 0) return structuredArticleText;
                 throw new EvidenceVerificationException("Evidence HTML depends on an external stylesheet, so visible text cannot be proven from the retained representation.");
+            }
             if (document.QuerySelector("style, [style]") is not null)
+            {
+                if (structuredArticleText.Count > 0) return structuredArticleText;
                 throw new EvidenceVerificationException("Evidence HTML contains CSS whose browser visibility cannot be proven from the retained representation.");
+            }
             if (document.QuerySelector("[popover], select, datalist, object, iframe, canvas, audio, video, picture") is not null)
                 throw new EvidenceVerificationException("Evidence HTML contains unsupported native visibility semantics.");
             var roots = new List<IElement>();
@@ -415,6 +422,42 @@ public sealed partial class EvidenceVerifier : IEvidenceVerifier
 
         return text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
             .Select(NormalizeWhitespace).Where(value => value.Length > 0).ToArray();
+    }
+
+    private static IReadOnlyList<string> ExtractStructuredArticleText(IDocument document)
+    {
+        var values = new List<string>();
+        foreach (var script in document.QuerySelectorAll("script[type='application/ld+json']"))
+        {
+            try
+            {
+                using var json = JsonDocument.Parse(script.TextContent, new JsonDocumentOptions { MaxDepth = 64 });
+                CollectStructuredArticleText(json.RootElement, values);
+            }
+            catch (JsonException) { }
+        }
+        return values.Select(NormalizeWhitespace).Where(value => value.Length > 0)
+            .Distinct(StringComparer.Ordinal).ToArray();
+    }
+
+    private static void CollectStructuredArticleText(JsonElement element, List<string> values)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) CollectStructuredArticleText(item, values);
+            return;
+        }
+        if (element.ValueKind != JsonValueKind.Object) return;
+        if (element.TryGetProperty("@graph", out var graph)) CollectStructuredArticleText(graph, values);
+        if (!element.TryGetProperty("@type", out var type)) return;
+        var types = type.ValueKind == JsonValueKind.Array
+            ? type.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String)
+                .Select(item => item.GetString()).ToArray()
+            : new[] { type.ValueKind == JsonValueKind.String ? type.GetString() : null };
+        if (!types.Any(value => value is "Article" or "NewsArticle" or "PressRelease")) return;
+        foreach (var name in new[] { "headline", "description", "articleBody" })
+            if (element.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String)
+                values.Add(property.GetString() ?? string.Empty);
     }
 
     private static bool IsHidden(IElement element)

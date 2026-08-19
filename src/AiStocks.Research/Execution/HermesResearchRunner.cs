@@ -278,7 +278,7 @@ public sealed class HermesResearchRunner
         startInfo.ArgumentList.Add("--provider");
         startInfo.ArgumentList.Add("copilot");
         startInfo.ArgumentList.Add("-t");
-        startInfo.ArgumentList.Add("web");
+        startInfo.ArgumentList.Add(_options.AllowControlledUserConfig ? "web,research" : "web");
         startInfo.ArgumentList.Add(_options.AllowControlledUserConfig ? "--ignore-rules" : "--safe-mode");
         startInfo.ArgumentList.Add("--usage-file");
         startInfo.ArgumentList.Add(runtimeReportPath);

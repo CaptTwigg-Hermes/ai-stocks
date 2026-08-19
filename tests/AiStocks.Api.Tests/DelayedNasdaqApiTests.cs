@@ -5,6 +5,8 @@ using System.Text.Json;
 using AiStocks.MarketData;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AiStocks.Api.Tests;
 
@@ -195,6 +197,11 @@ internal sealed class DelayedNasdaqApiFactory(string archivePath) : WebApplicati
         builder.UseSetting("AI_EXHIBITION_MODE", "1");
         builder.UseSetting("AI_EXHIBITION_KEY", AiExhibitionApiFactory.Secret);
         builder.UseSetting("AI_EXHIBITION_ARCHIVE_PATH", archivePath);
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:20:00Z")));
+        });
     }
 }
 

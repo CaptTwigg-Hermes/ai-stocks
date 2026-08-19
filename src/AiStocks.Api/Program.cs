@@ -104,7 +104,8 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddSingleton(TimeProvider.System);
 if (localAuth) builder.Services.AddSingleton<PreviewRaceStore>();
 if (aiExhibitionArchivePath is not null)
-    builder.Services.AddSingleton(new DelayedNasdaqInstrumentStore(aiExhibitionArchivePath, TimeProvider.System));
+    builder.Services.AddSingleton(services => new DelayedNasdaqInstrumentStore(
+        aiExhibitionArchivePath, services.GetRequiredService<TimeProvider>()));
 
 var app = builder.Build();
 if (!localAuth) _ = app.Services.GetRequiredService<IAccessAssertionValidator>();
