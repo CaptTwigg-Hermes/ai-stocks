@@ -69,14 +69,12 @@ public sealed class ExhibitionCycle(
                 await api.PostStatusAsync(StatusJson(runId, agent, "running", null, DateTimeOffset.UtcNow), cancellationToken)
                     .ConfigureAwait(false);
                 var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson);
-                var (execution, decision) = await InvokeValidDecisionAsync(agent, runId, prompt, observations, cancellationToken)
+                var (execution, decision, verified) = await InvokeVerifiedDecisionAsync(
+                        agent, runId, prompt, observations, cancellationToken)
                     .ConfigureAwait(false);
                 DelayedObservation? selectedObservation = null;
                 if (decision.InstrumentId is not null)
                     selectedObservation = observations[decision.InstrumentId];
-                var verified = new List<VerifiedEvidence>(decision.Evidence.Count);
-                foreach (var claim in decision.Evidence)
-                    verified.Add(await evidenceVerifier.VerifyAsync(claim, cancellationToken).ConfigureAwait(false));
                 var provenance = execution.Provenance;
                 if (provenance.AgentId != agent.Id || provenance.ModelId != agent.ModelId ||
                     provenance.RequestedModelId != agent.ModelId || provenance.Provider != "copilot" ||
@@ -154,7 +152,7 @@ public sealed class ExhibitionCycle(
         return new ExhibitionCycleResult(scheduledAt, succeeded, failures);
     }
 
-    private async Task<(ResearchExecutionResult Execution, ExhibitionDecision Decision)> InvokeValidDecisionAsync(
+    private async Task<(ResearchExecutionResult Execution, ExhibitionDecision Decision, IReadOnlyList<VerifiedEvidence> Verified)> InvokeVerifiedDecisionAsync(
         AgentDefinition agent,
         string runId,
         string prompt,
@@ -163,20 +161,68 @@ public sealed class ExhibitionCycle(
     {
         var parser = new ExhibitionDecisionParser();
         var execution = await invoker.InvokeAsync(agent, prompt, cancellationToken).ConfigureAwait(false);
+        ExhibitionDecision decision;
         try
         {
-            return (execution, parser.Parse(execution.StandardOutput, agent, observations));
+            decision = parser.Parse(execution.StandardOutput, agent, observations);
         }
         catch (ExhibitionDecisionException exception)
         {
             logger.LogWarning(exception,
                 "Exhibition agent {AgentId} returned an invalid final response for {RunId}; retrying once with the strict parser unchanged",
                 agent.Id, runId);
+            var retryPrompt = ExhibitionPromptBuilder.RetryAfterInvalidFinalResponse(prompt);
+            execution = await invoker.InvokeAsync(agent, retryPrompt, cancellationToken).ConfigureAwait(false);
+            decision = parser.Parse(execution.StandardOutput, agent, observations);
+            return (execution, decision,
+                await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false));
         }
 
-        var retryPrompt = ExhibitionPromptBuilder.RetryAfterInvalidFinalResponse(prompt);
-        execution = await invoker.InvokeAsync(agent, retryPrompt, cancellationToken).ConfigureAwait(false);
-        return (execution, parser.Parse(execution.StandardOutput, agent, observations));
+        try
+        {
+            return (execution, decision,
+                await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false));
+        }
+        catch (RejectedEvidenceException exception)
+        {
+            var rejectedHost = exception.Host;
+            logger.LogWarning(exception,
+                "Exhibition agent {AgentId} supplied rejected evidence from {Host} for {RunId}; retrying once with another source host",
+                agent.Id, rejectedHost, runId);
+            var retryPrompt = ExhibitionPromptBuilder.RetryAfterRejectedEvidence(prompt, rejectedHost);
+            execution = await invoker.InvokeAsync(agent, retryPrompt, cancellationToken).ConfigureAwait(false);
+            decision = parser.Parse(execution.StandardOutput, agent, observations);
+            if (decision.Evidence.Any(claim =>
+                    StringComparer.OrdinalIgnoreCase.Equals(claim.Url.IdnHost, rejectedHost)))
+                throw new EvidenceVerificationException(
+                    "Corrective evidence reused the rejected source host.");
+            return (execution, decision,
+                await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false));
+        }
+    }
+
+    private async Task<IReadOnlyList<VerifiedEvidence>> VerifyEvidenceAsync(
+        ExhibitionDecision decision, CancellationToken cancellationToken)
+    {
+        var verified = new List<VerifiedEvidence>(decision.Evidence.Count);
+        foreach (var claim in decision.Evidence)
+        {
+            try
+            {
+                verified.Add(await evidenceVerifier.VerifyAsync(claim, cancellationToken).ConfigureAwait(false));
+            }
+            catch (EvidenceVerificationException exception)
+            {
+                throw new RejectedEvidenceException(claim.Url.IdnHost, exception);
+            }
+        }
+        return verified;
+    }
+
+    private sealed class RejectedEvidenceException(string host, EvidenceVerificationException innerException)
+        : Exception(innerException.Message, innerException)
+    {
+        public string Host { get; } = host;
     }
 
     private static string StatusJson(string runId, AgentDefinition agent, string status, string? error, DateTimeOffset occurredAt) =>

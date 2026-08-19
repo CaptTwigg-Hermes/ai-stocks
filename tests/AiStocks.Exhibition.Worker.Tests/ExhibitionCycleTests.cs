@@ -239,6 +239,62 @@ public sealed class ExhibitionCycleTests
         });
     }
 
+    [Fact]
+    public async Task RunAsync_RetriesRejectedEvidenceOnceWithADifferentSourceHost()
+    {
+        var affected = ContestContract.Agents[0];
+        var api = new FakeApi();
+        var invoker = new FakeInvoker
+        {
+            FailingAgentId = null,
+            Action = "buy",
+            AlternateEvidenceOnSecondInvocation = true,
+            RejectedEvidenceSecondOnFirstInvocation = true
+        };
+        var verifier = new FakeVerifier { RejectUrl = new Uri("https://rejected.example/news") };
+        var cycle = new ExhibitionCycle(api, invoker, verifier, new ExhibitionHealthState(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(4, result.Succeeded);
+        Assert.Empty(result.Failures);
+        Assert.Equal(2, invoker.InvocationCounts[affected.Id]);
+        Assert.All(ContestContract.Agents.Where(agent => agent.Id != affected.Id),
+            agent => Assert.Equal(1, invoker.InvocationCounts[agent.Id]));
+        Assert.Contains("different source host", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("rejected.example", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        using var posted = JsonDocument.Parse(api.Posts[0]);
+        Assert.Equal("https://alternate.example/news",
+            posted.RootElement.GetProperty("evidence")[0].GetProperty("url").GetString());
+    }
+
+    [Fact]
+    public async Task RunAsync_RejectsEvidenceCorrectionThatReusesTheRejectedHost()
+    {
+        var affected = ContestContract.Agents[0];
+        var api = new FakeApi();
+        var invoker = new FakeInvoker
+        {
+            FailingAgentId = null,
+            Action = "buy",
+            RejectedEvidenceSecondOnFirstInvocation = true,
+            ReuseRejectedEvidenceOnSecondInvocation = true
+        };
+        var verifier = new FakeVerifier { RejectUrl = new Uri("https://rejected.example/news") };
+        var cycle = new ExhibitionCycle(api, invoker, verifier, new ExhibitionHealthState(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(3, result.Succeeded);
+        Assert.Single(result.Failures);
+        Assert.Equal(affected.Id, result.Failures[0].AgentId);
+        Assert.Contains("reused the rejected source host", result.Failures[0].Error, StringComparison.Ordinal);
+        Assert.Equal(2, invoker.InvocationCounts[affected.Id]);
+        Assert.Equal(3, api.Posts.Count);
+    }
+
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]
@@ -388,6 +444,9 @@ public sealed class ExhibitionCycleTests
         public Guid? FailingAgentId { get; init; } = ContestContract.Agents[0].Id;
         public Guid? MalformedFirstAgentId { get; init; }
         public string Action { get; init; } = "hold";
+        public bool AlternateEvidenceOnSecondInvocation { get; init; }
+        public bool RejectedEvidenceSecondOnFirstInvocation { get; init; }
+        public bool ReuseRejectedEvidenceOnSecondInvocation { get; init; }
         public List<Guid> Agents { get; } = [];
         public Dictionary<Guid, int> InvocationCounts { get; } = [];
         public Dictionary<Guid, List<string>> Prompts { get; } = [];
@@ -400,9 +459,17 @@ public sealed class ExhibitionCycleTests
             if (agent.Id == FailingAgentId) throw new InvalidOperationException("outage");
             var instrument = Action == "hold" ? "null" : "\"SE0000115446\"";
             var quantity = Action == "hold" ? 0 : 1;
+            var evidenceUrl = ReuseRejectedEvidenceOnSecondInvocation && InvocationCounts[agent.Id] == 2
+                ? "https://rejected.example/news"
+                : AlternateEvidenceOnSecondInvocation && InvocationCounts[agent.Id] == 2
+                    ? "https://alternate.example/news"
+                    : "https://example.com/news";
+            var evidence = RejectedEvidenceSecondOnFirstInvocation && InvocationCounts[agent.Id] == 1
+                ? "[{\"url\":\"https://example.com/news\",\"publishedAt\":\"2026-08-16T10:00:00Z\",\"exactExcerpt\":\"Exact public text\"},{\"url\":\"https://rejected.example/news\",\"publishedAt\":\"2026-08-16T10:00:00Z\",\"exactExcerpt\":\"Rejected public text\"}]"
+                : "[{\"url\":\"" + evidenceUrl + "\",\"publishedAt\":\"2026-08-16T10:00:00Z\",\"exactExcerpt\":\"Exact public text\"}]";
             var output = agent.Id == MalformedFirstAgentId && InvocationCounts[agent.Id] == 1
                 ? "Web research completed, but this is not JSON."
-                : $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"{{Action}}","instrumentId":{{instrument}},"quantity":{{quantity}},"reason":"Assumed-fill paper decision","confidence":0.5,"evidence":[{"url":"https://example.com/news","publishedAt":"2026-08-16T10:00:00Z","exactExcerpt":"Exact public text"}]}""";
+                : $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"{{Action}}","instrumentId":{{instrument}},"quantity":{{quantity}},"reason":"Assumed-fill paper decision","confidence":0.5,"evidence":{{evidence}}}""";
             return Task.FromResult(new ResearchExecutionResult(output, string.Empty, new InvocationProvenance
             {
                 AgentId = agent.Id,
@@ -428,8 +495,19 @@ public sealed class ExhibitionCycleTests
     private sealed class FakeVerifier : AiStocks.Research.Evidence.IEvidenceVerifier
     {
         public int Calls { get; private set; }
+        public Uri? RejectUrl { get; init; }
+        private bool rejected;
         public Task<VerifiedEvidence> VerifyAsync(AiStocks.Research.Decisions.EvidenceClaim claim, CancellationToken cancellationToken) =>
-            Task.FromResult(Verified(claim));
+            !rejected && claim.Url == RejectUrl
+                ? Reject()
+                : Task.FromResult(Verified(claim));
+
+        private Task<VerifiedEvidence> Reject()
+        {
+            rejected = true;
+            throw new AiStocks.Research.Evidence.EvidenceVerificationException(
+                "Evidence representation is not independently verifiable.");
+        }
 
         private VerifiedEvidence Verified(AiStocks.Research.Decisions.EvidenceClaim claim)
         {

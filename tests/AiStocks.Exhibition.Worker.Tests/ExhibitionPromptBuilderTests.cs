@@ -33,7 +33,10 @@ public sealed class ExhibitionPromptBuilderTests
         Assert.Contains("whole positive quantity", prompt, StringComparison.Ordinal);
         Assert.Contains("published no later than", prompt, StringComparison.Ordinal);
         Assert.Contains("MUST use web_search", prompt, StringComparison.Ordinal);
-        Assert.Contains("at least three", prompt, StringComparison.Ordinal);
+        Assert.Contains("at least eight", prompt, StringComparison.Ordinal);
+        Assert.Contains("maximize ending portfolio value", prompt, StringComparison.Ordinal);
+        Assert.Contains("remaining fully in cash can lose", prompt, StringComparison.Ordinal);
+        Assert.Contains("small exploratory position", prompt, StringComparison.Ordinal);
         Assert.Contains("search-result snippet is discovery only", prompt, StringComparison.Ordinal);
         Assert.Contains("mcp_research_fetch_public_https", prompt, StringComparison.Ordinal);
         Assert.Contains("structured_article_text", prompt, StringComparison.Ordinal);
@@ -43,6 +46,7 @@ public sealed class ExhibitionPromptBuilderTests
         Assert.DoesNotContain("99999", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("RIVAL_SECRET", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("HOLD-only", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Example shape only", prompt, StringComparison.Ordinal);
     }
 
     [Theory]
