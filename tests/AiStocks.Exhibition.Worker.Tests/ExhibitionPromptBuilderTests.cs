@@ -33,13 +33,16 @@ public sealed class ExhibitionPromptBuilderTests
         Assert.Contains("whole positive quantity", prompt, StringComparison.Ordinal);
         Assert.Contains("published no later than", prompt, StringComparison.Ordinal);
         Assert.Contains("MUST use web_search", prompt, StringComparison.Ordinal);
-        Assert.Contains("at least eight", prompt, StringComparison.Ordinal);
+        Assert.Contains("at least three diverse", prompt, StringComparison.Ordinal);
+        Assert.Contains("expand up to eight", prompt, StringComparison.Ordinal);
+        Assert.Contains("verifier_eligible=true", prompt, StringComparison.Ordinal);
+        Assert.Contains("discovery_text cannot be submitted as evidence", prompt, StringComparison.Ordinal);
         Assert.Contains("maximize ending portfolio value", prompt, StringComparison.Ordinal);
         Assert.Contains("remaining fully in cash can lose", prompt, StringComparison.Ordinal);
         Assert.Contains("small exploratory position", prompt, StringComparison.Ordinal);
         Assert.Contains("search-result snippet is discovery only", prompt, StringComparison.Ordinal);
         Assert.Contains("mcp_research_fetch_public_https", prompt, StringComparison.Ordinal);
-        Assert.Contains("structured_article_text", prompt, StringComparison.Ordinal);
+        Assert.Contains("evidence_candidates", prompt, StringComparison.Ordinal);
         Assert.Contains("issuer investor-relations", prompt, StringComparison.Ordinal);
         Assert.Contains("may use an empty evidence array", prompt, StringComparison.Ordinal);
         Assert.Contains("30000", prompt, StringComparison.Ordinal);
@@ -47,6 +50,19 @@ public sealed class ExhibitionPromptBuilderTests
         Assert.DoesNotContain("RIVAL_SECRET", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("HOLD-only", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("Example shape only", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RetryAfterRejectedEvidence_ScopesResearchToSelectedInstrument()
+    {
+        var prompt = ExhibitionPromptBuilder.RetryAfterRejectedEvidence(
+            "original", "rejected.example", "SE0000115446");
+
+        Assert.Contains("initial issuer survey is complete", prompt, StringComparison.Ordinal);
+        Assert.Contains("do not repeat it", prompt, StringComparison.Ordinal);
+        Assert.Contains("SE0000115446", prompt, StringComparison.Ordinal);
+        Assert.Contains("verifier_eligible=true", prompt, StringComparison.Ordinal);
+        Assert.Contains("rejected.example", prompt, StringComparison.Ordinal);
     }
 
     [Theory]

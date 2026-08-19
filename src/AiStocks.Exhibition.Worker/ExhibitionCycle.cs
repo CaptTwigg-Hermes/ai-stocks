@@ -189,7 +189,8 @@ public sealed class ExhibitionCycle(
             logger.LogWarning(exception,
                 "Exhibition agent {AgentId} supplied rejected evidence from {Host} for {RunId}; retrying once with another source host",
                 agent.Id, rejectedHost, runId);
-            var retryPrompt = ExhibitionPromptBuilder.RetryAfterRejectedEvidence(prompt, rejectedHost);
+            var retryPrompt = ExhibitionPromptBuilder.RetryAfterRejectedEvidence(
+                prompt, rejectedHost, decision.InstrumentId ?? "hold");
             execution = await invoker.InvokeAsync(agent, retryPrompt, cancellationToken).ConfigureAwait(false);
             decision = parser.Parse(execution.StandardOutput, agent, observations);
             if (decision.Evidence.Any(claim =>
