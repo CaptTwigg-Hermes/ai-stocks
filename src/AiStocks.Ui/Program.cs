@@ -39,7 +39,7 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 app.MapGet("/healthz", () => Results.Ok(new { status = "ready" }));
-app.MapGet("/trade", () => Results.File("wwwroot/trade.html", "text/html; charset=utf-8"));
+app.MapGet("/trade", () => Results.File("trade.html", "text/html; charset=utf-8"));
 app.MapFallbackToFile("index.html");
 
 if (args.Contains("--print-endpoints", StringComparer.Ordinal))
