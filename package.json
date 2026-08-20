@@ -1,0 +1,10 @@
+{
+  "name": "ai-stocks-ui-tests",
+  "private": true,
+  "scripts": {
+    "test:trade": "playwright test tests/ui/trade.spec.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

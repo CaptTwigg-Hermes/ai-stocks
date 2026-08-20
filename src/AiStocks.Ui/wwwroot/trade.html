@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080d16">
+  <meta name="description" content="Human paper trading in AI Stocks global races.">
+  <title>Human trade · AI Stocks</title>
+  <link rel="stylesheet" href="/trade.css">
+  <script src="/runtime-config.js"></script>
+  <script src="/trade.js" defer></script>
+</head>
+<body>
+  <header class="trade-topbar">
+    <a class="trade-brand" href="/" aria-label="AI Stocks legacy dashboard">AI Stocks</a>
+    <nav aria-label="Primary navigation">
+      <a href="/">Legacy dashboard</a>
+      <a href="/trade" aria-current="page">Human trade</a>
+      <a href="/leaderboard">Legacy leaderboard</a>
+    </nav>
+  </header>
+
+  <main id="v2-trade-page">
+    <section class="trade-hero" aria-labelledby="trade-title">
+      <div>
+        <p class="eyebrow">Global human paper races</p>
+        <h1 id="trade-title">Trade stocks</h1>
+        <p>Join a race with 100,000 DKK paper cash. The API—not this browser—is authoritative for orders, fills, cash, holdings, FX and rank.</p>
+      </div>
+      <p class="identity" id="current-user" role="status" aria-live="polite">Loading current user…</p>
+    </section>
+
+    <aside class="data-warning" id="market-data-state" role="status" aria-live="polite">
+      Non-production preview. Market data unavailable until the API reports an approved source and status.
+    </aside>
+
+    <section class="race-bar" aria-labelledby="race-title">
+      <div>
+        <h2 id="race-title">Race</h2>
+        <p id="race-detail">Loading races…</p>
+      </div>
+      <label for="race-list">Choose race
+        <select id="race-list" disabled><option>Loading…</option></select>
+      </label>
+      <button id="join-race" type="button" disabled>Join race</button>
+    </section>
+
+    <div class="trade-grid">
+      <section class="card search-card" aria-labelledby="search-title">
+        <header><h2 id="search-title">Global stock search</h2><p>Approved API instrument index</p></header>
+        <form id="instrument-search" role="search">
+          <label for="instrument-query">Search global stocks</label>
+          <div class="search-row">
+            <input id="instrument-query" type="search" minlength="2" maxlength="80" autocomplete="off" placeholder="Company, symbol or ISIN" required>
+            <button type="submit">Search</button>
+          </div>
+        </form>
+        <div id="instrument-results" class="instrument-results" aria-live="polite"></div>
+      </section>
+
+      <section class="card order-card" aria-labelledby="order-title">
+        <header><h2 id="order-title">Human order intent</h2><p id="selected-instrument">Select an instrument</p></header>
+        <div class="side-toggle" role="group" aria-label="Order side">
+          <button type="button" data-side="buy" aria-pressed="true">Buy</button>
+          <button type="button" data-side="sell" aria-pressed="false">Sell</button>
+        </div>
+        <form id="human-order-form">
+          <label for="order-quantity">Quantity</label>
+          <input id="order-quantity" type="number" min="1" max="100000" step="1" value="1" required>
+          <label for="order-note">Optional note</label>
+          <textarea id="order-note" maxlength="500" rows="3" placeholder="Why? Humans may leave this blank."></textarea>
+          <button id="submit-order" type="submit" disabled>Choose an instrument</button>
+        </form>
+        <p id="order-status" class="panel-status" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+
+    <div class="account-grid">
+      <section class="card" id="portfolio" aria-labelledby="portfolio-title">
+        <header><h2 id="portfolio-title">Own DKK portfolio</h2><p>Server-valued account</p></header>
+        <div id="portfolio-content" aria-live="polite">Join a race to load your portfolio.</div>
+      </section>
+      <section class="card" id="orders" aria-labelledby="orders-title">
+        <header><h2 id="orders-title">Orders and status</h2><p>Accepted intent outcomes</p></header>
+        <div id="orders-content" aria-live="polite">Join a race to load orders.</div>
+      </section>
+      <section class="card" id="race-leaderboard" aria-labelledby="leaderboard-title">
+        <header><h2 id="leaderboard-title">Leaderboard</h2><p>API-ranked DKK values</p></header>
+        <ol id="leaderboard-content" aria-live="polite"><li>Join a race to load standings.</li></ol>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
