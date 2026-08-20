@@ -1090,8 +1090,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionApiClient.cs": {
-    "mtime": 1787212483.1721349,
-    "ast_hash": "f9dd9b1cbf42606a917eda692e3f175c",
+    "mtime": 1787218674.2930253,
+    "ast_hash": "0b88935ab4acc16ae282276fb5ad9883",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionCycle.cs": {
@@ -1145,8 +1145,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionApiClientTests.cs": {
-    "mtime": 1787212483.2401361,
-    "ast_hash": "40c872d1cb27b950a443971aa769b950",
+    "mtime": 1787218674.3690267,
+    "ast_hash": "4c63b0e61c3a1e837856b077f22f7765",
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionCycleTests.cs": {
