@@ -32,6 +32,10 @@ ALLOWED_PROCESS_PROJECTS = {"AiStocks.Research", "AiStocks.Operations"}
 ALLOWED_MUTATIONS = {
     "/admin/start", "/admin/pause", "/admin/resume", "/admin/pre-start-reset",
     "/api/v1/orders", "/internal/preview/ai-status", "/internal/preview/ai-decisions",
+    "/api/v1/races/{raceId:guid}/join",
+    "/api/v1/races/{raceId:guid}/accounts/me/orders",
+    "/api/v1/races/{raceId:guid}/accounts/me/orders/{orderId:guid}/cancel",
+    "/internal/v2/races/{raceId:guid}/ai-orders",
 }
 SHIPPED_EXECUTABLES = {
     "AiStocks.Api", "AiStocks.Collector", "AiStocks.Exhibition.Worker", "AiStocks.Ui", "AiStocks.Web", "AiStocks.Worker",

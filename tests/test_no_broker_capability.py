@@ -68,6 +68,7 @@ def test_executable_negative_capability_inventory_passes():
         {"method": "GET", "path": "/healthz"},
         {"method": "GET", "path": "/readyz"},
         {"method": "GET", "path": "/runtime-config.js"},
+        {"method": "GET", "path": "/trade"},
         {"method": "GET", "path": "/{*path:nonfile}"},
         {"method": "HEAD", "path": "/{*path:nonfile}"},
     ]
