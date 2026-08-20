@@ -81,7 +81,7 @@ public sealed class GlobalRaceStore(TimeProvider clock)
             if (joins.TryGetValue(key, out var replay)) return replay with { Replayed = true };
             if (participants.TryGetValue((raceId, principal), out var existing))
                 throw new GlobalRaceException("already-joined", "Principal already joined this race with another key.");
-            var participant = new Participant(Guid.NewGuid(), raceId, principal, "human", principal, clock.GetUtcNow());
+            var participant = new Participant(Guid.NewGuid(), raceId, principal, "human", HumanAlias(principal), clock.GetUtcNow());
             participants.Add((raceId, principal), participant);
             var initial = new GlobalLedgerEvent(Guid.NewGuid(), participant.Id, "initial_cash", StartingCashDkk,
                 clock.GetUtcNow(), $"initial:{participant.Id}");
@@ -227,6 +227,7 @@ public sealed class GlobalRaceStore(TimeProvider clock)
             throw new GlobalRaceException("invalid-idempotency-key", "Idempotency key must be 8-128 visible ASCII characters.");
     }
     private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    private static string HumanAlias(string principal) => $"Human {Hash(principal)[..8]}";
     private static bool ValidSha(string? value) => value is { Length: 64 } && value.All(character =>
         character is >= '0' and <= '9' or >= 'a' and <= 'f');
 }

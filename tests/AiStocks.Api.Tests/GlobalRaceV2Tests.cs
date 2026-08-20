@@ -23,6 +23,9 @@ public sealed class GlobalRaceV2Tests
         Assert.Equal(100_000m, store.Portfolio("human@example.com", GlobalRaceStore.HumanSandboxRaceId).CashDkk);
         Assert.Single(store.LedgerEvents(first.Participant.Id), item =>
             item.EventType == "initial_cash" && item.CashDeltaDkk == 100_000m);
+        var publicEntry = Assert.Single(store.Leaderboard(GlobalRaceStore.HumanSandboxRaceId));
+        Assert.DoesNotContain("human@example.com", publicEntry.DisplayName, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("Human ", publicEntry.DisplayName, StringComparison.Ordinal);
     }
 
     [Fact]
