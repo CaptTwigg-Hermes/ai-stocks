@@ -35,6 +35,8 @@ var aiExhibitionKey = aiExhibitionMode ? Required("AI_EXHIBITION_KEY") : null;
 var globalV2RunnerKey = globalV2Mode
     ? (builder.Environment.IsEnvironment("Testing") ? "testing-global-v2-runner-key-0001" : Required("GLOBAL_V2_RUNNER_KEY"))
     : null;
+var globalV2DatabaseUrl = globalV2Mode && !builder.Environment.IsEnvironment("Testing")
+    ? PostgresConfiguration.Require(PostgresConfiguration.Environment(), "DATABASE_URL") : null;
 var aiExhibitionArchivePath = aiExhibitionMode ? Required("AI_EXHIBITION_ARCHIVE_PATH") : null;
 var aiExhibitionDatabaseUrl = aiExhibitionMode && !builder.Environment.IsEnvironment("Testing")
     ? PostgresConfiguration.Require(PostgresConfiguration.Environment(), "DATABASE_URL") : null;
@@ -113,7 +115,15 @@ builder.Services.AddRateLimiter(options =>
 });
 builder.Services.AddSingleton(TimeProvider.System);
 if (globalV2Mode)
-    builder.Services.AddSingleton<GlobalRaceStore>();
+{
+    if (globalV2DatabaseUrl is null)
+        builder.Services.AddSingleton<IGlobalRaceStore, GlobalRaceStore>();
+    else
+    {
+        builder.Services.AddSingleton(NpgsqlDataSource.Create(globalV2DatabaseUrl));
+        builder.Services.AddSingleton<IGlobalRaceStore, PostgresGlobalRaceStore>();
+    }
+}
 if (localAuth)
 {
     if (aiExhibitionDatabaseUrl is not null)
@@ -151,7 +161,7 @@ var api = app.MapGroup("/api/v1").RequireAuthorization();
 api.MapGet("/me", (ClaimsPrincipal user) => Results.Ok(new IdentityDto(Identity(user), Role(user))));
 if (globalV2Mode)
 {
-    api.MapGet("/races", (ClaimsPrincipal user, GlobalRaceStore store) => Results.Ok(new
+    api.MapGet("/races", (ClaimsPrincipal user, IGlobalRaceStore store) => Results.Ok(new
     {
         items = store.Races().Select(race => new
         {
@@ -163,7 +173,7 @@ if (globalV2Mode)
             joined = store.HasJoined(Identity(user), race.Id)
         })
     }));
-    api.MapPost("/races/{raceId:guid}/join", (Guid raceId, ClaimsPrincipal user, GlobalRaceStore store, HttpContext context) =>
+    api.MapPost("/races/{raceId:guid}/join", (Guid raceId, ClaimsPrincipal user, IGlobalRaceStore store, HttpContext context) =>
     {
         if (!IdempotencyKey(context, out var key))
             return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
@@ -176,34 +186,34 @@ if (globalV2Mode)
         }
         catch (GlobalRaceException exception) { return GlobalProblem(exception, context); }
     });
-    api.MapGet("/races/{raceId:guid}/leaderboard", (Guid raceId, GlobalRaceStore store, HttpContext context) =>
+    api.MapGet("/races/{raceId:guid}/leaderboard", (Guid raceId, IGlobalRaceStore store, HttpContext context) =>
     {
         try { return Results.Ok(new { items = store.Leaderboard(raceId) }); }
         catch (GlobalRaceException exception) { return GlobalProblem(exception, context); }
     });
-    api.MapGet("/races/{raceId:guid}/accounts/me/portfolio", (Guid raceId, ClaimsPrincipal user, GlobalRaceStore store, HttpContext context) =>
+    api.MapGet("/races/{raceId:guid}/accounts/me/portfolio", (Guid raceId, ClaimsPrincipal user, IGlobalRaceStore store, HttpContext context) =>
     {
         try { return Results.Ok(store.Portfolio(Identity(user), raceId)); }
         catch (GlobalRaceException exception) { return GlobalProblem(exception, context, StatusCodes.Status404NotFound); }
     });
-    api.MapGet("/instruments/search", (string? q, GlobalRaceStore store) => Results.Ok(store.Search(q)));
-    api.MapGet("/instruments/{instrumentId}", (string instrumentId, GlobalRaceStore store, HttpContext context) =>
+    api.MapGet("/instruments/search", (string? q, IGlobalRaceStore store) => Results.Ok(store.Search(q)));
+    api.MapGet("/instruments/{instrumentId}", (string instrumentId, IGlobalRaceStore store, HttpContext context) =>
     {
         try { return Results.Ok(store.Instrument(instrumentId)); }
         catch (GlobalRaceException exception) { return GlobalProblem(exception, context, StatusCodes.Status404NotFound); }
     });
-    api.MapGet("/instruments/{instrumentId}/quote", (string instrumentId, GlobalRaceStore store, HttpContext context) =>
+    api.MapGet("/instruments/{instrumentId}/quote", (string instrumentId, IGlobalRaceStore store, HttpContext context) =>
     {
         try { return Results.Ok(store.Quote(instrumentId)); }
         catch (GlobalRaceException exception) { return GlobalProblem(exception, context, StatusCodes.Status404NotFound); }
     });
-    api.MapGet("/races/{raceId:guid}/accounts/me/orders", (Guid raceId, ClaimsPrincipal user, GlobalRaceStore store, HttpContext context) =>
+    api.MapGet("/races/{raceId:guid}/accounts/me/orders", (Guid raceId, ClaimsPrincipal user, IGlobalRaceStore store, HttpContext context) =>
     {
         try { return Results.Ok(new { items = store.Orders(Identity(user), raceId) }); }
         catch (GlobalRaceException exception) { return GlobalProblem(exception, context, StatusCodes.Status404NotFound); }
     });
     api.MapPost("/races/{raceId:guid}/accounts/me/orders", (Guid raceId, ClaimsPrincipal user, GlobalHumanOrderRequest request,
-        GlobalRaceStore store, HttpContext context) =>
+        IGlobalRaceStore store, HttpContext context) =>
     {
         if (!IdempotencyKey(context, out var key))
             return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
@@ -217,7 +227,7 @@ if (globalV2Mode)
         catch (GlobalRaceException exception) { return GlobalProblem(exception, context); }
     }).RequireRateLimiting("orders");
     api.MapPost("/races/{raceId:guid}/accounts/me/orders/{orderId:guid}/cancel", (Guid raceId, Guid orderId, ClaimsPrincipal user,
-        GlobalRaceStore store, HttpContext context) =>
+        IGlobalRaceStore store, HttpContext context) =>
     {
         if (!IdempotencyKey(context, out var key))
             return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
@@ -311,7 +321,7 @@ else if (localAuth)
 if (globalV2Mode)
 {
     app.MapPost("/internal/v2/races/{raceId:guid}/ai-orders", (Guid raceId, GlobalAiOrderRequest request,
-        GlobalRaceStore store, HttpContext context) =>
+        IGlobalRaceStore store, HttpContext context) =>
     {
         if (!ValidGlobalRunner(context, globalV2RunnerKey!)) return Results.Unauthorized();
         if (!IdempotencyKey(context, out var key))

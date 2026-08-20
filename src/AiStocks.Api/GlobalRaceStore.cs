@@ -5,7 +5,25 @@ using AiStocks.Core;
 
 namespace AiStocks.Api;
 
-public sealed class GlobalRaceStore(TimeProvider clock)
+public interface IGlobalRaceStore
+{
+    IReadOnlyList<GlobalRace> Races();
+    bool HasJoined(string principal, Guid raceId);
+    GlobalRace Race(Guid raceId);
+    GlobalInstrumentList Search(string? query);
+    GlobalInstrument Instrument(string instrumentId);
+    GlobalQuote Quote(string instrumentId);
+    JoinSubmission Join(string principal, Guid raceId, string idempotencyKey);
+    GlobalPortfolio Portfolio(string principal, Guid raceId);
+    IReadOnlyList<GlobalLedgerEvent> LedgerEvents(Guid participantId);
+    IReadOnlyList<GlobalLeaderboardEntry> Leaderboard(Guid raceId);
+    GlobalOrderSubmission SubmitHumanOrder(string principal, Guid raceId, string idempotencyKey, GlobalHumanOrderRequest request);
+    IReadOnlyList<GlobalOrder> Orders(string principal, Guid raceId);
+    GlobalOrder Cancel(string principal, Guid raceId, Guid orderId, string idempotencyKey);
+    GlobalOrderSubmission SubmitAiOrder(Guid raceId, string idempotencyKey, GlobalAiOrderRequest request);
+}
+
+public sealed class GlobalRaceStore(TimeProvider clock) : IGlobalRaceStore
 {
     public static readonly Guid HumanSandboxRaceId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     public static readonly Guid AiLeagueRaceId = Guid.Parse("10000000-0000-0000-0000-000000000002");

@@ -15,12 +15,17 @@ CREATE TABLE v2_participants (
   race_id uuid NOT NULL REFERENCES v2_races(id),
   principal text NOT NULL CHECK (principal = lower(btrim(principal)) AND length(principal) BETWEEN 3 AND 254),
   participant_type text NOT NULL CHECK (participant_type IN ('human','ai')),
+  trusted_model_id text,
   display_name text NOT NULL CHECK (length(display_name) BETWEEN 1 AND 254),
   joined_at timestamptz NOT NULL,
   join_idempotency_key text NOT NULL CHECK (length(join_idempotency_key) BETWEEN 8 AND 128),
   join_request_hash text NOT NULL CHECK (join_request_hash ~ '^[0-9a-f]{64}$'),
   UNIQUE (race_id, principal),
-  UNIQUE (race_id, principal, join_idempotency_key)
+  UNIQUE (race_id, principal, join_idempotency_key),
+  UNIQUE (race_id, id),
+  UNIQUE (id, participant_type),
+  CHECK ((participant_type='human' AND trusted_model_id IS NULL)
+      OR (participant_type='ai' AND length(trusted_model_id) BETWEEN 1 AND 100))
 );
 
 CREATE TABLE v2_ledger_events (
@@ -40,6 +45,42 @@ CREATE TABLE v2_ledger_events (
 );
 CREATE UNIQUE INDEX v2_one_initial_cash_per_participant
   ON v2_ledger_events(participant_id) WHERE event_type = 'initial_cash';
+
+CREATE FUNCTION v2_ensure_participant(
+  p_id uuid,p_race_id uuid,p_principal text,p_participant_type text,p_display_name text,
+  p_trusted_model_id text,p_idempotency_key text,p_request_hash text,p_joined_at timestamptz)
+RETURNS TABLE(id uuid,race_id uuid,principal text,participant_type text,display_name text,joined_at timestamptz,replayed boolean)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE existing public.v2_participants%ROWTYPE;
+DECLARE race_kind text;
+BEGIN
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_race_id::text || ':' || p_principal,0));
+  SELECT kind INTO race_kind FROM public.v2_races WHERE v2_races.id=p_race_id AND status='open';
+  IF race_kind IS NULL THEN RAISE EXCEPTION 'race is absent or not open'; END IF;
+  IF (p_participant_type='human' AND race_kind='ai_league') OR
+     (p_participant_type='ai' AND race_kind='human_sandbox') THEN
+    RAISE EXCEPTION 'participant type is not allowed in race';
+  END IF;
+  SELECT * INTO existing FROM public.v2_participants p
+    WHERE p.race_id=p_race_id AND p.principal=p_principal;
+  IF FOUND THEN
+    IF existing.join_idempotency_key<>p_idempotency_key OR existing.join_request_hash<>p_request_hash OR
+       existing.participant_type<>p_participant_type OR existing.trusted_model_id IS DISTINCT FROM p_trusted_model_id THEN
+      RAISE EXCEPTION 'principal already joined with a different key or identity';
+    END IF;
+    RETURN QUERY SELECT existing.id,existing.race_id,existing.principal,existing.participant_type,
+      existing.display_name,existing.joined_at,true;
+    RETURN;
+  END IF;
+  INSERT INTO public.v2_participants(id,race_id,principal,participant_type,trusted_model_id,display_name,joined_at,
+    join_idempotency_key,join_request_hash)
+  VALUES(p_id,p_race_id,p_principal,p_participant_type,p_trusted_model_id,p_display_name,p_joined_at,
+    p_idempotency_key,p_request_hash);
+  INSERT INTO public.v2_ledger_events(id,participant_id,event_type,cash_delta_dkk,reference,occurred_at)
+  VALUES(gen_random_uuid(),p_id,'initial_cash',100000.00,'initial:' || p_id::text,p_joined_at);
+  RETURN QUERY SELECT p_id,p_race_id,p_principal,p_participant_type,p_display_name,p_joined_at,false;
+END $$;
+REVOKE ALL ON FUNCTION v2_ensure_participant(uuid,uuid,text,text,text,text,text,text,timestamptz) FROM PUBLIC;
 
 CREATE TABLE v2_instruments (
   id text PRIMARY KEY CHECK (length(id) BETWEEN 1 AND 128),
@@ -84,7 +125,7 @@ CREATE TABLE v2_verified_fx_rates (
 CREATE TABLE v2_orders (
   id uuid PRIMARY KEY,
   race_id uuid NOT NULL REFERENCES v2_races(id),
-  participant_id uuid REFERENCES v2_participants(id),
+  participant_id uuid NOT NULL REFERENCES v2_participants(id),
   actor_type text NOT NULL CHECK (actor_type IN ('human','ai')),
   trusted_model_id text,
   instrument_id text NOT NULL REFERENCES v2_instruments(id),
@@ -104,6 +145,10 @@ CREATE TABLE v2_orders (
           AND jsonb_typeof(evidence_json) = 'array' AND jsonb_array_length(evidence_json) BETWEEN 1 AND 20)),
   UNIQUE (race_id, participant_id, idempotency_key)
 );
+ALTER TABLE v2_orders ADD CONSTRAINT v2_order_race_participant_fk
+  FOREIGN KEY (race_id,participant_id) REFERENCES v2_participants(race_id,id);
+ALTER TABLE v2_orders ADD CONSTRAINT v2_order_actor_participant_fk
+  FOREIGN KEY (participant_id,actor_type) REFERENCES v2_participants(id,participant_type);
 ALTER TABLE v2_ledger_events ADD CONSTRAINT v2_ledger_order_fk FOREIGN KEY (order_id) REFERENCES v2_orders(id);
 
 CREATE TABLE v2_order_lifecycle_events (
@@ -140,7 +185,10 @@ INSERT INTO v2_instruments(id,symbol,name,exchange,country,currency,provider,pro
 REVOKE ALL ON v2_races,v2_participants,v2_ledger_events,v2_instruments,v2_verified_quotes,
   v2_verified_fx_rates,v2_orders,v2_order_lifecycle_events FROM PUBLIC;
 GRANT SELECT ON v2_races,v2_instruments,v2_verified_quotes,v2_verified_fx_rates TO ai_stocks_web_runtime;
-GRANT SELECT,INSERT ON v2_participants,v2_ledger_events,v2_orders,v2_order_lifecycle_events TO ai_stocks_web_runtime;
+GRANT SELECT ON v2_participants,v2_ledger_events,v2_orders,v2_order_lifecycle_events TO ai_stocks_web_runtime;
+GRANT INSERT ON v2_orders,v2_order_lifecycle_events TO ai_stocks_web_runtime;
+GRANT EXECUTE ON FUNCTION v2_ensure_participant(uuid,uuid,text,text,text,text,text,text,timestamptz)
+  TO ai_stocks_web_runtime;
 GRANT SELECT ON v2_races,v2_participants,v2_instruments,v2_verified_quotes,v2_verified_fx_rates,
   v2_orders,v2_ledger_events,v2_order_lifecycle_events TO ai_stocks_worker_runtime;
 GRANT INSERT ON v2_verified_quotes,v2_verified_fx_rates,v2_ledger_events TO ai_stocks_worker_runtime;
