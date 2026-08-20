@@ -15,6 +15,11 @@ public static class ExhibitionPromptBuilder
         EVIDENCE CORRECTION: Independent verification rejected evidence from {{rejectedHost}} for current instrument {{instrumentId}}. The initial issuer survey is complete; do not repeat it. Research only this instrument and its selected catalyst. Use a different source host whose bounded fetch result says verifier_eligible=true, then copy only verifier_publication_time and an exact evidence_candidates sentence. This is your single corrective retry. Return only the strict JSON object. Do not reuse the rejected host, invent evidence, or force a trade.
         """;
 
+    public static string RetryAfterAdvancedSnapshot(string refreshedPrompt) => refreshedPrompt + """
+
+        SNAPSHOT CORRECTION: The official delayed observation advanced after your first decision, so that trade could not be submitted. Do not call tools or research again. Immediately return one strict JSON decision against the refreshed observations above. Preserve your prior BUY or SELL only if its instrument, quantity, and already-verified evidence remain valid; otherwise return HOLD with null instrumentId, quantity 0, and an empty evidence array. Do not invent evidence or force a trade.
+        """;
+
     public static string Build(AgentDefinition agent, string runId, string instrumentsJson, string progressJson)
     {
         if (!ContestContract.IsExactAgent(agent.Id, agent.ModelId)) throw new InvalidOperationException("Unknown contest agent.");

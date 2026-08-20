@@ -257,6 +257,149 @@ public sealed class ExhibitionCycleTests
     }
 
     [Fact]
+    public async Task RunAsync_BindsTradeToRefreshedDelayedObservationBeforeSubmission()
+    {
+        var api = new FakeApi
+        {
+            RefreshedInstrumentPrice = 101m,
+            RefreshedInstrumentAvailableAt = DateTimeOffset.Parse("2026-08-16T10:30:00Z")
+        };
+        var invoker = new FakeInvoker { FailingAgentId = null, Action = "buy" };
+        var cycle = new ExhibitionCycle(api, invoker,
+            new FakeVerifier(), new ExhibitionHealthState(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Empty(result.Failures);
+        Assert.All(ContestContract.Agents,
+            agent => Assert.Equal(2, invoker.InvocationCounts[agent.Id]));
+        Assert.All(ContestContract.Agents,
+            agent => Assert.Contains("SNAPSHOT CORRECTION", invoker.Prompts[agent.Id][1], StringComparison.Ordinal));
+        Assert.All(ContestContract.Agents, agent =>
+        {
+            Assert.Contains("\"price\":101", invoker.Prompts[agent.Id][1], StringComparison.Ordinal);
+            Assert.Contains("2026-08-16T10:30:00.0000000+00:00", invoker.Prompts[agent.Id][1], StringComparison.Ordinal);
+        });
+        Assert.All(api.Posts, json =>
+        {
+            using var posted = JsonDocument.Parse(json);
+            Assert.Equal(101m, posted.RootElement.GetProperty("observedPriceSek").GetDecimal());
+            Assert.Equal(DateTimeOffset.Parse("2026-08-16T10:30:00Z"),
+                posted.RootElement.GetProperty("observationAvailableAt").GetDateTimeOffset());
+        });
+    }
+
+    [Fact]
+    public async Task RunAsync_FailsClosedWhenSnapshotAdvancesAfterCorrectionWasConsumed()
+    {
+        var affected = ContestContract.Agents[0];
+        var api = AdvancedSnapshotApi();
+        var invoker = new FakeInvoker { FailingAgentId = null, Action = "buy", MalformedFirstAgentId = affected.Id };
+        var cycle = CreateCycle(api, invoker, new FakeVerifier());
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(3, result.Succeeded);
+        Assert.Single(result.Failures);
+        Assert.Equal(affected.Id, result.Failures[0].AgentId);
+        Assert.Contains("single corrective invocation", result.Failures[0].Error, StringComparison.Ordinal);
+        Assert.Equal(2, invoker.InvocationCounts[affected.Id]);
+        Assert.Equal(3, api.Posts.Count);
+    }
+
+    [Fact]
+    public async Task RunAsync_FailsClosedWhenSelectedInstrumentDisappearsFromRefreshedSnapshot()
+    {
+        var api = new FakeApi { OmitInstrumentAfterFirstRead = true };
+        var invoker = new FakeInvoker { FailingAgentId = null, Action = "buy" };
+        var cycle = CreateCycle(api, invoker, new FakeVerifier());
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(0, result.Succeeded);
+        Assert.Equal(4, result.Failures.Count);
+        Assert.All(result.Failures, failure =>
+            Assert.Contains("absent from the refreshed delayed snapshot", failure.Error, StringComparison.Ordinal));
+        Assert.Empty(api.Posts);
+        Assert.All(ContestContract.Agents, agent => Assert.Equal(1, invoker.InvocationCounts[agent.Id]));
+    }
+
+    [Fact]
+    public async Task RunAsync_FailsClosedOnMalformedSnapshotCorrection()
+    {
+        var affected = ContestContract.Agents[0];
+        var api = AdvancedSnapshotApi();
+        var invoker = new FakeInvoker { FailingAgentId = null, Action = "buy", MalformedSecondAgentId = affected.Id };
+        var cycle = CreateCycle(api, invoker, new FakeVerifier());
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(3, result.Succeeded);
+        Assert.Single(result.Failures);
+        Assert.Equal(affected.Id, result.Failures[0].AgentId);
+        Assert.Contains("does not contain a JSON object", result.Failures[0].Error, StringComparison.Ordinal);
+        Assert.Equal(2, invoker.InvocationCounts[affected.Id]);
+        Assert.Equal(3, api.Posts.Count);
+    }
+
+    [Fact]
+    public async Task RunAsync_FailsClosedOnEvidenceInvalidSnapshotCorrection()
+    {
+        var affected = ContestContract.Agents[0];
+        var api = AdvancedSnapshotApi();
+        var invoker = new FakeInvoker
+        {
+            FailingAgentId = null,
+            Action = "buy",
+            AlternateEvidenceOnSecondInvocation = true
+        };
+        var verifier = new FakeVerifier { RejectUrl = new Uri("https://alternate.example/news") };
+        var cycle = CreateCycle(api, invoker, verifier);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(3, result.Succeeded);
+        Assert.Single(result.Failures);
+        Assert.Equal(affected.Id, result.Failures[0].AgentId);
+        Assert.Contains("not independently verifiable", result.Failures[0].Error, StringComparison.Ordinal);
+        Assert.Equal(2, invoker.InvocationCounts[affected.Id]);
+        Assert.Equal(3, api.Posts.Count);
+    }
+
+    [Fact]
+    public async Task RunAsync_HoldDoesNotRefreshOrInvokeSnapshotCorrection()
+    {
+        var api = AdvancedSnapshotApi();
+        var invoker = new FakeInvoker { FailingAgentId = null, Action = "hold" };
+        var cycle = CreateCycle(api, invoker, new FakeVerifier());
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(4, result.Succeeded);
+        Assert.Empty(result.Failures);
+        Assert.Equal(1, api.InstrumentReads);
+        Assert.All(ContestContract.Agents, agent => Assert.Equal(1, invoker.InvocationCounts[agent.Id]));
+        Assert.All(api.Posts, json =>
+        {
+            using var posted = JsonDocument.Parse(json);
+            Assert.Equal("hold", posted.RootElement.GetProperty("action").GetString());
+            Assert.Equal(JsonValueKind.Null, posted.RootElement.GetProperty("instrumentId").ValueKind);
+            Assert.Equal(JsonValueKind.Null, posted.RootElement.GetProperty("observedPriceSek").ValueKind);
+        });
+    }
+
+    private static FakeApi AdvancedSnapshotApi() => new()
+    {
+        RefreshedInstrumentPrice = 101m,
+        RefreshedInstrumentAvailableAt = DateTimeOffset.Parse("2026-08-16T10:30:00Z")
+    };
+
+    private static ExhibitionCycle CreateCycle(FakeApi api, FakeInvoker invoker, FakeVerifier verifier) =>
+        new(api, invoker, verifier, new ExhibitionHealthState(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+    [Fact]
     public async Task RunAsync_RetriesRejectedEvidenceOnceWithADifferentSourceHost()
     {
         var affected = ContestContract.Agents[0];
@@ -348,20 +491,31 @@ public sealed class ExhibitionCycleTests
         public bool InstrumentIsPreviewPrice { get; init; }
         public bool IncludeInstrumentPriceDkk { get; init; }
         public decimal InstrumentPrice { get; init; } = 100m;
+        public decimal? RefreshedInstrumentPrice { get; init; }
+        public DateTimeOffset? RefreshedInstrumentAvailableAt { get; init; }
+        public bool OmitInstrumentAfterFirstRead { get; init; }
         public bool InstrumentPaperTradable { get; init; } = true;
         public bool OmitRootExecutionMode { get; init; }
         public bool WrongPortfolioExecutionMode { get; init; }
         private string? committedDecision;
+        public int InstrumentReads { get; private set; }
         public List<string> Posts { get; } = [];
         public List<string> Statuses { get; } = [];
         public Task<string> GetInstrumentsAsync(CancellationToken cancellationToken)
         {
+            InstrumentReads++;
+            var instrumentId = InstrumentReads > 1 && OmitInstrumentAfterFirstRead
+                ? "SE9999999999" : "SE0000115446";
+            var price = InstrumentReads > 1 && RefreshedInstrumentPrice is not null
+                ? RefreshedInstrumentPrice.Value : InstrumentPrice;
+            var availableAt = InstrumentReads > 1 && RefreshedInstrumentAvailableAt is not null
+                ? RefreshedInstrumentAvailableAt.Value : DateTimeOffset.Parse("2026-08-16T10:15:00Z");
             var priceDkk = IncludeInstrumentPriceDkk ? ",\"priceDkk\":123.45" : string.Empty;
-            return Task.FromResult("{\"items\":[{\"id\":\"SE0000115446\",\"exchange\":\"" + InstrumentExchange +
+            return Task.FromResult("{\"items\":[{\"id\":\"" + instrumentId + "\",\"exchange\":\"" + InstrumentExchange +
                 "\",\"currency\":\"" + InstrumentCurrency + "\",\"isPreviewPrice\":" +
                 InstrumentIsPreviewPrice.ToString().ToLowerInvariant() + priceDkk +
-                ",\"price\":" + InstrumentPrice.ToString(System.Globalization.CultureInfo.InvariantCulture) +
-                ",\"executedAt\":\"2026-08-16T10:00:00Z\",\"availableAt\":\"2026-08-16T10:15:00Z\",\"source\":\"Nasdaq Nordic MiFID II delayed post-trade\",\"delayMinutes\":15,\"tradable\":false,\"paperTradable\":" +
+                ",\"price\":" + price.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ",\"executedAt\":\"2026-08-16T10:00:00Z\",\"availableAt\":\"" + availableAt.ToString("O") + "\",\"source\":\"Nasdaq Nordic MiFID II delayed post-trade\",\"delayMinutes\":15,\"tradable\":false,\"paperTradable\":" +
                 InstrumentPaperTradable.ToString().ToLowerInvariant() + "}],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\"}");
         }
         public Task<string> GetProgressAsync(CancellationToken cancellationToken)
@@ -461,6 +615,7 @@ public sealed class ExhibitionCycleTests
         public Guid? FailingAgentId { get; init; } = ContestContract.Agents[0].Id;
         public string FailureMessage { get; init; } = "outage";
         public Guid? MalformedFirstAgentId { get; init; }
+        public Guid? MalformedSecondAgentId { get; init; }
         public string Action { get; init; } = "hold";
         public bool AlternateEvidenceOnSecondInvocation { get; init; }
         public bool RejectedEvidenceSecondOnFirstInvocation { get; init; }
@@ -485,7 +640,8 @@ public sealed class ExhibitionCycleTests
             var evidence = RejectedEvidenceSecondOnFirstInvocation && InvocationCounts[agent.Id] == 1
                 ? "[{\"url\":\"https://example.com/news\",\"publishedAt\":\"2026-08-16T10:00:00Z\",\"exactExcerpt\":\"Exact public text\"},{\"url\":\"https://rejected.example/news\",\"publishedAt\":\"2026-08-16T10:00:00Z\",\"exactExcerpt\":\"Rejected public text\"}]"
                 : "[{\"url\":\"" + evidenceUrl + "\",\"publishedAt\":\"2026-08-16T10:00:00Z\",\"exactExcerpt\":\"Exact public text\"}]";
-            var output = agent.Id == MalformedFirstAgentId && InvocationCounts[agent.Id] == 1
+            var output = (agent.Id == MalformedFirstAgentId && InvocationCounts[agent.Id] == 1) ||
+                         (agent.Id == MalformedSecondAgentId && InvocationCounts[agent.Id] == 2)
                 ? "Web research completed, but this is not JSON."
                 : $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"{{Action}}","instrumentId":{{instrument}},"quantity":{{quantity}},"reason":"Assumed-fill paper decision","confidence":0.5,"evidence":{{evidence}}}""";
             return Task.FromResult(new ResearchExecutionResult(output, string.Empty, new InvocationProvenance

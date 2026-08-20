@@ -69,12 +69,36 @@ public sealed class ExhibitionCycle(
                 await api.PostStatusAsync(StatusJson(runId, agent, "running", null, DateTimeOffset.UtcNow), cancellationToken)
                     .ConfigureAwait(false);
                 var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson);
-                var (execution, decision, verified) = await InvokeVerifiedDecisionAsync(
+                var (execution, decision, verified, correctionUsed) = await InvokeVerifiedDecisionAsync(
                         agent, runId, prompt, observations, cancellationToken)
                     .ConfigureAwait(false);
                 DelayedObservation? selectedObservation = null;
                 if (decision.InstrumentId is not null)
-                    selectedObservation = observations[decision.InstrumentId];
+                {
+                    var refreshedJson = await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
+                    var refreshed = ReadDelayedObservations(refreshedJson);
+                    if (!refreshed.TryGetValue(decision.InstrumentId, out var refreshedObservation))
+                        throw new InvalidOperationException("Selected instrument is absent from the refreshed delayed snapshot.");
+                    var originalObservation = observations[decision.InstrumentId];
+                    if (refreshedObservation != originalObservation)
+                    {
+                        if (correctionUsed)
+                            throw new InvalidOperationException("Delayed snapshot advanced after the decision's single corrective invocation.");
+                        var refreshedPrompt = ExhibitionPromptBuilder.Build(agent, runId, refreshedJson, progressJson);
+                        execution = await invoker.InvokeAsync(agent,
+                                ExhibitionPromptBuilder.RetryAfterAdvancedSnapshot(refreshedPrompt), cancellationToken)
+                            .ConfigureAwait(false);
+                        decision = new ExhibitionDecisionParser().Parse(execution.StandardOutput, agent, refreshed);
+                        verified = await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false);
+                        if (decision.InstrumentId is not null &&
+                            !refreshed.TryGetValue(decision.InstrumentId, out selectedObservation))
+                            throw new InvalidOperationException("Corrected instrument is absent from the refreshed delayed snapshot.");
+                    }
+                    else
+                    {
+                        selectedObservation = refreshedObservation;
+                    }
+                }
                 var provenance = execution.Provenance;
                 if (provenance.AgentId != agent.Id || provenance.ModelId != agent.ModelId ||
                     provenance.RequestedModelId != agent.ModelId || provenance.Provider != "copilot" ||
@@ -159,7 +183,8 @@ public sealed class ExhibitionCycle(
         return char.IsHighSurrogate(bounded[^1]) ? bounded[..^1] : bounded;
     }
 
-    private async Task<(ResearchExecutionResult Execution, ExhibitionDecision Decision, IReadOnlyList<VerifiedEvidence> Verified)> InvokeVerifiedDecisionAsync(
+    private async Task<(ResearchExecutionResult Execution, ExhibitionDecision Decision,
+        IReadOnlyList<VerifiedEvidence> Verified, bool CorrectionUsed)> InvokeVerifiedDecisionAsync(
         AgentDefinition agent,
         string runId,
         string prompt,
@@ -182,13 +207,13 @@ public sealed class ExhibitionCycle(
             execution = await invoker.InvokeAsync(agent, retryPrompt, cancellationToken).ConfigureAwait(false);
             decision = parser.Parse(execution.StandardOutput, agent, observations);
             return (execution, decision,
-                await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false));
+                await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false), true);
         }
 
         try
         {
             return (execution, decision,
-                await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false));
+                await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false), false);
         }
         catch (RejectedEvidenceException exception)
         {
@@ -205,7 +230,7 @@ public sealed class ExhibitionCycle(
                 throw new EvidenceVerificationException(
                     "Corrective evidence reused the rejected source host.");
             return (execution, decision,
-                await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false));
+                await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false), true);
         }
     }
 

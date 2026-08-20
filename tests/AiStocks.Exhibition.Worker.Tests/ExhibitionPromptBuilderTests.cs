@@ -75,6 +75,17 @@ public sealed class ExhibitionPromptBuilderTests
         Assert.Contains("rejected.example", prompt, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void RetryAfterAdvancedSnapshot_UsesRefreshedObservationsWithoutMoreResearch()
+    {
+        var prompt = ExhibitionPromptBuilder.RetryAfterAdvancedSnapshot("refreshed observations");
+
+        Assert.Contains("refreshed observations", prompt, StringComparison.Ordinal);
+        Assert.Contains("SNAPSHOT CORRECTION", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not call tools or research again", prompt, StringComparison.Ordinal);
+        Assert.Contains("otherwise return HOLD", prompt, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(null, ExecutionMode, DataMode, ExecutionMode)]
     [InlineData(DataMode, null, DataMode, ExecutionMode)]
