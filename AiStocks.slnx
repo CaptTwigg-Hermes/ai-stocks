@@ -5,6 +5,7 @@
     <Project Path="src/AiStocks.Core/AiStocks.Core.csproj" />
     <Project Path="src/AiStocks.Exhibition.Worker/AiStocks.Exhibition.Worker.csproj" />
     <Project Path="src/AiStocks.MarketData/AiStocks.MarketData.csproj" />
+    <Project Path="src/AiStocks.Observability/AiStocks.Observability.csproj" />
     <Project Path="src/AiStocks.Operations/AiStocks.Operations.csproj" />
     <Project Path="src/AiStocks.Persistence/AiStocks.Persistence.csproj" />
     <Project Path="src/AiStocks.Research/AiStocks.Research.csproj" />

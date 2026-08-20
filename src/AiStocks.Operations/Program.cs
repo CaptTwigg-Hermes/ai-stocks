@@ -1,6 +1,13 @@
+using AiStocks.Observability;
 using AiStocks.Operations;
 using AiStocks.Persistence;
+using Microsoft.Extensions.Configuration;
 using Npgsql;
+using Serilog;
+
+var loggingConfiguration = new ConfigurationManager();
+loggingConfiguration.AddEnvironmentVariables();
+Log.Logger = AiStocksLogging.CreateLogger(loggingConfiguration, "AiStocks.Operations");
 
 try
 {
@@ -21,6 +28,7 @@ try
         var alerts = new PostgresImmediateAlertPublisher(runtimeSource, delivery);
         using var shutdown = new CancellationTokenSource();
         Console.CancelKeyPress += (_, eventArgs) => { eventArgs.Cancel = true; shutdown.Cancel(); };
+        Log.Information("Operations reporter runtime started with a {PollSeconds}-second poll interval", pollSeconds);
         await new OperationsRuntimeService(new PostgresContestOperations(runtimeSource), publisher, alerts,
             TimeProvider.System, TimeSpan.FromSeconds(pollSeconds)).RunAsync(shutdown.Token);
         return;
@@ -42,8 +50,13 @@ try
 catch (OperationCanceledException) { }
 catch (Exception exception) when (exception is OperationsException or RuntimeConfigurationException or NpgsqlException or InvalidOperationException)
 {
+    Log.Error(exception, "Operations command failed safely");
     Console.Error.WriteLine("operations failed safely: invalid command or configuration");
     Environment.ExitCode = 2;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
 }
 
 public sealed class SystemOperationsClock(TimeProvider timeProvider) : AiStocks.Core.IClock

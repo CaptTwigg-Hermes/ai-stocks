@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <ProjectReference Include="..\AiStocks.Observability\AiStocks.Observability.csproj" />
     <ProjectReference Include="..\AiStocks.Core\AiStocks.Core.csproj" />
     <ProjectReference Include="..\AiStocks.Persistence\AiStocks.Persistence.csproj" />
     <ProjectReference Include="..\AiStocks.Trading\AiStocks.Trading.csproj" />

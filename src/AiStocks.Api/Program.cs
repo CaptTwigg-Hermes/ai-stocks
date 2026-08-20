@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.RateLimiting;
 using AiStocks.Api;
 using AiStocks.MarketData;
+using AiStocks.Observability;
 using AiStocks.Persistence;
 using AiStocks.Security;
 using Microsoft.AspNetCore.Authentication;
@@ -15,6 +16,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.UseAiStocksSerilog("AiStocks.Api");
 builder.Services.Configure<JsonOptions>(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -141,6 +143,7 @@ if (aiExhibitionArchivePath is not null)
         aiExhibitionArchivePath, services.GetRequiredService<TimeProvider>()));
 
 var app = builder.Build();
+app.UseAiStocksRequestLogging();
 if (aiExhibitionMode) _ = app.Services.GetRequiredService<PreviewRaceStore>();
 if (!localAuth) _ = app.Services.GetRequiredService<IAccessAssertionValidator>();
 app.Use(async (context, next) =>

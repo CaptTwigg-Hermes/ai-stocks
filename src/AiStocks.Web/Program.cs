@@ -10,8 +10,10 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using AiStocks.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.UseAiStocksSerilog("AiStocks.Web");
 if (builder.Environment.IsEnvironment("Testing"))
 {
     builder.Services.Configure<AccessOptions>(builder.Configuration.GetSection(AccessOptions.Section));
@@ -86,6 +88,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+app.UseAiStocksRequestLogging();
 if (!builder.Environment.IsEnvironment("Testing"))
     _ = app.Services.GetRequiredService<IAccessAssertionValidator>();
 app.Use(async (context, next) =>

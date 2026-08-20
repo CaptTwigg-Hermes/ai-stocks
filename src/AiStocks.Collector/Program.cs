@@ -1,5 +1,6 @@
 using AiStocks.MarketData;
 using AiStocks.Collector;
+using AiStocks.Observability;
 
 if (args.Contains("--replay-archive", StringComparer.Ordinal))
 {
@@ -19,6 +20,7 @@ if (args.Contains("--replay-archive", StringComparer.Ordinal))
 }
 
 var builder = WebApplication.CreateBuilder(args);
+builder.UseAiStocksSerilog("AiStocks.Collector");
 var archivePath = builder.Configuration["ARCHIVE_PATH"] ?? "/data/nasdaq";
 var artifactRoot = builder.Configuration["ARTIFACT_ROOT"] ?? AppContext.BaseDirectory;
 var databaseUrl = builder.Configuration["COLLECTOR_DATABASE_URL"]
@@ -63,6 +65,7 @@ builder.Services.AddSingleton(new PostgresCollectorReadiness(databaseUrl));
 builder.Services.AddHostedService<CollectorWorker>();
 
 var app = builder.Build();
+app.UseAiStocksRequestLogging();
 app.MapGet("/healthz", (CollectorHealth health) => health.IsHealthy(DateTimeOffset.UtcNow)
     ? Results.Ok(new { status = "healthy" })
     : Results.Json(new { status = "unhealthy", failure = health.Failure }, statusCode: StatusCodes.Status503ServiceUnavailable));

@@ -1,6 +1,8 @@
 using System.Text.Json;
+using AiStocks.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.UseAiStocksSerilog("AiStocks.Ui");
 var apiOrigin = builder.Configuration["API_PUBLIC_ORIGIN"];
 if (string.IsNullOrWhiteSpace(apiOrigin) && builder.Environment.IsDevelopment())
     apiOrigin = "http://192.168.50.2:3233";
@@ -12,6 +14,7 @@ if (!Uri.TryCreate(apiOrigin, UriKind.Absolute, out var apiUri)
 apiOrigin = apiUri.GetLeftPart(UriPartial.Authority);
 
 var app = builder.Build();
+app.UseAiStocksRequestLogging();
 app.Use(async (context, next) =>
 {
     context.Response.Headers.XContentTypeOptions = "nosniff";

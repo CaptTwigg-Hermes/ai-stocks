@@ -6,6 +6,7 @@ using AiStocks.Research.Execution;
 using AiStocks.Worker;
 using AiStocks.Worker.Orchestration;
 using Npgsql;
+using AiStocks.Observability;
 
 if (args.Contains("--probe-order-path-denial", StringComparer.Ordinal))
 {
@@ -15,6 +16,7 @@ if (args.Contains("--probe-order-path-denial", StringComparer.Ordinal))
 }
 
 var builder = WebApplication.CreateBuilder(args);
+builder.UseAiStocksSerilog("AiStocks.Worker");
 var connectionString = PostgresConfiguration.Require(PostgresConfiguration.Environment(), "DATABASE_URL");
 var dataSource = NpgsqlDataSource.Create(connectionString);
 builder.Services.AddSingleton(dataSource);
@@ -45,6 +47,7 @@ builder.Services.AddSingleton<QueuedExecutionCoordinator>();
 builder.Services.AddHostedService<WorkerRuntimeService>();
 
 var app = builder.Build();
+app.UseAiStocksRequestLogging();
 app.MapGet("/healthz", async (PostgresWorkerState state, CancellationToken cancellationToken) =>
     await state.ReadyAsync(cancellationToken).ConfigureAwait(false)
         ? Results.Ok(new { status = "ready" })
