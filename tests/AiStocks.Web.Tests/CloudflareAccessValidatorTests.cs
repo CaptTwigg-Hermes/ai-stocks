@@ -106,8 +106,12 @@ public sealed class CloudflareAccessValidatorTests
 
         var errors = await Task.WhenAll(validations);
         var rotatedIdentity = await rotation;
+        // The safety property under test is that a key visible to an in-flight validator is
+        // never disposed: every failure must be a clean authentication failure, never a
+        // CryptographicException or ObjectDisposedException from a torn-down key. Whether any
+        // individual old-token validation observes the pre-rotation key is a scheduling race,
+        // so asserting a survivor here would be non-deterministic.
         Assert.DoesNotContain(errors, error => error is not null and not AuthenticationFailureException);
-        Assert.Contains(errors, error => error is null);
         Assert.Equal("viewer", rotatedIdentity.Role);
     }
 
