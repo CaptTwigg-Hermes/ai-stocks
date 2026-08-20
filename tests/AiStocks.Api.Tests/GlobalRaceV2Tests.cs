@@ -79,6 +79,10 @@ public sealed class GlobalRaceV2Tests
         human.DefaultRequestHeaders.Add("Idempotency-Key", "join-http-0001");
         using var joined = await human.PostAsync($"/api/v1/races/{GlobalRaceStore.HumanSandboxRaceId}/join", null);
         Assert.Equal(HttpStatusCode.Created, joined.StatusCode);
+        var racesAfterJoin = await human.GetFromJsonAsync<JsonElement>("/api/v1/races");
+        Assert.True(racesAfterJoin.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == GlobalRaceStore.HumanSandboxRaceId)
+            .GetProperty("joined").GetBoolean());
         var own = await human.GetFromJsonAsync<JsonElement>(
             $"/api/v1/races/{GlobalRaceStore.HumanSandboxRaceId}/accounts/me/portfolio");
         Assert.Equal(100_000m, own.GetProperty("cashDkk").GetDecimal());
@@ -88,6 +92,10 @@ public sealed class GlobalRaceV2Tests
         using var other = factory.CreateClient();
         other.DefaultRequestHeaders.Add("X-Test-User-Email", "other@example.com");
         other.DefaultRequestHeaders.Add("X-Test-User-Role", "owner");
+        var otherRaces = await other.GetFromJsonAsync<JsonElement>("/api/v1/races");
+        Assert.False(otherRaces.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == GlobalRaceStore.HumanSandboxRaceId)
+            .GetProperty("joined").GetBoolean());
         Assert.Equal(HttpStatusCode.NotFound,
             (await other.GetAsync($"/api/v1/races/{GlobalRaceStore.HumanSandboxRaceId}/accounts/me/portfolio")).StatusCode);
     }

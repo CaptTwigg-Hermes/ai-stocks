@@ -151,7 +151,18 @@ var api = app.MapGroup("/api/v1").RequireAuthorization();
 api.MapGet("/me", (ClaimsPrincipal user) => Results.Ok(new IdentityDto(Identity(user), Role(user))));
 if (globalV2Mode)
 {
-    api.MapGet("/races", (GlobalRaceStore store) => Results.Ok(new { items = store.Races() }));
+    api.MapGet("/races", (ClaimsPrincipal user, GlobalRaceStore store) => Results.Ok(new
+    {
+        items = store.Races().Select(race => new
+        {
+            race.Id,
+            race.Name,
+            race.Kind,
+            race.Status,
+            race.InitialCashDkk,
+            joined = store.HasJoined(Identity(user), race.Id)
+        })
+    }));
     api.MapPost("/races/{raceId:guid}/join", (Guid raceId, ClaimsPrincipal user, GlobalRaceStore store, HttpContext context) =>
     {
         if (!IdempotencyKey(context, out var key))

@@ -37,6 +37,11 @@ public sealed class GlobalRaceStore(TimeProvider clock)
 
     public IReadOnlyList<GlobalRace> Races() => RaceSeed;
 
+    public bool HasJoined(string principal, Guid raceId)
+    {
+        lock (sync) return participants.ContainsKey((raceId, Principal(principal)));
+    }
+
     public GlobalRace Race(Guid raceId) => RaceSeed.SingleOrDefault(item => item.Id == raceId)
         ?? throw new GlobalRaceException("race-not-found", "Race was not found.");
 
