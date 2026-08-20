@@ -2,6 +2,14 @@
 
 This matrix is a release gate. A requirement is not complete because code exists; its named executable evidence must pass on the exact candidate tree.
 
+This matrix traces the legacy Swedish 2026 championship contracts:
+[`acceptance-contract.md`](acceptance-contract.md) and
+[`market-data-contract.md`](market-data-contract.md). The separate global v2
+platform is governed by [`v2-acceptance-contract.md`](v2-acceptance-contract.md)
+and [`v2-market-data-provider-contract.md`](v2-market-data-provider-contract.md).
+Those v2 contracts define their own deployment and verification gates; no row or
+passing evidence in this legacy matrix grants v2 production readiness.
+
 | Contract requirement | Implementation boundary | Executable evidence |
 |---|---|---|
 | Four exact Copilot models, isolated state, no fallback | Core, Research, Worker | Core/Research orchestration and identity tests; four-model dry run |

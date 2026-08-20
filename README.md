@@ -3,6 +3,16 @@
 Private Nasdaq Stockholm paper-trading competition. It has no
 broker integration and cannot place real orders.
 
+## Contracts
+
+- [`docs/acceptance-contract.md`](docs/acceptance-contract.md) and
+  [`docs/market-data-contract.md`](docs/market-data-contract.md) remain the
+  authoritative legacy Swedish 2026 championship contracts.
+- [`docs/v2-acceptance-contract.md`](docs/v2-acceptance-contract.md) and
+  [`docs/v2-market-data-provider-contract.md`](docs/v2-market-data-provider-contract.md)
+  define the separate global human + AI v2 platform. V2 production execution is
+  blocked until its provider approval and verification gates pass.
+
 ## Production topology
 
 - The authoritative private 2026 contest uses the explicit `contest` profile:
@@ -33,8 +43,10 @@ The `warmup` profile runs only `warmup-collector`. It may run beside the local
 AI exhibition to accumulate the strict contest's 20 verified sessions. It must
 not run beside the contest `collector`.
 
-Do not start the contest until every release gate in
-`docs/acceptance-contract.md` has passed.
+Do not start the legacy contest until every release gate in
+[`docs/acceptance-contract.md`](docs/acceptance-contract.md) has passed. Its gate
+does not approve v2, and a v2 seed/test-provider demonstration does not approve
+either production deployment.
 
 ## Dockge preparation
 
