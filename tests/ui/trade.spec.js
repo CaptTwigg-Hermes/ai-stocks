@@ -9,14 +9,14 @@ let joined = false;
 const hostile = `<img src=x onerror=alert(1)>${"X".repeat(180)}`;
 
 const fixtures = {
-  me: { id: "user-1", displayName: hostile, email: "human@example.test" },
+  me: { identity: hostile, role: "viewer" },
   race: {
     id: "race-global", name: `Global humans ${hostile}`, status: "running",
-    kind: "human_sandbox", baseCurrency: "DKK", startingCashDkk: 100000,
+    kind: "human_sandbox", initialCashDkk: 100000,
     joined: false, dataMode: "non-production", marketDataStatus: "unavailable"
   },
   instrument: {
-    instrumentId: "US0378331005:XNAS", symbol: hostile, name: hostile,
+    id: "US0378331005:XNAS", symbol: hostile, name: hostile,
     exchange: "NASDAQ", mic: "XNAS", country: "US", currency: "USD",
     tradable: false, tradabilityReason: "market_data_unavailable",
     marketDataStatus: "unavailable", quoteDelayMinutes: null
@@ -77,7 +77,7 @@ test.beforeAll(async () => {
         items: [{ id: "order-old", side: "buy", symbol: hostile, quantity: 1, status: "queued", note: hostile }]
       });
       if (url.pathname.endsWith("/orders") && request.method === "POST") return json(response, 202, {
-        id: "order-new", side: "sell", instrumentId: fixtures.instrument.instrumentId,
+        id: "order-new", side: "sell", instrumentId: fixtures.instrument.id,
         symbol: hostile, quantity: 2, status: "queued", note: hostile
       });
       response.writeHead(404); response.end();
@@ -132,12 +132,13 @@ test("join search and human order use exact v2 endpoints and intent-only payload
   await page.getByRole("button", { name: /submit sell intent/i }).click();
   await expect(page.locator("#order-status")).toContainText(/queued/i);
 
-  expect(requests.some(item => item.method === "POST" && item.path === "/api/v1/races/race-global/join")).toBeTruthy();
+  const join = requests.find(item => item.method === "POST" && item.path === "/api/v1/races/race-global/join");
+  expect(join.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/i);
   expect(requests.some(item => item.path === "/api/v1/instruments/search" && item.query === "?q=Apple+%26+sons&limit=20")).toBeTruthy();
   const order = requests.find(item => item.method === "POST" && item.path === "/api/v1/races/race-global/accounts/me/orders");
   expect(order.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/i);
   expect(JSON.parse(order.body)).toEqual({
-    side: "sell", instrumentId: fixtures.instrument.instrumentId, quantity: 2, note: hostile
+    side: "sell", instrumentId: fixtures.instrument.id, quantity: 2, note: hostile
   });
   expect(order.body).not.toContain("fill");
   expect(order.body).not.toContain("price");

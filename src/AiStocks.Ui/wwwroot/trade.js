@@ -87,7 +87,8 @@
     state.race = race;
     ui.races.value = race.id;
     const base = race.baseCurrency || "DKK";
-    const start = Number.isFinite(Number(race.startingCashDkk)) ? dkk.format(Number(race.startingCashDkk)) : "100,000 DKK";
+    const initialCash = race.initialCashDkk ?? race.startingCashDkk;
+    const start = Number.isFinite(Number(initialCash)) ? dkk.format(Number(initialCash)) : "100,000 DKK";
     ui.raceDetail.textContent = `${race.status || "Status unavailable"} · ${base} base · ${start} starting cash`;
     ui.join.disabled = Boolean(race.joined) || state.busy;
     ui.join.textContent = race.joined ? "Joined" : "Join race";
@@ -110,7 +111,11 @@
     ui.join.disabled = true;
     ui.join.textContent = "Joining…";
     try {
-      const joined = await api(`/api/v1/races/${raceId()}/join`, { method: "POST", body: "{}" });
+      const joined = await api(`/api/v1/races/${raceId()}/join`, {
+        method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        body: "{}"
+      });
       state.race = { ...state.race, ...joined, joined: true };
       state.races = state.races.map(race => race.id === raceId() ? state.race : race);
       ui.join.textContent = "Joined";
@@ -213,7 +218,7 @@
       button.type = "button";
       button.className = "instrument-result";
       button.append(
-        text("strong", instrument.symbol || instrument.instrumentId || "Unknown"),
+        text("strong", instrument.symbol || instrument.id || instrument.instrumentId || "Unknown"),
         text("small", instrument.currency || "Currency unavailable"),
         text("span", instrument.name || "Name unavailable"),
         text("small", `${instrument.exchange || instrument.mic || "Exchange unavailable"} · ${instrument.tradabilityReason || (instrument.tradable ? "tradable" : "status unavailable")}`)
@@ -225,7 +230,7 @@
 
   function selectInstrument(instrument) {
     state.instrument = instrument;
-    ui.selected.textContent = `${instrument.symbol || instrument.instrumentId} · ${instrument.name || "Name unavailable"} · ${instrument.currency || "Currency unavailable"}`;
+    ui.selected.textContent = `${instrument.symbol || instrument.id || instrument.instrumentId} · ${instrument.name || "Name unavailable"} · ${instrument.currency || "Currency unavailable"}`;
     marketMessage(instrument);
     updateOrderButton();
   }
@@ -267,7 +272,7 @@
     event.preventDefault();
     if (ui.submit.disabled || !raceId() || !state.instrument) return;
     const quantity = Number(ui.quantity.value);
-    const payload = { side: state.side, instrumentId: state.instrument.instrumentId, quantity };
+    const payload = { side: state.side, instrumentId: state.instrument.id || state.instrument.instrumentId, quantity };
     const note = ui.note.value.trim();
     if (note) payload.note = note;
     state.busy = true;
@@ -295,7 +300,7 @@
   async function start() {
     try {
       const [me, races] = await Promise.all([api("/api/v1/me"), api("/api/v1/races")]);
-      ui.user.textContent = `${me.displayName || me.email || me.id || "Authenticated user"}${me.email && me.displayName ? ` · ${me.email}` : ""}`;
+      ui.user.textContent = `${me.displayName || me.email || me.identity || me.id || "Authenticated user"}${me.email && me.displayName ? ` · ${me.email}` : ""}`;
       state.races = items(races);
       renderRaces();
     } catch (error) {
