@@ -46,6 +46,19 @@
         "resolved": "3.1.4",
         "contentHash": "5mj99LvCqrq3CNi06xYdyIAXOEh+5b33F2nErCzI5zWiDdLHXiPXEWFSUAF8zlIv0ZWqjZNCwHTQeAPYbF3pCg=="
       },
+      "AngleSharp": {
+        "type": "Transitive",
+        "resolved": "1.7.1",
+        "contentHash": "QBblGpRB3SYD66Mls7fHyl1mWkP93n7ErWDWHc1vd9sPHhdlTkmUoY3CjgfjcWNxGF9m7xjNyztRfErXqoBKOA=="
+      },
+      "AngleSharp.Css": {
+        "type": "Transitive",
+        "resolved": "1.0.1",
+        "contentHash": "6S13xNHH+SUGPZd6EO1MhkuDbpEnFroUM6A8DZpLJHQnLRTvtBJb3Ydu65s618E4gWF9FSWmM5jhKk4RIfwT2A==",
+        "dependencies": {
+          "AngleSharp": "[1.5.0, 2.0.0)"
+        }
+      },
       "Microsoft.AspNetCore.TestHost": {
         "type": "Transitive",
         "resolved": "10.0.0",
@@ -359,6 +372,14 @@
         "resolved": "13.0.3",
         "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
       },
+      "Npgsql": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "xZAYhPOU2rUIFpV48xsqhCx9vXs6Y+0jX2LCoSEfDFYMw9jtAOUk3iQsCnDLrFIv9NT3JGMihn7nnuZsPKqJmA==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
+        }
+      },
       "System.Diagnostics.EventLog": {
         "type": "Transitive",
         "resolved": "10.0.0",
@@ -409,6 +430,7 @@
         "dependencies": {
           "AiStocks.Core": "[1.0.0, )",
           "AiStocks.MarketData": "[1.0.0, )",
+          "AiStocks.Persistence": "[1.0.0, )",
           "AiStocks.Security": "[1.0.0, )"
         }
       },
@@ -421,8 +443,32 @@
           "AiStocks.Core": "[1.0.0, )"
         }
       },
+      "aistocks.persistence": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )",
+          "AiStocks.MarketData": "[1.0.0, )",
+          "AiStocks.Research": "[1.0.0, )",
+          "AiStocks.Trading": "[1.0.0, )",
+          "Npgsql": "[10.0.0, )"
+        }
+      },
+      "aistocks.research": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )",
+          "AngleSharp": "[1.7.1, )",
+          "AngleSharp.Css": "[1.0.1, )"
+        }
+      },
       "aistocks.security": {
         "type": "Project"
+      },
+      "aistocks.trading": {
+        "type": "Project",
+        "dependencies": {
+          "AiStocks.Core": "[1.0.0, )"
+        }
       }
     }
   }

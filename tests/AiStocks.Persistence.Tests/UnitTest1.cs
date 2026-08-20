@@ -93,12 +93,32 @@ public sealed class PersistenceContractTests
     [Fact]
     public void MigrationChecksumIsStableAndSha256()
     {
-        Assert.Equal(17, MigrationCatalog.All.Count);
+        Assert.Equal(18, MigrationCatalog.All.Count);
         foreach (var migration in MigrationCatalog.All)
         {
             Assert.Matches("^[0-9a-f]{64}$", migration.Sha256);
             Assert.Equal(migration.Sha256, MigrationCatalog.ComputeSha256(migration.Sql));
         }
+    }
+
+    [Fact]
+    public void ExhibitionPreviewStateMigrationIsDurableBoundedAndLeastPrivilege()
+    {
+        var sql = MigrationCatalog.All.Single(migration => migration.Id == "018_exhibition_preview_state").Sql;
+        Assert.Contains("CREATE TABLE exhibition_preview_state", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CREATE TABLE exhibition_preview_mutation_receipts", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("state_json jsonb NOT NULL", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("octet_length(state_json::text) <= 4194304", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("revision bigint NOT NULL", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("REVOKE ALL ON exhibition_preview_state FROM PUBLIC", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("GRANT SELECT, INSERT, UPDATE ON exhibition_preview_state TO ai_stocks_web_runtime", sql,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("GRANT SELECT, INSERT ON exhibition_preview_mutation_receipts TO ai_stocks_web_runtime", sql,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CREATE TRIGGER exhibition_preview_receipt_bound", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NEW.state_revision - 100000", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("GRANT DELETE ON exhibition_preview_mutation_receipts", sql,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

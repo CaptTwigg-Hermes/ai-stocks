@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace AiStocks.Api;
 
-public sealed class PreviewRaceStore(TimeProvider clock)
+public sealed partial class PreviewRaceStore
 {
     public const decimal StartingCashDkk = 100_000m;
     public const string DataMode = "preview-fixtures";
@@ -36,6 +36,19 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         .ToDictionary(agent => agent.Id, agent => new AiAccount(agent.Id, agent.ModelId));
     private readonly Dictionary<string, AiRun> aiRuns = new(StringComparer.Ordinal);
     private readonly List<AiActivityDto> aiActivity = [];
+    private readonly TimeProvider clock;
+    private readonly IPreviewRaceStatePersistence? persistence;
+    private long? persistenceRevision;
+
+    public PreviewRaceStore(TimeProvider clock, IPreviewRaceStatePersistence? persistence = null)
+    {
+        this.clock = clock;
+        this.persistence = persistence;
+        var persisted = persistence?.Load();
+        if (persisted is null) return;
+        RestoreState(persisted.Json);
+        persistenceRevision = persisted.Revision;
+    }
 
     public InstrumentListDto Search(string? query)
     {
@@ -95,6 +108,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
     {
         lock (sync)
         {
+            RefreshDurableState();
             var participants = aiAccounts.Values.OrderBy(account => account.ModelId, StringComparer.Ordinal)
                 .Select(account => new AiProgressAgentDto(account.AgentId, account.ModelId, account.ModelId,
                     account.Status, account.RunId, account.QueuedAt, account.StartedAt, account.CompletedAt,
@@ -111,6 +125,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         var instruments = Snapshot(snapshot);
         lock (sync)
         {
+            RefreshDurableState();
             var participants = aiAccounts.Values.OrderBy(account => account.ModelId, StringComparer.Ordinal)
                 .Select(account => new AiProgressAgentDto(account.AgentId, account.ModelId, account.ModelId,
                     account.Status, account.RunId, account.QueuedAt, account.StartedAt, account.CompletedAt,
@@ -127,6 +142,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
     {
         lock (sync)
         {
+            RefreshDurableState();
             var rows = aiAccounts.Values.Select(account =>
                 (account.ModelId, TotalValueDkk: PortfolioFor(account.Account).TotalValueDkk)).ToArray();
             var ordered = rows.OrderByDescending(row => row.TotalValueDkk)
@@ -142,6 +158,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         var instruments = Snapshot(snapshot);
         lock (sync)
         {
+            RefreshDurableState();
             var rows = aiAccounts.Values.Select(account =>
                 (account.ModelId, TotalValueDkk: PortfolioFor(account.Account, snapshot.DataMode, instruments).TotalValueDkk)).ToArray();
             var ordered = rows.OrderByDescending(row => row.TotalValueDkk)
@@ -159,7 +176,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         if (!string.Equals(request.Action.Trim(), "hold", StringComparison.OrdinalIgnoreCase))
             throw new PreviewOrderException("delayed-snapshot-required", "Trades require one immutable current delayed snapshot.");
         var fingerprint = JsonSerializer.Serialize(request);
-        lock (sync)
+        return PersistMutation<AiDecisionSubmission>(() =>
         {
             if (aiRuns.TryGetValue(request.RunId, out var prior))
             {
@@ -191,10 +208,10 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             account.SeenRunIds.Add(request.RunId);
             AddAiActivity(new(request.RunId, request.AgentId, request.ModelId, "succeeded", action,
                 request.Reason.Trim(), null, request.CompletedAt));
-            aiRuns.Add(request.RunId, new(fingerprint, decision));
+            aiRuns.Add(request.RunId, new(request.AgentId, request.ModelId, fingerprint, decision));
             RecordPerformance(account.Account, request.CompletedAt, PortfolioFor(account.Account).TotalValueDkk);
             return new(decision, false);
-        }
+        });
     }
 
     public AiDecisionSubmission SubmitAi(AiDecisionRequestDto request, InstrumentListDto snapshot)
@@ -202,7 +219,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         ValidateAi(request);
         var instruments = Snapshot(snapshot);
         var fingerprint = JsonSerializer.Serialize(request);
-        lock (sync)
+        return PersistMutation<AiDecisionSubmission>(() =>
         {
             if (aiRuns.TryGetValue(request.RunId, out var prior))
             {
@@ -269,11 +286,11 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                         account.Account.CostBasisDkk[instrument.Id] = Money(averageCost * (held - request.Quantity));
                     }
                 }
-                account.Account.Marks[instrument.Id] = instrument;
                 fill = new(instrument.Price, AssumedSekToDkk, AssumedSlippagePercent, fillPrice, total,
                     instrument.ExecutedAt.Value, instrument.AvailableAt.Value, clock.GetUtcNow(), AssumedExecutionMode);
             }
 
+            RefreshPersistedMarks(account.Account, instruments);
             var decision = new AiDecisionDto(request.RunId, action, request.InstrumentId, request.Quantity,
                 request.Reason.Trim(), request.Confidence, request.Evidence,
                 new(request.RuntimeProvider, request.RuntimeModel, request.ReportSha256), request.CompletedAt, fill);
@@ -281,7 +298,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             RecordPerformance(account.Account, request.CompletedAt,
                 PortfolioFor(account.Account, snapshot.DataMode, instruments).TotalValueDkk);
             return new(decision, false);
-        }
+        });
     }
 
     public void UpdateAiStatus(AiStatusRequestDto request)
@@ -299,7 +316,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             (status != "failed" && request.Error is not null))
             throw new PreviewOrderException("invalid-status-detail", "Status time and bounded failure detail must match the status.");
 
-        lock (sync)
+        PersistMutationVoid(() =>
         {
             var account = aiAccounts[request.AgentId];
             var sameRun = string.Equals(account.RunId, request.RunId, StringComparison.Ordinal);
@@ -351,7 +368,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                     account.Account.Performance.LastOrDefault()?.ValueDkk ?? StartingCashDkk);
             }
             account.Status = status;
-        }
+        });
     }
 
     private static void ValidateCurrentRun(AiAccount account, AiDecisionRequestDto request)
@@ -377,7 +394,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         account.SeenRunIds.Add(request.RunId);
         AddAiActivity(new(request.RunId, request.AgentId, request.ModelId, "succeeded", action,
             request.Reason.Trim(), null, request.CompletedAt));
-        aiRuns.Add(request.RunId, new(fingerprint, decision));
+        aiRuns.Add(request.RunId, new(request.AgentId, request.ModelId, fingerprint, decision));
     }
 
     private static InstrumentDto[] Snapshot(InstrumentListDto snapshot)
@@ -385,6 +402,22 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         if (snapshot.DataMode != DelayedNasdaqInstrumentStore.DataMode)
             throw new PreviewOrderException("invalid-data-mode", "Assumed fills require the official delayed Nasdaq data mode.");
         return snapshot.Items?.ToArray() ?? throw new PreviewOrderException("invalid-snapshot", "A current delayed snapshot is required.");
+    }
+
+    private static void RefreshPersistedMarks(Account account, IReadOnlyCollection<InstrumentDto> current)
+    {
+        foreach (var stale in account.Marks.Keys.Except(account.Holdings.Keys, StringComparer.Ordinal).ToArray())
+            account.Marks.Remove(stale);
+        foreach (var holding in account.Holdings)
+        {
+            var instrument = current.SingleOrDefault(item => item.Id == holding.Key)
+                ?? throw new PreviewOrderException("stale-portfolio-mark",
+                    "AI exhibition portfolio cannot be persisted without a current delayed observation.");
+            account.Marks[holding.Key] = instrument with
+            {
+                PriceDkk = Money(instrument.Price * AssumedSekToDkk)
+            };
+        }
     }
 
     private static bool StatusDetailsMatch(AiAccount account, string status, AiStatusRequestDto request) => status switch
@@ -453,7 +486,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             throw new PreviewOrderException("note-too-long", "Human notes may contain at most 500 characters.");
         var fingerprint = $"{side}\n{instrument.Id}\n{request.Quantity}\n{note}";
 
-        lock (sync)
+        return PersistMutation<PreviewSubmission>(() =>
         {
             var account = AccountFor(identity);
             if (account.Idempotency.TryGetValue(idempotencyKey, out var prior))
@@ -500,7 +533,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             account.Idempotency.Add(idempotencyKey, new(fingerprint, order));
             if (account.Orders.Count > 100) account.Orders.RemoveRange(0, account.Orders.Count - 100);
             return new(order, false);
-        }
+        });
     }
 
     private Account AccountFor(string identity)
@@ -610,7 +643,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
     }
 
     private sealed record IdempotencyEntry(string Fingerprint, PreviewOrderDto Order);
-    private sealed record AiRun(string Fingerprint, AiDecisionDto Decision);
+    private sealed record AiRun(Guid AgentId, string ModelId, string Fingerprint, AiDecisionDto Decision);
 
     private sealed class AiAccount(Guid agentId, string modelId)
     {

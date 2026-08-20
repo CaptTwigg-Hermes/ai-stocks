@@ -82,6 +82,7 @@ services:
       AI_EXHIBITION_MODE: "1"
       AI_EXHIBITION_KEY: ${AI_EXHIBITION_KEY:?set a random AI exhibition internal key}
       AI_EXHIBITION_ARCHIVE_PATH: /data/nasdaq
+      DATABASE_URL: ${WEB_DATABASE_URL:?set the web PostgreSQL URL}
       TZ: Europe/Stockholm
       UI_ORIGINS: ${PREVIEW_UI_ORIGINS:-http://192.168.50.2:3232}
     ports:
