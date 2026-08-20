@@ -41,7 +41,9 @@ public sealed class GlobalRaceV2Tests
         Assert.Single(firstStore.LedgerEvents(joins[0].Participant.Id), item => item.EventType == "initial_cash");
 
         var restarted = new PostgresGlobalRaceStore(dataSource, TimeProvider.System);
-        Assert.Equal(100_000m, restarted.Portfolio("durable@example.com", GlobalRaceStore.HumanSandboxRaceId).CashDkk);
+        var durablePortfolio = restarted.Portfolio("durable@example.com", GlobalRaceStore.HumanSandboxRaceId);
+        Assert.Equal(100_000m, durablePortfolio.CashDkk);
+        Assert.DoesNotContain("durable@example.com", durablePortfolio.DisplayName, StringComparison.OrdinalIgnoreCase);
         var request = new GlobalHumanOrderRequest("buy", "novo-dk", 2, "durable intent");
         var order = restarted.SubmitHumanOrder("durable@example.com", GlobalRaceStore.HumanSandboxRaceId,
             "durable-order-key", request);
@@ -56,6 +58,18 @@ public sealed class GlobalRaceV2Tests
         restarted.Cancel("durable@example.com", GlobalRaceStore.HumanSandboxRaceId, order.Order.Id, "own-cancel-key");
         Assert.Equal("cancelled", Assert.Single(new PostgresGlobalRaceStore(dataSource, TimeProvider.System)
             .Orders("durable@example.com", GlobalRaceStore.HumanSandboxRaceId)).Status);
+
+        var aiRequest = new GlobalAiOrderRequest("gpt-5.6-sol", "buy", "asml-nl", 1,
+            new GlobalAiRationale("Durable AI thesis",
+                [new("https://example.invalid/evidence", DateTimeOffset.UtcNow.AddMinutes(-5),
+                    "Exact excerpt", new string('a', 64))], 0.7m));
+        var aiOrder = restarted.SubmitAiOrder(GlobalRaceStore.AiLeagueRaceId, "durable-ai-order-key", aiRequest);
+        var aiReplay = new PostgresGlobalRaceStore(dataSource, TimeProvider.System).SubmitAiOrder(
+            GlobalRaceStore.AiLeagueRaceId, "durable-ai-order-key", aiRequest);
+        Assert.False(aiOrder.Replayed);
+        Assert.True(aiReplay.Replayed);
+        Assert.Equal(aiOrder.Order.Id, aiReplay.Order.Id);
+        Assert.NotEqual(Guid.Empty, aiOrder.Order.ParticipantId);
 
         await using var count = dataSource.CreateCommand(
             "SELECT count(*) FROM v2_ledger_events WHERE participant_id=$1 AND event_type='initial_cash'");
@@ -145,6 +159,14 @@ public sealed class GlobalRaceV2Tests
             instruments.GetProperty("dataMode").GetString());
         Assert.Equal("NOVO B", instruments.GetProperty("items")[0].GetProperty("symbol").GetString());
 
+        using (var hostileJoin = new HttpRequestMessage(HttpMethod.Post,
+                   $"/api/v1/races/{GlobalRaceStore.HumanSandboxRaceId}/join"))
+        {
+            hostileJoin.Headers.Add("Origin", "https://evil.example");
+            hostileJoin.Headers.Add("Idempotency-Key", "hostile-join-0001");
+            Assert.Equal(HttpStatusCode.Forbidden, (await human.SendAsync(hostileJoin)).StatusCode);
+        }
+        human.DefaultRequestHeaders.Add("Origin", "https://stocks.example.com");
         human.DefaultRequestHeaders.Add("Idempotency-Key", "join-http-0001");
         using var joined = await human.PostAsync($"/api/v1/races/{GlobalRaceStore.HumanSandboxRaceId}/join", null);
         Assert.Equal(HttpStatusCode.Created, joined.StatusCode);

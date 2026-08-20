@@ -42,6 +42,8 @@ var aiExhibitionDatabaseUrl = aiExhibitionMode && !builder.Environment.IsEnviron
     ? PostgresConfiguration.Require(PostgresConfiguration.Environment(), "DATABASE_URL") : null;
 if (aiExhibitionKey is not null && aiExhibitionKey.Length < 32)
     throw new InvalidOperationException("AI_EXHIBITION_KEY must contain at least 32 characters.");
+if (globalV2RunnerKey is not null && globalV2RunnerKey.Length < 32)
+    throw new InvalidOperationException("GLOBAL_V2_RUNNER_KEY must contain at least 32 characters.");
 
 var uiOrigins = (builder.Configuration["UI_ORIGINS"] ?? (localAuth
         ? "http://192.168.50.2:3232,https://stocks.example.com"
@@ -175,6 +177,9 @@ if (globalV2Mode)
     }));
     api.MapPost("/races/{raceId:guid}/join", (Guid raceId, ClaimsPrincipal user, IGlobalRaceStore store, HttpContext context) =>
     {
+        if (!ExactOrigin(context, uiOrigins))
+            return ApiEndpointResults.Problem("origin-rejected", "Origin rejected", StatusCodes.Status403Forbidden,
+                context, "Paper-race mutations require an exact configured UI origin.");
         if (!IdempotencyKey(context, out var key))
             return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
                 StatusCodes.Status400BadRequest, context, "Send exactly one Idempotency-Key header.");
@@ -215,6 +220,9 @@ if (globalV2Mode)
     api.MapPost("/races/{raceId:guid}/accounts/me/orders", (Guid raceId, ClaimsPrincipal user, GlobalHumanOrderRequest request,
         IGlobalRaceStore store, HttpContext context) =>
     {
+        if (!ExactOrigin(context, uiOrigins))
+            return ApiEndpointResults.Problem("origin-rejected", "Origin rejected", StatusCodes.Status403Forbidden,
+                context, "Paper-race mutations require an exact configured UI origin.");
         if (!IdempotencyKey(context, out var key))
             return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
                 StatusCodes.Status400BadRequest, context, "Send exactly one Idempotency-Key header.");
@@ -229,6 +237,9 @@ if (globalV2Mode)
     api.MapPost("/races/{raceId:guid}/accounts/me/orders/{orderId:guid}/cancel", (Guid raceId, Guid orderId, ClaimsPrincipal user,
         IGlobalRaceStore store, HttpContext context) =>
     {
+        if (!ExactOrigin(context, uiOrigins))
+            return ApiEndpointResults.Problem("origin-rejected", "Origin rejected", StatusCodes.Status403Forbidden,
+                context, "Paper-race mutations require an exact configured UI origin.");
         if (!IdempotencyKey(context, out var key))
             return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
                 StatusCodes.Status400BadRequest, context, "Send exactly one Idempotency-Key header.");
@@ -333,7 +344,7 @@ if (globalV2Mode)
             return result.Replayed ? Results.Ok(result.Order) : Results.Accepted(value: result.Order);
         }
         catch (GlobalRaceException exception) { return GlobalProblem(exception, context); }
-    }).WithMetadata(new Microsoft.AspNetCore.Cors.DisableCorsAttribute());
+    }).WithMetadata(new Microsoft.AspNetCore.Cors.DisableCorsAttribute()).RequireRateLimiting("orders");
 }
 
 if (app.Environment.IsEnvironment("Testing"))
