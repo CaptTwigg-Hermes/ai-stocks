@@ -67,7 +67,9 @@ public sealed class ExhibitionApiClient(HttpClient client, ExhibitionOptions opt
             var summary = string.IsNullOrWhiteSpace(detail) ? code : $"{code}: {detail}";
             summary = string.Concat(summary.Select(character =>
                 char.IsControl(character) || character is '\u2028' or '\u2029' ? ' ' : character));
-            return summary.Length <= maximumSummaryCharacters ? summary : summary[..maximumSummaryCharacters];
+            if (summary.Length <= maximumSummaryCharacters) return summary;
+            var bounded = summary[..maximumSummaryCharacters];
+            return char.IsHighSurrogate(bounded[^1]) ? bounded[..^1] : bounded;
         }
         catch (JsonException)
         {

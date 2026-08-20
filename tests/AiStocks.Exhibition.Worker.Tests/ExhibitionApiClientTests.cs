@@ -93,6 +93,28 @@ public sealed class ExhibitionApiClientTests
         Assert.Equal("Exhibition API returned HTTP 400: unparseable problem response", error.Message);
     }
 
+    [Fact]
+    public async Task Api_problem_diagnostic_does_not_split_surrogate_pair_at_bound()
+    {
+        var options = new ExhibitionOptions
+        {
+            ApiBaseUrl = new Uri("https://api.example.test/"),
+            InternalKey = new string('k', 32),
+            CopilotCredentialFile = "/run/secrets/copilot.json",
+            HermesHomeRoot = "/dev/shm/exhibition"
+        };
+        var api = new ExhibitionApiClient(
+            new HttpClient(new ProblemHandler(new string('x', 979) + "😀tail")) { BaseAddress = options.ApiBaseUrl },
+            options);
+
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            api.PostDecisionAsync("run-1", "{}", CancellationToken.None));
+        var summary = error.Message["Exhibition API returned HTTP 400: ".Length..];
+
+        Assert.Equal(999, summary.Length);
+        Assert.False(char.IsSurrogate(summary[^1]));
+    }
+
     private sealed class InvalidUtf8ProblemHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>

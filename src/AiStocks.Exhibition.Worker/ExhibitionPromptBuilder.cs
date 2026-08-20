@@ -7,7 +7,7 @@ public static class ExhibitionPromptBuilder
 {
     public static string RetryAfterInvalidFinalResponse(string originalPrompt) => originalPrompt + """
 
-        RETRY: Your previous final response was rejected because it was not the exact JSON object required above. Repeat the autonomous decision. You may research again. Your FINAL response must start with {, end with }, and contain only the required JSON object—no lead-in, markdown fence, or trailing commentary. Do not invent evidence or force a trade.
+        RETRY: Your previous final response was rejected because it was not the exact JSON object required above. Do not call tools or research again. Immediately convert your completed analysis into the required JSON object. Your FINAL response must start with {, end with }, and contain only that object—no lead-in, markdown fence, or trailing commentary. Preserve a BUY or SELL only when you already have every required valid field and evidence item; otherwise return a HOLD decision with null instrumentId, quantity 0, and an empty evidence array. Do not invent evidence or force a trade.
         """;
 
     public static string RetryAfterRejectedEvidence(string originalPrompt, string rejectedHost, string instrumentId) => originalPrompt + $$"""

@@ -137,7 +137,7 @@ public sealed class ExhibitionCycle(
                 failures.Add(new ExhibitionAgentFailure(agent.Id, agent.ModelId, exception.Message));
                 try
                 {
-                    var boundedError = exception.Message.Length > 1_000 ? exception.Message[..1_000] : exception.Message;
+                    var boundedError = BoundError(exception.Message);
                     await api.PostStatusAsync(StatusJson(runId, agent, "failed", boundedError, DateTimeOffset.UtcNow), cancellationToken)
                         .ConfigureAwait(false);
                 }
@@ -150,6 +150,13 @@ public sealed class ExhibitionCycle(
         }
         health.Complete(DateTimeOffset.UtcNow, failures.Count, failures.FirstOrDefault()?.Error);
         return new ExhibitionCycleResult(scheduledAt, succeeded, failures);
+    }
+
+    private static string BoundError(string error)
+    {
+        if (error.Length <= 1_000) return error;
+        var bounded = error[..1_000];
+        return char.IsHighSurrogate(bounded[^1]) ? bounded[..^1] : bounded;
     }
 
     private async Task<(ResearchExecutionResult Execution, ExhibitionDecision Decision, IReadOnlyList<VerifiedEvidence> Verified)> InvokeVerifiedDecisionAsync(

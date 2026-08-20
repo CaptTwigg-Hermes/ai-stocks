@@ -214,6 +214,23 @@ public sealed class ExhibitionCycleTests
     }
 
     [Fact]
+    public async Task RunAsync_DoesNotSplitSurrogatePairWhenBoundingFailureStatus()
+    {
+        var api = new FakeApi();
+        var invoker = new FakeInvoker { FailureMessage = new string('x', 999) + "😀tail" };
+        var cycle = new ExhibitionCycle(api, invoker, new FakeVerifier(), new ExhibitionHealthState(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        var failed = api.Statuses.Select(status => JsonDocument.Parse(status))
+            .Single(status => status.RootElement.GetProperty("status").GetString() == "failed");
+        var error = failed.RootElement.GetProperty("error").GetString()!;
+        Assert.Equal(999, error.Length);
+        Assert.False(char.IsSurrogate(error[^1]));
+    }
+
+    [Fact]
     public async Task RunAsync_PostsValidBuyAfterIndependentParserAndEvidenceValidation()
     {
         var api = new FakeApi();
@@ -442,6 +459,7 @@ public sealed class ExhibitionCycleTests
     private sealed class FakeInvoker : IExhibitionModelInvoker
     {
         public Guid? FailingAgentId { get; init; } = ContestContract.Agents[0].Id;
+        public string FailureMessage { get; init; } = "outage";
         public Guid? MalformedFirstAgentId { get; init; }
         public string Action { get; init; } = "hold";
         public bool AlternateEvidenceOnSecondInvocation { get; init; }
@@ -456,7 +474,7 @@ public sealed class ExhibitionCycleTests
             InvocationCounts[agent.Id] = InvocationCounts.GetValueOrDefault(agent.Id) + 1;
             if (!Prompts.TryGetValue(agent.Id, out var prompts)) Prompts[agent.Id] = prompts = [];
             prompts.Add(prompt);
-            if (agent.Id == FailingAgentId) throw new InvalidOperationException("outage");
+            if (agent.Id == FailingAgentId) throw new InvalidOperationException(FailureMessage);
             var instrument = Action == "hold" ? "null" : "\"SE0000115446\"";
             var quantity = Action == "hold" ? 0 : 1;
             var evidenceUrl = ReuseRejectedEvidenceOnSecondInvocation && InvocationCounts[agent.Id] == 2

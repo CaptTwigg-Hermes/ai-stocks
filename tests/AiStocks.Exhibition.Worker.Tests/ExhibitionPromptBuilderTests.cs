@@ -53,6 +53,16 @@ public sealed class ExhibitionPromptBuilderTests
     }
 
     [Fact]
+    public void RetryAfterInvalidFinalResponse_RequiresImmediateJsonWithoutMoreResearch()
+    {
+        var prompt = ExhibitionPromptBuilder.RetryAfterInvalidFinalResponse("original");
+
+        Assert.Contains("Do not call tools or research again", prompt, StringComparison.Ordinal);
+        Assert.Contains("return a HOLD decision", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("You may research again", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RetryAfterRejectedEvidence_ScopesResearchToSelectedInstrument()
     {
         var prompt = ExhibitionPromptBuilder.RetryAfterRejectedEvidence(
