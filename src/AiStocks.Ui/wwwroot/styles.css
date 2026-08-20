@@ -529,6 +529,39 @@ input[type="number"], textarea {
   text-decoration: none;
 }
 .exhibition-mode .leaderboard-trade-link { display: none; }
+.performance-panel { margin-bottom: 16px; }
+.time-filter { display: grid; gap: 4px; color: var(--muted); font-size: .72rem; font-weight: 750; }
+.time-filter select {
+  min-height: 44px;
+  min-width: 130px;
+  padding: 8px 34px 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  color: var(--text);
+  background: var(--surface-soft);
+}
+.chart-filters { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 12px; }
+.chart-filters fieldset { min-width: 0; margin: 0; padding: 8px 10px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.chart-filters legend { padding: 0 5px; color: var(--muted); font-size: .72rem; font-weight: 750; }
+.chart-filters fieldset > div { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.chart-filter-option { min-height: 44px; display: inline-flex; align-items: center; gap: 7px; font-size: .75rem; overflow-wrap: anywhere; }
+.chart-filter-option input { width: 18px; height: 18px; accent-color: var(--accent); }
+.series-swatch { width: 16px; height: 3px; flex: 0 0 auto; border-radius: 999px; background: currentColor; }
+.series-0 { color: #5ee0ac; stroke: #5ee0ac; fill: #5ee0ac; }
+.series-1 { color: #8bb7ff; stroke: #8bb7ff; fill: #8bb7ff; }
+.series-2 { color: #ffc56e; stroke: #ffc56e; fill: #ffc56e; }
+.series-3 { color: #ff9aa3; stroke: #ff9aa3; fill: #ff9aa3; }
+.series-4 { color: #c9a8ff; stroke: #c9a8ff; fill: #c9a8ff; }
+.series-5 { color: #69d4ed; stroke: #69d4ed; fill: #69d4ed; }
+.performance-chart-wrap { min-height: 260px; overflow-x: auto; }
+.performance-chart-wrap svg { display: block; width: 100%; min-width: 620px; height: auto; }
+.chart-grid-line { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.chart-axis-label { fill: var(--muted); font-size: 10px; }
+.chart-series { fill: none; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.chart-series.benchmark { stroke-dasharray: 7 5; stroke-width: 2; }
+.chart-point { stroke: var(--surface); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 7px 16px; margin-top: 8px; }
+.chart-legend-item { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .72rem; }
 .ai-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -568,6 +601,13 @@ input[type="number"], textarea {
 .ai-narrative .ai-detail:nth-child(4) { grid-column: 1 / -1; }
 .ai-holdings, .ai-evidence { min-width: 0; margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
 .ai-holdings h3, .ai-evidence h3 { margin: 0 0 8px; font-size: .84rem; }
+.ai-holdings .holding-row { grid-template-columns: minmax(130px, .7fr) minmax(0, 1.3fr); align-items: start; gap: 14px; }
+.holding-isin { display: block; margin-top: 3px; color: var(--muted-low); font-size: .68rem; overflow-wrap: anywhere; }
+.holding-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 12px; margin: 0; }
+.holding-detail-grid div { min-width: 0; }
+.holding-detail-grid dt { color: var(--muted); font-size: .68rem; }
+.holding-detail-grid dd { margin: 1px 0 0; font-size: .74rem; font-weight: 750; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.holding-detail-grid dd.negative { color: var(--danger); }
 .ai-evidence ul { list-style: none; margin: 0; padding: 0; }
 .ai-evidence li { min-width: 0; padding: 9px 0; border-top: 1px solid rgba(54, 68, 93, .55); }
 .ai-evidence a, .ai-evidence time, .ai-evidence q, .ai-evidence code {
@@ -621,6 +661,8 @@ input[type="number"], textarea {
   .account-summary { min-width: 0; margin-top: 18px; padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--line); text-align: left; }
   .search-results { grid-template-columns: 1fr; }
   .data-badge { display: none; }
+  .chart-filters { grid-template-columns: 1fr; }
+  .performance-chart-wrap { margin-inline: -8px; }
 }
 @media (max-width: 430px) {
   .brand small { display: none; }
@@ -643,6 +685,7 @@ input[type="number"], textarea {
   }
   .leaderboard-full b em { display: block; margin-top: 1px; }
   .metrics { grid-template-columns: 1fr; }
+  .ai-holdings .holding-row { grid-template-columns: 1fr; }
   kbd { display: none; }
   .toast { left: 14px; right: 14px; bottom: 14px; max-width: none; }
 }

@@ -27,6 +27,12 @@
     aiActivity: byId("ai-activity"),
     aiRefresh: byId("ai-refresh"),
     aiRaceStatus: byId("ai-race-status"),
+    performanceChart: byId("performance-chart"),
+    performanceTime: byId("performance-time"),
+    modelFilters: byId("model-filters"),
+    benchmarkFilters: byId("benchmark-filters"),
+    performanceLegend: byId("performance-legend"),
+    performanceEmpty: byId("performance-empty"),
     search: byId("stock-search"),
     results: byId("search-results"),
     resultCount: byId("result-count"),
@@ -448,9 +454,23 @@
       const identity = element("div");
       identity.append(
         element("strong", "", String(holding.symbol || holding.instrumentId || "Unknown instrument")),
-        element("span", "", `${safeNumber(holding.quantity)} shares`)
+        element("span", "", String(holding.name || "Name unavailable")),
+        element("small", "holding-isin", String(holding.instrumentId || "ISIN unavailable"))
       );
-      row.append(identity, element("b", "", dkk.format(safeNumber(holding.valueDkk))));
+      const values = element("dl", "holding-detail-grid");
+      [
+        ["Shares", number.format(safeNumber(holding.quantity))],
+        ["Current price", dkk.format(safeNumber(holding.priceDkk))],
+        ["Average buy", dkk.format(safeNumber(holding.averageBuyPriceDkk))],
+        ["Cost basis", dkk.format(safeNumber(holding.costBasisDkk))],
+        ["Market value", dkk.format(safeNumber(holding.valueDkk))],
+        ["Gain", `${dkk.format(safeNumber(holding.gainDkk))} · ${safeNumber(holding.gainPercent) >= 0 ? "+" : ""}${number.format(safeNumber(holding.gainPercent))}%`]
+      ].forEach(([label, value]) => {
+        const item = element("div");
+        item.append(element("dt", "", label), element("dd", label === "Gain" && safeNumber(holding.gainDkk) < 0 ? "negative" : "", value));
+        values.append(item);
+      });
+      row.append(identity, values);
       section.append(row);
     });
     return section;
@@ -479,6 +499,124 @@
     if (!list.childElementCount) list.append(element("li", "muted-empty", "No verified source links supplied."));
     section.append(list);
     return section;
+  }
+
+  const svgNamespace = "http://www.w3.org/2000/svg";
+  const performanceSelection = new Set();
+  const knownPerformanceSeries = new Set();
+  let latestPerformance = [];
+
+  function svgElement(tag, attributes = {}, text) {
+    const node = document.createElementNS(svgNamespace, tag);
+    Object.entries(attributes).forEach(([name, value]) => node.setAttribute(name, String(value)));
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function renderPerformanceFilters(series) {
+    ui.modelFilters.replaceChildren();
+    ui.benchmarkFilters.replaceChildren();
+    series.forEach((item, index) => {
+      if (!knownPerformanceSeries.has(item.id)) performanceSelection.add(item.id);
+      knownPerformanceSeries.add(item.id);
+      const label = element("label", "chart-filter-option");
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = performanceSelection.has(item.id);
+      input.dataset.seriesId = item.id;
+      input.addEventListener("change", () => {
+        if (input.checked) performanceSelection.add(item.id);
+        else performanceSelection.delete(item.id);
+        renderPerformanceChart();
+      });
+      const swatch = element("i", `series-swatch series-${index % 6}`);
+      label.append(input, swatch, document.createTextNode(String(item.label || item.id)));
+      if (item.type === "model") ui.modelFilters.append(label);
+      if (item.type === "benchmark") ui.benchmarkFilters.append(label);
+    });
+  }
+
+  function visiblePerformanceSeries() {
+    const selected = latestPerformance.filter((series) => performanceSelection.has(series.id));
+    const allPoints = selected.flatMap((series) => Array.isArray(series.points) ? series.points : [])
+      .map((point) => ({ ...point, timestamp: new Date(point.at).valueOf() }))
+      .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(Number(point.valueDkk)));
+    if (!allPoints.length || ui.performanceTime.value === "all") return selected;
+    const newest = Math.max(...allPoints.map((point) => point.timestamp));
+    const windows = { "24h": 24 * 60 * 60 * 1000, "7d": 7 * 24 * 60 * 60 * 1000, "30d": 30 * 24 * 60 * 60 * 1000 };
+    const duration = windows[ui.performanceTime.value];
+    if (!duration) return selected;
+    return selected.map((series) => ({
+      ...series,
+      points: series.points.filter((point) => new Date(point.at).valueOf() >= newest - duration)
+    }));
+  }
+
+  function renderPerformanceChart() {
+    const series = visiblePerformanceSeries();
+    const plotted = series.map((item) => ({
+      ...item,
+      points: (Array.isArray(item.points) ? item.points : [])
+        .map((point) => ({ at: new Date(point.at), value: Number(point.valueDkk) }))
+        .filter((point) => !Number.isNaN(point.at.valueOf()) && Number.isFinite(point.value))
+        .sort((left, right) => left.at - right.at)
+    })).filter((item) => item.points.length);
+    ui.performanceChart.replaceChildren();
+    ui.performanceLegend.replaceChildren();
+    ui.performanceEmpty.hidden = plotted.length > 0;
+    if (!plotted.length) return;
+
+    const width = 720, height = 300, left = 70, right = 18, top = 18, bottom = 42;
+    const points = plotted.flatMap((item) => item.points);
+    let minTime = Math.min(...points.map((point) => point.at.valueOf()));
+    let maxTime = Math.max(...points.map((point) => point.at.valueOf()));
+    let minValue = Math.min(...points.map((point) => point.value));
+    let maxValue = Math.max(...points.map((point) => point.value));
+    if (minTime === maxTime) maxTime += 1;
+    const valuePadding = Math.max(10, (maxValue - minValue) * .08);
+    minValue -= valuePadding;
+    maxValue += valuePadding;
+    const x = (at) => left + (at.valueOf() - minTime) / (maxTime - minTime) * (width - left - right);
+    const y = (value) => top + (maxValue - value) / (maxValue - minValue) * (height - top - bottom);
+
+    for (let index = 0; index < 5; index += 1) {
+      const yPosition = top + index * (height - top - bottom) / 4;
+      const value = maxValue - index * (maxValue - minValue) / 4;
+      ui.performanceChart.append(
+        svgElement("line", { x1: left, y1: yPosition, x2: width - right, y2: yPosition, class: "chart-grid-line" }),
+        svgElement("text", { x: left - 10, y: yPosition + 4, class: "chart-axis-label", "text-anchor": "end" },
+          leaderboardNumber.format(value))
+      );
+    }
+    const startDate = new Date(minTime), endDate = new Date(maxTime);
+    ui.performanceChart.append(
+      svgElement("text", { x: left, y: height - 12, class: "chart-axis-label", "text-anchor": "start" }, decisionTime.format(startDate)),
+      svgElement("text", { x: width - right, y: height - 12, class: "chart-axis-label", "text-anchor": "end" }, decisionTime.format(endDate))
+    );
+
+    plotted.forEach((item) => {
+      const sourceIndex = latestPerformance.findIndex((series) => series.id === item.id);
+      const className = `chart-series series-${sourceIndex % 6}${item.type === "benchmark" ? " benchmark" : ""}`;
+      const path = item.points.map((point, index) => `${index ? "L" : "M"}${x(point.at).toFixed(1)},${y(point.value).toFixed(1)}`).join(" ");
+      const line = svgElement("path", { d: path, class: className });
+      line.append(svgElement("title", {}, `${item.label}: ${dkk.format(item.points.at(-1).value)}`));
+      ui.performanceChart.append(line);
+      const last = item.points.at(-1);
+      ui.performanceChart.append(svgElement("circle", {
+        cx: x(last.at), cy: y(last.value), r: 3.5, class: `chart-point series-${sourceIndex % 6}`
+      }));
+      const legend = element("span", "chart-legend-item");
+      legend.append(element("i", `series-swatch series-${sourceIndex % 6}`),
+        document.createTextNode(`${item.label} · ${dkk.format(last.value)}`));
+      ui.performanceLegend.append(legend);
+    });
+  }
+
+  function renderPerformance(data) {
+    latestPerformance = Array.isArray(data.performance) ? data.performance.filter((series) =>
+      series && Array.isArray(series.points) && (series.type === "model" || series.type === "benchmark")) : [];
+    renderPerformanceFilters(latestPerformance);
+    renderPerformanceChart();
   }
 
   function renderAiParticipants(data) {
@@ -573,6 +711,7 @@
     ui.aiRacePage.hidden = false;
     ui.leaderboardPage.hidden = !isLeaderboardPage;
     ui.aiRacePage.hidden = isLeaderboardPage;
+    renderPerformance(data);
     renderAiParticipants(data);
     renderAiActivity(data);
     renderLeaderboard(exhibitionLeaderboard(data));
@@ -653,5 +792,6 @@
   }
 
   ui.aiRefresh.addEventListener("click", () => refreshAiProgress(true));
+  ui.performanceTime.addEventListener("change", renderPerformanceChart);
   start().catch(() => {});
 })();

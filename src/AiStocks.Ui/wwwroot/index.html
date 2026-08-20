@@ -148,6 +148,29 @@
       <button class="text-button" id="ai-refresh" type="button">Refresh AI race</button>
     </section>
     <p class="panel-state" id="ai-race-status" role="status" aria-live="polite"></p>
+    <section class="panel performance-panel" aria-labelledby="performance-title">
+      <div class="panel-heading">
+        <div><h2 id="performance-title">Performance over time</h2><p>Paper portfolio value in DKK</p></div>
+        <label class="time-filter" for="performance-time">Time
+          <select id="performance-time">
+            <option value="all">All</option>
+            <option value="24h">24 hours</option>
+            <option value="7d">7 days</option>
+            <option value="30d">30 days</option>
+          </select>
+        </label>
+      </div>
+      <div class="chart-filters">
+        <fieldset><legend>Models</legend><div id="model-filters"></div></fieldset>
+        <fieldset><legend>Benchmarks</legend><div id="benchmark-filters"></div></fieldset>
+      </div>
+      <div class="performance-chart-wrap">
+        <svg id="performance-chart" viewBox="0 0 720 300" role="img"
+          aria-label="Selected model and benchmark portfolio values over time"></svg>
+      </div>
+      <div class="chart-legend" id="performance-legend" aria-live="polite"></div>
+      <p class="muted-empty" id="performance-empty" hidden>No performance points match these filters.</p>
+    </section>
     <section class="ai-grid" id="ai-participants" aria-live="polite" aria-busy="true"></section>
     <section class="panel ai-activity-panel" aria-labelledby="ai-activity-title">
       <h2 id="ai-activity-title">Autonomous activity</h2>

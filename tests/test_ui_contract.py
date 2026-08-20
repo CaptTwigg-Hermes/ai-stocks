@@ -131,6 +131,24 @@ def test_exhibition_cards_are_four_defensive_safe_complete_ai_participants():
     assert html.count("not the strict 2026 contest") >= 2
 
 
+def test_exhibition_has_filterable_performance_chart_and_detailed_holdings():
+    html = (UI / "index.html").read_text()
+    script = (UI / "app.js").read_text()
+    css = (UI / "styles.css").read_text()
+
+    for element_id in ("performance-chart", "performance-time", "model-filters", "benchmark-filters"):
+        assert f'id="{element_id}"' in html
+    for label in ("Current price", "Average buy", "Cost basis", "Gain"):
+        assert f'"{label}"' in script
+    assert "renderPerformanceChart" in script
+    assert "createElementNS" in script
+    assert 'series.type === "model"' in script
+    assert 'series.type === "benchmark"' in script
+    assert ".performance-panel" in css
+    assert ".chart-filters" in css
+    assert "min-height: 44px" in css
+
+
 def test_exhibition_refresh_is_bounded_race_safe_and_responsive():
     script = (UI / "app.js").read_text()
     css = (UI / "styles.css").read_text()

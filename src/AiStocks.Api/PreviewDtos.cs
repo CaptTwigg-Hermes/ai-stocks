@@ -50,7 +50,11 @@ public sealed record PreviewHoldingDto(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("quantity")] int Quantity,
     [property: JsonPropertyName("priceDkk")] decimal PriceDkk,
-    [property: JsonPropertyName("valueDkk")] decimal ValueDkk);
+    [property: JsonPropertyName("valueDkk")] decimal ValueDkk,
+    [property: JsonPropertyName("averageBuyPriceDkk")] decimal AverageBuyPriceDkk = 0m,
+    [property: JsonPropertyName("costBasisDkk")] decimal CostBasisDkk = 0m,
+    [property: JsonPropertyName("gainDkk")] decimal GainDkk = 0m,
+    [property: JsonPropertyName("gainPercent")] decimal GainPercent = 0m);
 
 public sealed record PreviewPortfolioDto(
     [property: JsonPropertyName("displayName")] string DisplayName,
@@ -84,7 +88,18 @@ public sealed record AiProgressDto(
     [property: JsonPropertyName("executionMode")] string? ExecutionMode = null,
     [property: JsonPropertyName("assumedFills")] bool AssumedFills = false,
     [property: JsonPropertyName("assumedSekToDkk")] decimal? AssumedSekToDkk = null,
-    [property: JsonPropertyName("assumedSlippagePercent")] decimal? AssumedSlippagePercent = null);
+    [property: JsonPropertyName("assumedSlippagePercent")] decimal? AssumedSlippagePercent = null,
+    [property: JsonPropertyName("performance")] IReadOnlyList<PerformanceSeriesDto>? Performance = null);
+
+public sealed record PerformancePointDto(
+    [property: JsonPropertyName("at")] DateTimeOffset At,
+    [property: JsonPropertyName("valueDkk")] decimal ValueDkk);
+
+public sealed record PerformanceSeriesDto(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("label")] string Label,
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("points")] IReadOnlyList<PerformancePointDto> Points);
 
 public sealed record AiProgressAgentDto(
     [property: JsonPropertyName("agentId")] Guid AgentId,

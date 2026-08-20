@@ -43,6 +43,34 @@ public sealed class AssumedFillExhibitionTests
     }
 
     [Fact]
+    public void Progress_reports_stock_name_cost_basis_gain_and_filterable_performance_series()
+    {
+        var clock = new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:30:00Z"));
+        var store = new PreviewRaceStore(clock);
+        var bought = Snapshot(Instrument("SE0000108656", "ERIC-B", 100m));
+        Submit(store, Decision("detailed-buy-001", "buy", "SE0000108656", 10), bought);
+        var marked = Snapshot(Instrument("SE0000108656", "ERIC-B", 120m,
+            ExecutedAt.AddMinutes(1), AvailableAt.AddMinutes(1)));
+
+        var progress = store.AiProgress(marked);
+        var participant = progress.Participants.Single(item => item.AgentId == Agent.Id);
+        var holding = Assert.Single(participant.Portfolio.Holdings);
+
+        Assert.Equal("ERIC-B", holding.Name);
+        Assert.Equal(78m, holding.PriceDkk);
+        Assert.Equal(65.65m, holding.AverageBuyPriceDkk);
+        Assert.Equal(656.50m, holding.CostBasisDkk);
+        Assert.Equal(123.50m, holding.GainDkk);
+        Assert.Equal(18.81m, holding.GainPercent);
+        var performance = Assert.IsAssignableFrom<IReadOnlyList<PerformanceSeriesDto>>(progress.Performance);
+        Assert.Equal(4, performance.Count(item => item.Type == "model"));
+        Assert.Contains(performance, item => item.Id == "starting-cash" && item.Type == "benchmark");
+        Assert.Contains(performance, item => item.Id == "ai-field-average" && item.Type == "benchmark");
+        Assert.All(performance, item => Assert.NotEmpty(item.Points));
+        Assert.True(performance.Single(item => item.Id == Agent.ModelId).Points.Count >= 2);
+    }
+
+    [Fact]
     public void Sell_uses_adverse_slippage_and_cannot_exceed_holdings()
     {
         var store = new PreviewRaceStore(new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:30:00Z")));
@@ -208,6 +236,33 @@ public sealed class AssumedFillExhibitionTests
         var error = Assert.Throws<PreviewOrderException>(() => store.AiProgress(currentWithoutHolding));
 
         Assert.Equal("stale-portfolio-mark", error.Code);
+    }
+
+    [Fact]
+    public void Missing_existing_mark_rejects_trade_without_mutation_or_consuming_run_id()
+    {
+        var store = new PreviewRaceStore(TimeProvider.System);
+        var held = Instrument("SE0000108656", "ERIC-B", 100m);
+        var traded = Instrument("SE0000115446", "VOLV-B", 100m);
+        Submit(store, Decision("atomic-mark-seed", "buy", held.Id, 10), Snapshot(held));
+        var request = Decision("atomic-mark-trade", "buy", traded.Id, 10, AvailableAt.AddMinutes(4));
+        StartRun(store, request);
+        var completeSnapshot = Snapshot(held, traded);
+        var before = store.AiProgress(completeSnapshot);
+
+        var error = Assert.Throws<PreviewOrderException>(() => store.SubmitAi(request, Snapshot(traded)));
+        var after = store.AiProgress(completeSnapshot);
+
+        Assert.Equal("stale-portfolio-mark", error.Code);
+        var beforeParticipant = before.Participants.Single(item => item.AgentId == Agent.Id);
+        var afterParticipant = after.Participants.Single(item => item.AgentId == Agent.Id);
+        Assert.Equal("running", afterParticipant.Status);
+        Assert.Equal(beforeParticipant.LatestDecision, afterParticipant.LatestDecision);
+        Assert.Equal(beforeParticipant.Portfolio.CashDkk, afterParticipant.Portfolio.CashDkk);
+        Assert.Equal(beforeParticipant.Portfolio.Holdings, afterParticipant.Portfolio.Holdings);
+        Assert.Equal(before.Activity, after.Activity);
+
+        Assert.False(store.SubmitAi(request, completeSnapshot).Replayed);
     }
 
     private static AiDecisionSubmission Submit(PreviewRaceStore store, AiDecisionRequestDto request, InstrumentListDto snapshot)

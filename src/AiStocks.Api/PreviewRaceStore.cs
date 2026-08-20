@@ -95,12 +95,14 @@ public sealed class PreviewRaceStore(TimeProvider clock)
     {
         lock (sync)
         {
-            return new(aiAccounts.Values.OrderBy(account => account.ModelId, StringComparer.Ordinal)
+            var participants = aiAccounts.Values.OrderBy(account => account.ModelId, StringComparer.Ordinal)
                 .Select(account => new AiProgressAgentDto(account.AgentId, account.ModelId, account.ModelId,
                     account.Status, account.RunId, account.QueuedAt, account.StartedAt, account.CompletedAt,
-                    account.Error, PortfolioFor(account.Account, dataMode), account.LatestDecision)).ToArray(),
+                    account.Error, PortfolioFor(account.Account, dataMode), account.LatestDecision)).ToArray();
+            return new(participants,
                 aiActivity.OrderByDescending(item => item.OccurredAt).Take(100).ToArray(),
-                dataMode, IsNonLive: true, StrictContest: false, HoldOnly: true);
+                dataMode, IsNonLive: true, StrictContest: false, HoldOnly: true,
+                Performance: BuildPerformance(participants));
         }
     }
 
@@ -109,13 +111,15 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         var instruments = Snapshot(snapshot);
         lock (sync)
         {
-            return new(aiAccounts.Values.OrderBy(account => account.ModelId, StringComparer.Ordinal)
+            var participants = aiAccounts.Values.OrderBy(account => account.ModelId, StringComparer.Ordinal)
                 .Select(account => new AiProgressAgentDto(account.AgentId, account.ModelId, account.ModelId,
                     account.Status, account.RunId, account.QueuedAt, account.StartedAt, account.CompletedAt,
-                    account.Error, PortfolioFor(account.Account, snapshot.DataMode, instruments), account.LatestDecision)).ToArray(),
+                    account.Error, PortfolioFor(account.Account, snapshot.DataMode, instruments), account.LatestDecision)).ToArray();
+            return new(participants,
                 aiActivity.OrderByDescending(item => item.OccurredAt).Take(100).ToArray(), snapshot.DataMode,
                 IsNonLive: true, StrictContest: false, HoldOnly: false, AssumedExecutionMode,
-                AssumedFills: true, AssumedSekToDkk, AssumedSlippagePercent);
+                AssumedFills: true, AssumedSekToDkk, AssumedSlippagePercent,
+                BuildPerformance(participants));
         }
     }
 
@@ -188,6 +192,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             AddAiActivity(new(request.RunId, request.AgentId, request.ModelId, "succeeded", action,
                 request.Reason.Trim(), null, request.CompletedAt));
             aiRuns.Add(request.RunId, new(fingerprint, decision));
+            RecordPerformance(account.Account, request.CompletedAt, PortfolioFor(account.Account).TotalValueDkk);
             return new(decision, false);
         }
     }
@@ -211,6 +216,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             var account = aiAccounts[request.AgentId];
             ValidateCurrentRun(account, request);
             var action = request.Action.Trim().ToLowerInvariant();
+            PortfolioFor(account.Account, snapshot.DataMode, instruments);
             AiAssumedPaperFillDto? fill = null;
             if (action != "hold")
             {
@@ -243,14 +249,25 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                         throw new PreviewOrderException("maximum-position-value", "The resulting marked position cannot exceed DKK 25,000.");
                     account.Account.CashDkk = Money(account.Account.CashDkk - total);
                     account.Account.Holdings[instrument.Id] = held + request.Quantity;
+                    account.Account.CostBasisDkk[instrument.Id] = Money(
+                        account.Account.CostBasisDkk.GetValueOrDefault(instrument.Id) + total);
                 }
                 else
                 {
                     if (held < request.Quantity)
                         throw new PreviewOrderException("insufficient-holdings", "The paper account does not hold enough shares.");
                     account.Account.CashDkk = Money(account.Account.CashDkk + total);
-                    if (held == request.Quantity) account.Account.Holdings.Remove(instrument.Id);
-                    else account.Account.Holdings[instrument.Id] = held - request.Quantity;
+                    var averageCost = account.Account.CostBasisDkk.GetValueOrDefault(instrument.Id) / held;
+                    if (held == request.Quantity)
+                    {
+                        account.Account.Holdings.Remove(instrument.Id);
+                        account.Account.CostBasisDkk.Remove(instrument.Id);
+                    }
+                    else
+                    {
+                        account.Account.Holdings[instrument.Id] = held - request.Quantity;
+                        account.Account.CostBasisDkk[instrument.Id] = Money(averageCost * (held - request.Quantity));
+                    }
                 }
                 account.Account.Marks[instrument.Id] = instrument;
                 fill = new(instrument.Price, AssumedSekToDkk, AssumedSlippagePercent, fillPrice, total,
@@ -261,6 +278,8 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                 request.Reason.Trim(), request.Confidence, request.Evidence,
                 new(request.RuntimeProvider, request.RuntimeModel, request.ReportSha256), request.CompletedAt, fill);
             CompleteAiDecision(account, request, decision, fingerprint, action);
+            RecordPerformance(account.Account, request.CompletedAt,
+                PortfolioFor(account.Account, snapshot.DataMode, instruments).TotalValueDkk);
             return new(decision, false);
         }
     }
@@ -314,6 +333,8 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                 account.StartedAt = null;
                 account.CompletedAt = null;
                 account.Error = null;
+                if (account.Account.Performance.Count == 0)
+                    RecordPerformance(account.Account, request.OccurredAt, StartingCashDkk);
             }
             else if (status == "running")
             {
@@ -326,6 +347,8 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                 account.Error = request.Error!.Trim();
                 AddAiActivity(new(request.RunId, request.AgentId, request.ModelId, "failed", null, null,
                     account.Error, request.OccurredAt));
+                RecordPerformance(account.Account, request.OccurredAt,
+                    account.Account.Performance.LastOrDefault()?.ValueDkk ?? StartingCashDkk);
             }
             account.Status = status;
         }
@@ -450,14 +473,25 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                     throw new PreviewOrderException("insufficient-cash", "The paper account has insufficient DKK cash.");
                 account.CashDkk = Money(account.CashDkk - total);
                 account.Holdings[instrument.Id] = held + request.Quantity;
+                account.CostBasisDkk[instrument.Id] = Money(
+                    account.CostBasisDkk.GetValueOrDefault(instrument.Id) + total);
             }
             else
             {
                 if (held < request.Quantity)
                     throw new PreviewOrderException("insufficient-holdings", "The paper account does not hold enough shares.");
                 account.CashDkk = Money(account.CashDkk + total);
-                if (held == request.Quantity) account.Holdings.Remove(instrument.Id);
-                else account.Holdings[instrument.Id] = held - request.Quantity;
+                var averageCost = account.CostBasisDkk.GetValueOrDefault(instrument.Id) / held;
+                if (held == request.Quantity)
+                {
+                    account.Holdings.Remove(instrument.Id);
+                    account.CostBasisDkk.Remove(instrument.Id);
+                }
+                else
+                {
+                    account.Holdings[instrument.Id] = held - request.Quantity;
+                    account.CostBasisDkk[instrument.Id] = Money(averageCost * (held - request.Quantity));
+                }
             }
 
             var order = new PreviewOrderDto(Guid.NewGuid(), side, instrument.Id, instrument.Symbol,
@@ -484,8 +518,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
             .Select(item =>
             {
                 var instrument = Instruments.Single(candidate => candidate.Id == item.Key);
-                return new PreviewHoldingDto(instrument.Id, instrument.Symbol, instrument.Name, item.Value,
-                    instrument.PriceDkk!.Value, Money(instrument.PriceDkk.Value * item.Value));
+                return Holding(account, instrument, item.Value, instrument.PriceDkk!.Value);
             }).ToArray();
         var holdingsValue = Money(holdings.Sum(item => item.ValueDkk));
         var total = Money(account.CashDkk + holdingsValue);
@@ -503,8 +536,7 @@ public sealed class PreviewRaceStore(TimeProvider clock)
                     ?? throw new PreviewOrderException("stale-portfolio-mark",
                         "AI exhibition portfolio cannot be valued without a current delayed observation.");
                 var priceDkk = Money(instrument.Price * AssumedSekToDkk);
-                return new PreviewHoldingDto(instrument.Id, instrument.Symbol, instrument.Name, item.Value,
-                    priceDkk, Money(priceDkk * item.Value));
+                return Holding(account, instrument, item.Value, priceDkk);
             }).ToArray();
         var holdingsValue = Money(holdings.Sum(item => item.ValueDkk));
         var total = Money(account.CashDkk + holdingsValue);
@@ -519,6 +551,49 @@ public sealed class PreviewRaceStore(TimeProvider clock)
 
     private static decimal Money(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
     private static decimal Percent(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+
+    private static PreviewHoldingDto Holding(Account account, InstrumentDto instrument, int quantity, decimal priceDkk)
+    {
+        var value = Money(priceDkk * quantity);
+        var cost = account.CostBasisDkk.GetValueOrDefault(instrument.Id);
+        var average = quantity == 0 ? 0m : Money(cost / quantity);
+        var gain = Money(value - cost);
+        var gainPercent = cost == 0m ? 0m : Percent(gain / cost * 100m);
+        return new(instrument.Id, instrument.Symbol, instrument.Name, quantity, priceDkk, value,
+            average, cost, gain, gainPercent);
+    }
+
+    private static void RecordPerformance(Account account, DateTimeOffset at, decimal valueDkk)
+    {
+        var point = new PerformancePointDto(at, Money(valueDkk));
+        if (account.Performance.Count > 0 && account.Performance[^1].At == at)
+            account.Performance[^1] = point;
+        else account.Performance.Add(point);
+    }
+
+    private IReadOnlyList<PerformanceSeriesDto> BuildPerformance(IReadOnlyList<AiProgressAgentDto> participants)
+    {
+        var asOf = clock.GetUtcNow();
+        var models = participants.Select(participant =>
+        {
+            var account = aiAccounts[participant.AgentId].Account;
+            var points = account.Performance.ToList();
+            if (points.Count == 0) points.Add(new(asOf, participant.Portfolio.TotalValueDkk));
+            else if (asOf > points[^1].At) points.Add(new(asOf, participant.Portfolio.TotalValueDkk));
+            return new PerformanceSeriesDto(participant.ModelId, participant.DisplayName, "model", points);
+        }).ToArray();
+        var times = models.SelectMany(series => series.Points).Select(point => point.At)
+            .Distinct().Order().ToArray();
+        decimal ValueAt(PerformanceSeriesDto series, DateTimeOffset at) =>
+            series.Points.LastOrDefault(point => point.At <= at)?.ValueDkk ?? StartingCashDkk;
+        var starting = times.Select(at => new PerformancePointDto(at, StartingCashDkk)).ToArray();
+        var average = times.Select(at => new PerformancePointDto(at,
+            Money(models.Average(series => ValueAt(series, at))))).ToArray();
+        return [..models,
+            new("starting-cash", "Starting cash", "benchmark", starting),
+            new("ai-field-average", "AI field average", "benchmark", average)];
+    }
+
     private static string ToTitleCase(string value) => string.Join(' ', value.Split(' ', StringSplitOptions.RemoveEmptyEntries)
         .Select(word => char.ToUpperInvariant(word[0]) + word[1..].ToLowerInvariant()));
 
@@ -527,7 +602,9 @@ public sealed class PreviewRaceStore(TimeProvider clock)
         public string DisplayName { get; } = displayName;
         public decimal CashDkk { get; set; } = StartingCashDkk;
         public Dictionary<string, int> Holdings { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, decimal> CostBasisDkk { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, InstrumentDto> Marks { get; } = new(StringComparer.Ordinal);
+        public List<PerformancePointDto> Performance { get; } = [];
         public List<PreviewOrderDto> Orders { get; } = [];
         public Dictionary<string, IdempotencyEntry> Idempotency { get; } = new(StringComparer.Ordinal);
     }
