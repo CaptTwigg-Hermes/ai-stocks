@@ -440,8 +440,18 @@ public sealed class PostgresCollectorPersistence(
     }
 }
 
-public sealed class PostgresCollectorReadiness(string connectionString)
+public sealed class PostgresCollectorReadiness(string connectionString, int pollSeconds = 15)
 {
+    /// <summary>
+    /// How stale the last successful poll may be before readiness fails.
+    /// A poll performs full session acquisition and persistence, so it can
+    /// take minutes even when the configured cadence is seconds. The window
+    /// must therefore allow several full cycles, otherwise the service
+    /// reports unready forever while collecting perfectly well.
+    /// </summary>
+    public static TimeSpan StalenessWindow(int pollSeconds) =>
+        TimeSpan.FromMinutes(10) + TimeSpan.FromSeconds(Math.Clamp(pollSeconds, 5, 60) * 4);
+
     public async Task<ReadinessResult> EvaluateAsync(DateTimeOffset asOf, CancellationToken cancellationToken)
     {
         try
@@ -461,7 +471,7 @@ public sealed class PostgresCollectorReadiness(string connectionString)
                   LEFT JOIN instrument_session_stats s ON s.instrument_id=i.id AND s.session_id=e.session_id AND s.complete
                   GROUP BY u.isin,u.order_book_id)
                 SELECT
-                  EXISTS(SELECT 1 FROM collector_runtime_state WHERE last_error IS NULL AND last_poll_succeeded_at >= $1 - interval '2 minutes'),
+                  EXISTS(SELECT 1 FROM collector_runtime_state WHERE last_error IS NULL AND last_poll_succeeded_at >= $1 - $3::interval),
                   EXISTS(SELECT 1 FROM universe),
                   EXISTS(SELECT 1 FROM market_status_snapshots) AND
                     COALESCE((SELECT max(retrieved_at) FROM market_status_rss_artifacts),'-infinity'::timestamptz) >= $1 - interval '2 hours',
@@ -470,6 +480,7 @@ public sealed class PostgresCollectorReadiness(string connectionString)
                   NOT EXISTS(SELECT 1 FROM coverage WHERE sessions <> 20 OR NOT COALESCE(has_trade,false) OR NOT COALESCE(has_observation,false))
                 """, connection);
             command.Parameters.AddWithValue(asOf.ToUniversalTime()); command.Parameters.AddWithValue(expected.Select(x => $"XSTO-{x:yyyy-MM-dd}").ToArray());
+            command.Parameters.AddWithValue(StalenessWindow(pollSeconds));
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return new(false, ["PostgreSQL readiness query returned no row"]);
             string[] messages = ["collector poll is stale or failed", "FIRDS universe is empty", "status provenance is stale", "20 complete consecutive manifests are missing", "instrument zero-day/session coverage is incomplete"];

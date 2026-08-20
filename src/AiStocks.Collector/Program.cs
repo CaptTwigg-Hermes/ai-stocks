@@ -34,7 +34,9 @@ builder.Services.AddSingleton(new ImmutableArchive(archivePath));
 builder.Services.AddSingleton(new SessionManifestStore(archivePath));
 builder.Services.AddSingleton(new DurableFirdsStore(firdsPath));
 builder.Services.AddSingleton(_ => NasdaqStatusMachine.LoadPublicRssBestEffort(Path.Combine(archivePath, "status-state.json")));
-builder.Services.AddSingleton(new CollectorHealth(TimeSpan.FromSeconds(120)));
+var collectorPollSeconds = builder.Configuration.GetValue("COLLECTOR_POLL_SECONDS", 15);
+builder.Services.AddSingleton(new CollectorHealth(
+    PostgresCollectorReadiness.StalenessWindow(collectorPollSeconds)));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient<NasdaqPostTradeClient>(client =>
 {
@@ -61,7 +63,7 @@ builder.Services.AddSingleton(serviceProvider => new PostgresCollectorPersistenc
     serviceProvider.GetRequiredService<DurableFirdsStore>(), serviceProvider.GetRequiredService<NasdaqStatusMachine>(),
     null, null));
 builder.Services.AddSingleton(new PostgresCorporateActionIngestion(databaseUrl));
-builder.Services.AddSingleton(new PostgresCollectorReadiness(databaseUrl));
+builder.Services.AddSingleton(new PostgresCollectorReadiness(databaseUrl, collectorPollSeconds));
 builder.Services.AddHostedService<CollectorWorker>();
 
 var app = builder.Build();

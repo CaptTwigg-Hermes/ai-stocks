@@ -15,6 +15,11 @@ from urllib.parse import urlparse
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src"
+# Each probe cold-starts a .NET executable. On constrained CI runners
+# JIT and assembly loading can take far longer than on a warm developer
+# machine, so a tight timeout turns a healthy build into a false
+# negative. Overridable for slower environments.
+PROBE_TIMEOUT_SECONDS = int(os.environ.get("AISTOCKS_PROBE_TIMEOUT_SECONDS", "60"))
 FORBIDDEN_PACKAGES = {"alpaca.markets", "alpaca.markets.extensions", "ibapi", "interactivebrokers.client", "robinhood.net", "tinkoff.investapi", "ccxt.net"}
 FORBIDDEN_HOSTS = {"api.alpaca.markets", "api.ibkr.com", "api.nordnet.se", "api.avanza.se", "api.robinhood.com"}
 FORBIDDEN_CREDENTIAL = re.compile(r"(?:broker|alpaca|ibkr|interactive_?brokers|nordnet|avanza).*(?:api_?key|secret|token|password)", re.I)
@@ -79,7 +84,7 @@ def order_path_denial_probe(findings: list[str]) -> dict[str, object]:
     try:
         result = subprocess.run(  # noqa: S603  # nosec B603
             [dotnet, str(dll), "--probe-order-path-denial"], cwd=ROOT, env=environment,
-            text=True, capture_output=True, check=False, timeout=10)
+            text=True, capture_output=True, check=False, timeout=PROBE_TIMEOUT_SECONDS)
     except (OSError, subprocess.TimeoutExpired) as error:
         findings.append(f"executable order-path denial probe failed: {error}")
         return unavailable
@@ -130,7 +135,7 @@ def runtime_endpoint_table(executable: str, findings: list[str], environment_nam
     try:
         result = subprocess.run(  # noqa: S603  # nosec B603
             [dotnet, str(dll), "--print-endpoints"], cwd=ROOT, env=environment,
-            text=True, capture_output=True, check=False, timeout=10)
+            text=True, capture_output=True, check=False, timeout=PROBE_TIMEOUT_SECONDS)
     except (OSError, subprocess.TimeoutExpired) as error:
         findings.append(f"runtime endpoint inventory failed for {executable}: {error}")
         return {"executable": executable, "environment": environment_name, "routes": []}
