@@ -93,12 +93,33 @@ public sealed class PersistenceContractTests
     [Fact]
     public void MigrationChecksumIsStableAndSha256()
     {
-        Assert.Equal(18, MigrationCatalog.All.Count);
+        Assert.Equal(19, MigrationCatalog.All.Count);
         foreach (var migration in MigrationCatalog.All)
         {
             Assert.Matches("^[0-9a-f]{64}$", migration.Sha256);
             Assert.Equal(migration.Sha256, MigrationCatalog.ComputeSha256(migration.Sql));
         }
+    }
+
+    [Fact]
+    public void GlobalV2MigrationSeparatesRacesAndEnforcesPaperOnlyAuditContracts()
+    {
+        var sql = MigrationCatalog.All.Single(migration => migration.Id == "019_v2_global_races").Sql;
+        Assert.Contains("human_sandbox", sql, StringComparison.Ordinal);
+        Assert.Contains("ai_league", sql, StringComparison.Ordinal);
+        Assert.Contains("mixed_exhibition", sql, StringComparison.Ordinal);
+        Assert.Contains("initial_cash_dkk numeric(18,2) NOT NULL CHECK (initial_cash_dkk = 100000.00)", sql,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("v2_one_initial_cash_per_participant", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("join_request_hash", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("request_hash", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("rationale_json", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("evidence_json", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("provider_approved boolean NOT NULL CHECK (provider_approved)", sql,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("quote_currency char(3) NOT NULL CHECK (quote_currency = 'DKK')", sql,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("broker", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -23,12 +23,18 @@ builder.Services.Configure<JsonOptions>(options =>
 
 var previewMode = builder.Configuration["PREVIEW_MODE"] == "1";
 var aiExhibitionMode = builder.Configuration["AI_EXHIBITION_MODE"] == "1";
+var globalV2Mode = builder.Configuration["GLOBAL_V2_MODE"] == "1";
 var localAuth = builder.Environment.IsEnvironment("Testing") || (builder.Environment.IsDevelopment() && previewMode);
 if (previewMode && !localAuth)
     throw new InvalidOperationException("PREVIEW_MODE is permitted only in Development or Testing.");
 if (aiExhibitionMode && (!previewMode || !localAuth))
     throw new InvalidOperationException("AI_EXHIBITION_MODE requires PREVIEW_MODE in Development or Testing.");
+if (globalV2Mode && previewMode)
+    throw new InvalidOperationException("GLOBAL_V2_MODE and PREVIEW_MODE are separate deployment surfaces.");
 var aiExhibitionKey = aiExhibitionMode ? Required("AI_EXHIBITION_KEY") : null;
+var globalV2RunnerKey = globalV2Mode
+    ? (builder.Environment.IsEnvironment("Testing") ? "testing-global-v2-runner-key-0001" : Required("GLOBAL_V2_RUNNER_KEY"))
+    : null;
 var aiExhibitionArchivePath = aiExhibitionMode ? Required("AI_EXHIBITION_ARCHIVE_PATH") : null;
 var aiExhibitionDatabaseUrl = aiExhibitionMode && !builder.Environment.IsEnvironment("Testing")
     ? PostgresConfiguration.Require(PostgresConfiguration.Environment(), "DATABASE_URL") : null;
@@ -106,6 +112,8 @@ builder.Services.AddRateLimiter(options =>
         }));
 });
 builder.Services.AddSingleton(TimeProvider.System);
+if (globalV2Mode)
+    builder.Services.AddSingleton<GlobalRaceStore>();
 if (localAuth)
 {
     if (aiExhibitionDatabaseUrl is not null)
@@ -141,7 +149,73 @@ app.MapGet("/healthz", () => Results.Ok(new HealthResponse("ready", localAuth ? 
 
 var api = app.MapGroup("/api/v1").RequireAuthorization();
 api.MapGet("/me", (ClaimsPrincipal user) => Results.Ok(new IdentityDto(Identity(user), Role(user))));
-if (localAuth)
+if (globalV2Mode)
+{
+    api.MapGet("/races", (GlobalRaceStore store) => Results.Ok(new { items = store.Races() }));
+    api.MapPost("/races/{raceId:guid}/join", (Guid raceId, ClaimsPrincipal user, GlobalRaceStore store, HttpContext context) =>
+    {
+        if (!IdempotencyKey(context, out var key))
+            return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
+                StatusCodes.Status400BadRequest, context, "Send exactly one Idempotency-Key header.");
+        try
+        {
+            var result = store.Join(Identity(user), raceId, key);
+            context.Response.Headers["Idempotency-Replayed"] = result.Replayed ? "true" : "false";
+            return result.Replayed ? Results.Ok(result.Participant) : Results.Created($"/api/v1/races/{raceId}/accounts/me/portfolio", result.Participant);
+        }
+        catch (GlobalRaceException exception) { return GlobalProblem(exception, context); }
+    });
+    api.MapGet("/races/{raceId:guid}/leaderboard", (Guid raceId, GlobalRaceStore store, HttpContext context) =>
+    {
+        try { return Results.Ok(new { items = store.Leaderboard(raceId) }); }
+        catch (GlobalRaceException exception) { return GlobalProblem(exception, context); }
+    });
+    api.MapGet("/races/{raceId:guid}/accounts/me/portfolio", (Guid raceId, ClaimsPrincipal user, GlobalRaceStore store, HttpContext context) =>
+    {
+        try { return Results.Ok(store.Portfolio(Identity(user), raceId)); }
+        catch (GlobalRaceException exception) { return GlobalProblem(exception, context, StatusCodes.Status404NotFound); }
+    });
+    api.MapGet("/instruments/search", (string? q, GlobalRaceStore store) => Results.Ok(store.Search(q)));
+    api.MapGet("/instruments/{instrumentId}", (string instrumentId, GlobalRaceStore store, HttpContext context) =>
+    {
+        try { return Results.Ok(store.Instrument(instrumentId)); }
+        catch (GlobalRaceException exception) { return GlobalProblem(exception, context, StatusCodes.Status404NotFound); }
+    });
+    api.MapGet("/instruments/{instrumentId}/quote", (string instrumentId, GlobalRaceStore store, HttpContext context) =>
+    {
+        try { return Results.Ok(store.Quote(instrumentId)); }
+        catch (GlobalRaceException exception) { return GlobalProblem(exception, context, StatusCodes.Status404NotFound); }
+    });
+    api.MapGet("/races/{raceId:guid}/accounts/me/orders", (Guid raceId, ClaimsPrincipal user, GlobalRaceStore store, HttpContext context) =>
+    {
+        try { return Results.Ok(new { items = store.Orders(Identity(user), raceId) }); }
+        catch (GlobalRaceException exception) { return GlobalProblem(exception, context, StatusCodes.Status404NotFound); }
+    });
+    api.MapPost("/races/{raceId:guid}/accounts/me/orders", (Guid raceId, ClaimsPrincipal user, GlobalHumanOrderRequest request,
+        GlobalRaceStore store, HttpContext context) =>
+    {
+        if (!IdempotencyKey(context, out var key))
+            return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
+                StatusCodes.Status400BadRequest, context, "Send exactly one Idempotency-Key header.");
+        try
+        {
+            var result = store.SubmitHumanOrder(Identity(user), raceId, key, request);
+            context.Response.Headers["Idempotency-Replayed"] = result.Replayed ? "true" : "false";
+            return result.Replayed ? Results.Ok(result.Order) : Results.Accepted($"/api/v1/races/{raceId}/accounts/me/orders/{result.Order.Id}", result.Order);
+        }
+        catch (GlobalRaceException exception) { return GlobalProblem(exception, context); }
+    }).RequireRateLimiting("orders");
+    api.MapPost("/races/{raceId:guid}/accounts/me/orders/{orderId:guid}/cancel", (Guid raceId, Guid orderId, ClaimsPrincipal user,
+        GlobalRaceStore store, HttpContext context) =>
+    {
+        if (!IdempotencyKey(context, out var key))
+            return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
+                StatusCodes.Status400BadRequest, context, "Send exactly one Idempotency-Key header.");
+        try { return Results.Ok(store.Cancel(Identity(user), raceId, orderId, key)); }
+        catch (GlobalRaceException exception) { return GlobalProblem(exception, context); }
+    }).RequireRateLimiting("orders");
+}
+else if (localAuth)
 {
     if (aiExhibitionMode)
         api.MapGet("/instruments", (string? query, DelayedNasdaqInstrumentStore store) => Results.Ok(store.Search(query)));
@@ -223,6 +297,24 @@ if (localAuth)
     }
 }
 
+if (globalV2Mode)
+{
+    app.MapPost("/internal/v2/races/{raceId:guid}/ai-orders", (Guid raceId, GlobalAiOrderRequest request,
+        GlobalRaceStore store, HttpContext context) =>
+    {
+        if (!ValidGlobalRunner(context, globalV2RunnerKey!)) return Results.Unauthorized();
+        if (!IdempotencyKey(context, out var key))
+            return ApiEndpointResults.Problem("idempotency-key-required", "Idempotency key required",
+                StatusCodes.Status400BadRequest, context, "Send exactly one Idempotency-Key header.");
+        try
+        {
+            var result = store.SubmitAiOrder(raceId, key, request);
+            return result.Replayed ? Results.Ok(result.Order) : Results.Accepted(value: result.Order);
+        }
+        catch (GlobalRaceException exception) { return GlobalProblem(exception, context); }
+    }).WithMetadata(new Microsoft.AspNetCore.Cors.DisableCorsAttribute());
+}
+
 if (app.Environment.IsEnvironment("Testing"))
     app.MapGet("/__endpoint-inventory", () => Results.Ok(EndpointInventory(app)));
 
@@ -274,6 +366,26 @@ static bool ValidSecret(HttpContext context, string expected)
     var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expected));
     return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
 }
+static bool ValidGlobalRunner(HttpContext context, string expected)
+{
+    if (!context.Request.Headers.TryGetValue("X-AI-Stocks-Runner-Key", out var values) || values.Count != 1) return false;
+    var actualHash = SHA256.HashData(Encoding.UTF8.GetBytes(values.ToString()));
+    var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expected));
+    return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
+}
+static bool IdempotencyKey(HttpContext context, out string key)
+{
+    if (context.Request.Headers.TryGetValue("Idempotency-Key", out var values) && values.Count == 1)
+    {
+        key = values.ToString();
+        return true;
+    }
+    key = string.Empty;
+    return false;
+}
+static IResult GlobalProblem(GlobalRaceException exception, HttpContext context,
+    int status = StatusCodes.Status400BadRequest) =>
+    ApiEndpointResults.Problem(exception.Code, "Global paper race request rejected", status, context, exception.Message);
 static string Identity(ClaimsPrincipal user) =>
     user.FindFirstValue(ClaimTypes.Email) ?? throw new InvalidOperationException("Authenticated identity lacks email.");
 static string Role(ClaimsPrincipal user) => user.FindFirstValue(ClaimTypes.Role) ?? "viewer";
