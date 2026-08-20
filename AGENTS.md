@@ -10,3 +10,24 @@
 - Production code targets .NET 10 and treats warnings as errors.
 - Before source changes, run `graphify query "<task>"` when `graphify-out/graph.json` exists. Run `graphify update .` after source changes.
 - Do not commit or release unless the complete launch gate in the acceptance contract passes.
+
+## Repository and worktree hygiene
+
+- `/opt/data/ai-stocks-build/coordinator` is the single working
+  checkout and always tracks `origin/main`. Work there unless a
+  task genuinely requires parallel isolated checkouts.
+- If you create extra worktrees, delete them in the same session.
+  Never leave a stale checkout behind: a later agent can mistake
+  it for live code and rebuild work that already shipped.
+- Before treating any checkout as authoritative, confirm it:
+  run `git status -sb` and check it tracks current `origin/main`.
+- `git log origin/main..<branch>` overstates divergence when
+  history was squashed or rebased. Use `git cherry origin/main
+  <branch>` to test patch-equivalence, and compare file contents
+  against `origin/main` before concluding work is unmerged.
+- Every project in `AiStocks.slnx` is built and tested by CI.
+  When adding a project, add it AND its test project to the
+  solution, or its tests will silently never run.
+- Archived history from the 2026-08-20 cleanup lives in local
+  tags `archive/2026-08-20/*` and tarballs under
+  `/opt/data/archive/ai-stocks-2026-08-20/`.
