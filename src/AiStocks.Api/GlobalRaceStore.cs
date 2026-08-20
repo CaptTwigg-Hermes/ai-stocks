@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Serialization;
+using AiStocks.Core;
 
 namespace AiStocks.Api;
 
@@ -185,14 +186,16 @@ public sealed class GlobalRaceStore(TimeProvider clock)
             request.Rationale.Thesis.Trim().Length > 2_000 || request.Rationale.Confidence is < 0m or > 1m ||
             request.Rationale.Evidence is null || request.Rationale.Evidence.Count == 0 ||
             request.Rationale.Evidence.Count > 20 || request.Rationale.Evidence.Any(item =>
+                item.Url is not { Length: <= 2_048 } ||
                 !Uri.TryCreate(item.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
-                item.PublishedAt == default || string.IsNullOrWhiteSpace(item.ExactExcerpt) ||
+                item.PublishedAt == default || item.PublishedAt > clock.GetUtcNow() ||
+                string.IsNullOrWhiteSpace(item.ExactExcerpt) ||
                 item.ExactExcerpt.Length > 2_000 || !ValidSha(item.ContentSha256)))
             throw new GlobalRaceException("invalid-ai-rationale", "AI orders require bounded thesis, confidence, and structured HTTPS evidence.");
-        if (string.IsNullOrWhiteSpace(request.ModelId))
-            throw new GlobalRaceException("invalid-model", "AI model identity is required from the trusted runner.");
+        if (!ContestContract.Agents.Any(agent => string.Equals(agent.ModelId, request.ModelId, StringComparison.Ordinal)))
+            throw new GlobalRaceException("invalid-model", "AI model identity must be one fixed trusted competitor.");
         var instrument = Instrument(request.InstrumentId);
-        if (request.Side?.Trim().ToLowerInvariant() is not ("buy" or "sell") || request.Quantity < 1)
+        if (request.Side?.Trim().ToLowerInvariant() is not ("buy" or "sell") || request.Quantity is < 1 or > 100_000)
             throw new GlobalRaceException("invalid-order", "AI order shape is invalid.");
         var hash = Hash($"ai\n{raceId}\n{request.ModelId}\n{System.Text.Json.JsonSerializer.Serialize(request)}");
         lock (sync)

@@ -48,16 +48,28 @@ public sealed class GlobalRaceV2Tests
     }
 
     [Fact]
-    public void Ai_trade_requires_structured_rationale_and_evidence()
+    public void Ai_trade_requires_trusted_model_identity_structured_rationale_and_bounded_intent()
     {
         var store = new GlobalRaceStore(TimeProvider.System);
-        var invalid = new GlobalAiOrderRequest("gpt-5.6-sol", "buy", "novo-dk", 1,
-            new GlobalAiRationale("", [], 0.8m));
+        var evidence = new[]
+        {
+            new GlobalEvidence("https://example.invalid/evidence", DateTimeOffset.UtcNow.AddMinutes(-5),
+                "Exact public excerpt", new string('a', 64))
+        };
+        var rationale = new GlobalAiRationale("Bounded thesis", evidence, 0.8m);
+        var valid = store.SubmitAiOrder(GlobalRaceStore.AiLeagueRaceId, "ai-order-key-0001",
+            new GlobalAiOrderRequest("gpt-5.6-sol", "buy", "novo-dk", 1, rationale));
 
-        var exception = Assert.Throws<GlobalRaceException>(() => store.SubmitAiOrder(
-            GlobalRaceStore.AiLeagueRaceId, "ai-order-key-0001", invalid));
-
-        Assert.Equal("invalid-ai-rationale", exception.Code);
+        Assert.Equal("queued", valid.Order.Status);
+        Assert.Null(valid.Order.FillPriceDkk);
+        var model = Assert.Throws<GlobalRaceException>(() => store.SubmitAiOrder(
+            GlobalRaceStore.AiLeagueRaceId, "ai-order-key-0002",
+            new GlobalAiOrderRequest("attacker-selected-model", "buy", "novo-dk", 1, rationale)));
+        Assert.Equal("invalid-model", model.Code);
+        var quantity = Assert.Throws<GlobalRaceException>(() => store.SubmitAiOrder(
+            GlobalRaceStore.AiLeagueRaceId, "ai-order-key-0003",
+            new GlobalAiOrderRequest("gpt-5.6-sol", "buy", "novo-dk", 100_001, rationale)));
+        Assert.Equal("invalid-order", quantity.Code);
     }
 
     [Fact]
