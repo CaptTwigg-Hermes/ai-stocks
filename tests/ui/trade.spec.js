@@ -40,7 +40,13 @@ test.beforeAll(async () => {
     let body = "";
     request.on("data", chunk => { body += chunk; });
     request.on("end", () => {
-      requests.push({ method: request.method, path: url.pathname, query: url.search, body });
+      requests.push({
+        method: request.method,
+        path: url.pathname,
+        query: url.search,
+        body,
+        idempotencyKey: request.headers["idempotency-key"]
+      });
       if (url.pathname === "/") return asset(response, "index.html", "text/html");
       if (url.pathname === "/trade") return asset(response, "trade.html", "text/html");
       if (url.pathname === "/trade.js") return asset(response, "trade.js", "text/javascript");
@@ -129,6 +135,7 @@ test("join search and human order use exact v2 endpoints and intent-only payload
   expect(requests.some(item => item.method === "POST" && item.path === "/api/v1/races/race-global/join")).toBeTruthy();
   expect(requests.some(item => item.path === "/api/v1/instruments/search" && item.query === "?q=Apple+%26+sons&limit=20")).toBeTruthy();
   const order = requests.find(item => item.method === "POST" && item.path === "/api/v1/races/race-global/accounts/me/orders");
+  expect(order.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/i);
   expect(JSON.parse(order.body)).toEqual({
     side: "sell", instrumentId: fixtures.instrument.instrumentId, quantity: 2, note: hostile
   });

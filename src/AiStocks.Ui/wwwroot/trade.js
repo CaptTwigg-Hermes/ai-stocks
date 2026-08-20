@@ -277,6 +277,7 @@
     try {
       const order = await api(`/api/v1/races/${raceId()}/accounts/me/orders`, {
         method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify(payload)
       });
       ui.orderStatus.textContent = `Order ${order.id || "accepted"}: ${order.status || "status unavailable"}. No client-side fill was assumed.`;
