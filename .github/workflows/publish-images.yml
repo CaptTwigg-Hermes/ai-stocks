@@ -47,7 +47,7 @@ jobs:
         run: |
           docker run --rm --network host -e AISTOCKS_TEST_DATABASE_URL -v "$PWD:/src" -w /src \
             mcr.microsoft.com/dotnet/sdk:10.0-noble@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 \
-            bash -ec 'dotnet restore AiStocks.slnx --locked-mode && dotnet build AiStocks.slnx -c Release --no-restore && dotnet test AiStocks.slnx -c Release --no-build --no-restore'
+            bash -ec 'dotnet restore AiStocks.slnx --locked-mode && dotnet build AiStocks.slnx -c Release --no-restore && dotnet test AiStocks.slnx -c Release --no-build --no-restore -m:1'
 
       - name: Set up host .NET SDK for executable inventory probes
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1

@@ -346,7 +346,7 @@ def test_github_publishes_every_dockge_image_target():
     assert verify_job["services"]["postgres"]["image"].startswith("postgres:17")
     assert "AISTOCKS_TEST_DATABASE_URL" in verify_job["env"]
     assert "TEST_POSTGRES_URL" in verify_job["env"]
-    assert "dotnet test" in verify_steps
+    assert "dotnet test AiStocks.slnx -c Release --no-build --no-restore -m:1" in verify_steps
     assert "tests/postgres/bootstrap.sql" in verify_steps
     bootstrap = (ROOT / "tests/postgres/bootstrap.sql").read_text()
     for role in ("ai_stocks_worker", "ai_stocks_operations", "ai_stocks_web"):
@@ -413,6 +413,7 @@ def test_release_gate_and_restore_fail_closed_with_scheduled_backup():
     cycle = (ROOT / "scripts" / "backup-cycle.sh").read_text()
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     assert "AISTOCKS_TEST_DATABASE_URL is required" in verify
+    assert '\"$DOTNET\" test AiStocks.slnx -c Release --no-build --no-restore -m:1' in verify
     assert "TEST_POSTGRES_URL is required" in verify
     assert "/workspace/house-consensus" not in verify
     assert "uv run pytest -q" in verify

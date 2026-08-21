@@ -44,7 +44,9 @@ export DOTNET_NOLOGO=1
 "$DOTNET" restore AiStocks.slnx --locked-mode
 "$DOTNET" format AiStocks.slnx --verify-no-changes --no-restore
 "$DOTNET" build AiStocks.slnx -c Release --no-restore
-"$DOTNET" test AiStocks.slnx -c Release --no-build --no-restore \
+# Test projects provision cluster-global PostgreSQL roles; serialize project
+# execution so independent disposable databases cannot race role creation.
+"$DOTNET" test AiStocks.slnx -c Release --no-build --no-restore -m:1 \
   --logger 'console;verbosity=minimal'
 command -v uv >/dev/null 2>&1 || { printf 'verify-release: uv is required\n' >&2; exit 1; }
 uv run pytest -q
