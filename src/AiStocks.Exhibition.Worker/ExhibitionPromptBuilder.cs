@@ -20,9 +20,9 @@ public static class ExhibitionPromptBuilder
         ExhibitionDecision candidate,
         IReadOnlyList<VerifiedEvidence> verifiedEvidence) => originalPrompt + $$"""
 
-        EVIDENCE CORRECTION: Independent verification rejected evidence from {{rejectedHost}} for current instrument {{candidate.InstrumentId ?? "hold"}}. The initial issuer survey is complete; do not repeat it. Research only this instrument and its selected catalyst. The only tools you may call are web_search and mcp_research_fetch_public_https_tool, solely to find a replacement on a different source host. Use a different source host whose bounded fetch result says verifier_eligible=true, then copy only verifier_publication_time and an exact evidence_candidates sentence.
+        EVIDENCE CORRECTION: Independent verification rejected evidence from {{rejectedHost}} for current instrument {{candidate.InstrumentId ?? "hold"}}. The initial issuer survey is complete. Do not call tools or research again. Immediately return one strict JSON decision using only the bounded prior context below.
         {{DecisionContext(candidate, verifiedEvidence)}}
-        This is your single corrective retry. Return only the strict JSON object. Do not reuse the rejected host, invent evidence, or force a trade.
+        This is your single corrective retry. Use only the entries in verifiedEvidence, copied unchanged, as evidence for BUY or SELL. If verifiedEvidence is empty or insufficient for the candidate action, return HOLD with null instrumentId, quantity 0, and an empty evidence array. Return only the strict JSON object. Do not reuse the rejected host, invent evidence, or force a trade.
         """;
 
     public static string RetryAfterAdvancedSnapshot(

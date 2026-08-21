@@ -70,7 +70,7 @@ public sealed class ExhibitionPromptBuilderTests
     }
 
     [Fact]
-    public void RetryAfterRejectedEvidence_ScopesResearchToSelectedInstrument()
+    public void RetryAfterRejectedEvidence_UsesOnlyVerifiedContextWithoutMoreResearch()
     {
         var agent = ContestContract.Agents[0];
         var claim = new AiStocks.Research.Decisions.EvidenceClaim(
@@ -84,12 +84,14 @@ public sealed class ExhibitionPromptBuilderTests
             "original", "rejected.example", candidate, [verified]);
 
         Assert.Contains("initial issuer survey is complete", prompt, StringComparison.Ordinal);
-        Assert.Contains("do not repeat it", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not call tools or research again", prompt, StringComparison.Ordinal);
+        Assert.Contains("Use only the entries in verifiedEvidence", prompt, StringComparison.Ordinal);
+        Assert.Contains("If verifiedEvidence is empty", prompt, StringComparison.Ordinal);
         Assert.Contains("SE0000115446", prompt, StringComparison.Ordinal);
-        Assert.Contains("verifier_eligible=true", prompt, StringComparison.Ordinal);
         Assert.Contains("rejected.example", prompt, StringComparison.Ordinal);
         Assert.Contains("candidate thesis", prompt, StringComparison.Ordinal);
         Assert.Contains("verified excerpt", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("find a replacement", prompt, StringComparison.Ordinal);
     }
 
     [Fact]

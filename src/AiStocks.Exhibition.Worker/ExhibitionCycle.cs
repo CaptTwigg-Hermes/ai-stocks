@@ -226,7 +226,7 @@ public sealed class ExhibitionCycle(
         {
             var rejectedHost = exception.Host;
             logger.LogWarning(exception,
-                "Exhibition agent {AgentId} supplied rejected evidence from {Host} for {RunId}; retrying once with another source host",
+                "Exhibition agent {AgentId} supplied rejected evidence from {Host} for {RunId}; retrying once from already-verified context",
                 agent.Id, rejectedHost, runId);
             var retryPrompt = ExhibitionPromptBuilder.RetryAfterRejectedEvidence(
                 prompt, rejectedHost, decision, exception.VerifiedEvidence);
@@ -236,9 +236,23 @@ public sealed class ExhibitionCycle(
                     StringComparer.OrdinalIgnoreCase.Equals(claim.Url.IdnHost, rejectedHost)))
                 throw new EvidenceVerificationException(
                     "Corrective evidence reused the rejected source host.");
+            EnsureCorrectionUsesOnlyVerifiedEvidence(decision, exception.VerifiedEvidence);
             return (execution, decision,
                 await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false), true);
         }
+    }
+
+    private static void EnsureCorrectionUsesOnlyVerifiedEvidence(
+        ExhibitionDecision decision,
+        IReadOnlyList<VerifiedEvidence> verifiedEvidence)
+    {
+        var allowed = verifiedEvidence
+            .Select(item => (item.FinalUrl.AbsoluteUri, item.PublishedAt, item.ExactExcerpt))
+            .ToHashSet();
+        if (decision.Evidence.Any(claim =>
+                !allowed.Contains((claim.Url.AbsoluteUri, claim.PublishedAt, claim.ExactExcerpt))))
+            throw new EvidenceVerificationException(
+                "Corrective evidence was not already independently verified.");
     }
 
     private async Task<IReadOnlyList<VerifiedEvidence>> VerifyEvidenceAsync(

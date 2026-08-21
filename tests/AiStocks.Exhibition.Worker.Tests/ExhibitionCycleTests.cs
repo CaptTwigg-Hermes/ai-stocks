@@ -426,7 +426,7 @@ public sealed class ExhibitionCycleTests
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
 
     [Fact]
-    public async Task RunAsync_RetriesRejectedEvidenceOnceWithADifferentSourceHost()
+    public async Task RunAsync_RetriesRejectedEvidenceOnceUsingOnlyAlreadyVerifiedEvidence()
     {
         var affected = ContestContract.Agents[0];
         var api = new FakeApi();
@@ -434,7 +434,6 @@ public sealed class ExhibitionCycleTests
         {
             FailingAgentId = null,
             Action = "buy",
-            AlternateEvidenceOnSecondInvocation = true,
             RejectedEvidenceSecondOnFirstInvocation = true
         };
         var verifier = new FakeVerifier { RejectUrl = new Uri("https://rejected.example/news") };
@@ -448,15 +447,15 @@ public sealed class ExhibitionCycleTests
         Assert.Equal(2, invoker.InvocationCounts[affected.Id]);
         Assert.All(ContestContract.Agents.Where(agent => agent.Id != affected.Id),
             agent => Assert.Equal(1, invoker.InvocationCounts[agent.Id]));
-        Assert.Contains("different source host", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("Do not call tools or research again", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
         Assert.Contains("rejected.example", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
         Assert.Contains("BEGIN SERVER-OWNED UNTRUSTED PRIOR CONTEXT", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
         Assert.Contains("Assumed-fill paper decision", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
         Assert.Contains("https://example.com/news", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
         Assert.Contains("Exact public text", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
-        Assert.Contains("The only tools you may call", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("Use only the entries in verifiedEvidence", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
         using var posted = JsonDocument.Parse(api.Posts[0]);
-        Assert.Equal("https://alternate.example/news",
+        Assert.Equal("https://example.com/news",
             posted.RootElement.GetProperty("evidence")[0].GetProperty("url").GetString());
     }
 
@@ -484,6 +483,30 @@ public sealed class ExhibitionCycleTests
         Assert.Contains("reused the rejected source host", result.Failures[0].Error, StringComparison.Ordinal);
         Assert.Equal(2, invoker.InvocationCounts[affected.Id]);
         Assert.Equal(3, api.Posts.Count);
+    }
+
+    [Fact]
+    public async Task RunAsync_RejectsNewUnverifiedEvidenceDuringCorrection()
+    {
+        var affected = ContestContract.Agents[0];
+        var api = new FakeApi();
+        var invoker = new FakeInvoker
+        {
+            FailingAgentId = null,
+            Action = "buy",
+            RejectedEvidenceSecondOnFirstInvocation = true,
+            AlternateEvidenceOnSecondInvocation = true
+        };
+        var verifier = new FakeVerifier { RejectUrl = new Uri("https://rejected.example/news") };
+        var cycle = CreateCycle(api, invoker, verifier);
+
+        var result = await cycle.RunAsync(
+            DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(3, result.Succeeded);
+        Assert.Single(result.Failures);
+        Assert.Equal(affected.Id, result.Failures[0].AgentId);
+        Assert.Contains("not already independently verified", result.Failures[0].Error, StringComparison.Ordinal);
     }
 
     [Theory]
