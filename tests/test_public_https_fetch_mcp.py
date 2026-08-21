@@ -331,6 +331,14 @@ def test_html_head_text_is_never_verifier_eligible_evidence():
     assert "Head-only catalyst" not in result["discovery_text"]
 
 
+def test_title_text_is_never_verifier_eligible_even_when_misplaced():
+    module = load_module()
+    document = b'''<html><head><meta name="datePublished" content="2026-08-19T08:00:00Z"></head>
+    <body><title>Misplaced title catalyst</title><p>Body catalyst.</p></body></html>'''
+    result = module.extract_document("https://example.com/news", "text/html", document)
+    assert result["evidence_candidates"] == ["Body catalyst."]
+
+
 def test_all_publication_metadata_is_checked_before_output_bounding():
     module = load_module()
     instant = datetime(2026, 8, 19, 8, tzinfo=timezone.utc)

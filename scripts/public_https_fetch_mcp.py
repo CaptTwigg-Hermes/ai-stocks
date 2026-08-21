@@ -181,7 +181,7 @@ class _DocumentParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         lower = tag.lower()
-        if lower in {"head", "script", "style", "noscript", "svg", "template"}:
+        if lower in {"head", "title", "script", "style", "noscript", "svg", "template"}:
             self._blocked_depth += 1
         names = {key.lower() for key, _value in attrs}
         values: dict[str, str] = {}
@@ -226,7 +226,7 @@ class _DocumentParser(HTMLParser):
         if matching_index is not None and lower == "script" and self._structured_depth:
             self._structured_depth -= 1
         if (matching_index is not None and
-                lower in {"head", "script", "style", "noscript", "svg", "template"} and self._blocked_depth):
+                lower in {"head", "title", "script", "style", "noscript", "svg", "template"} and self._blocked_depth):
             self._blocked_depth -= 1
 
     def handle_data(self, data: str) -> None:
