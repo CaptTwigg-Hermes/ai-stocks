@@ -236,7 +236,11 @@ class _DocumentParser(HTMLParser):
             value = re.sub(r"\s+", " ", html.unescape(data)).strip()
             if value:
                 self.visible.append(value)
-            if not any(unicodedata.category(character).startswith("C") for character in data):
+            if not any(
+                unicodedata.category(character).startswith("C")
+                and DOTNET_WHITESPACE_RE.fullmatch(character) is None
+                for character in data
+            ):
                 evidence_value = DOTNET_WHITESPACE_RE.sub(" ", data).strip(" ")
                 if evidence_value:
                     self.evidence_visible.append(evidence_value)

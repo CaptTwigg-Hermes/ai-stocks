@@ -311,6 +311,15 @@ def test_html_without_css_exposes_verifier_aligned_visible_text():
     assert result["ineligibility_reason"] is None
 
 
+def test_html_without_css_normalizes_verifier_whitespace():
+    module = load_module()
+    document = b'''<html><head><meta name="datePublished" content="2026-08-19T08:00:00Z"></head>
+    <body><p>Visible\n catalyst.</p></body></html>'''
+    result = module.extract_document("https://example.com/news", "text/html", document)
+    assert result["evidence_candidates"] == ["Visible catalyst."]
+    assert result["verifier_eligible"] is True
+
+
 def test_html_without_css_rejects_transform_unstable_visible_text():
     module = load_module()
     document = b'''<html><head><meta name="datePublished" content="2026-08-19T08:00:00Z"></head>
