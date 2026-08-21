@@ -193,7 +193,8 @@ def test_ai_exhibition_and_market_warmup_have_explicit_isolated_services():
     assert exhibition["environment"]["AI_EXHIBITION_KEY"].startswith("${AI_EXHIBITION_KEY:?")
     assert exhibition["environment"]["HERMES_CREDENTIAL_FILE"] == "/run/hermes-credentials/copilot.env"
     assert exhibition["volumes"] == [
-        "${HERMES_COPILOT_ENV_FILE:?set a mode-0600 Copilot-only Hermes env file}:/run/hermes-credentials/copilot.env:ro"
+        "${HERMES_COPILOT_ENV_FILE:?set a mode-0600 Copilot-only Hermes env file}:/run/hermes-credentials/copilot.env:ro",
+        "exhibition-strategy-memory:/data/strategy-memory",
     ]
     assert services["api"]["environment"]["AI_EXHIBITION_MODE"] == "1"
     assert services["api"]["environment"]["AI_EXHIBITION_KEY"].startswith("${AI_EXHIBITION_KEY:?")
