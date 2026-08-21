@@ -236,23 +236,29 @@ public sealed class ExhibitionCycle(
                     StringComparer.OrdinalIgnoreCase.Equals(claim.Url.IdnHost, rejectedHost)))
                 throw new EvidenceVerificationException(
                     "Corrective evidence reused the rejected source host.");
-            EnsureCorrectionUsesOnlyVerifiedEvidence(decision, exception.VerifiedEvidence);
-            return (execution, decision,
-                await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false), true);
+            var correctionEvidence = SelectAlreadyVerifiedCorrectionEvidence(
+                decision, exception.VerifiedEvidence);
+            return (execution, decision, correctionEvidence, true);
         }
     }
 
-    private static void EnsureCorrectionUsesOnlyVerifiedEvidence(
+    private static IReadOnlyList<VerifiedEvidence> SelectAlreadyVerifiedCorrectionEvidence(
         ExhibitionDecision decision,
         IReadOnlyList<VerifiedEvidence> verifiedEvidence)
     {
-        var allowed = verifiedEvidence
-            .Select(item => (item.FinalUrl.AbsoluteUri, item.PublishedAt, item.ExactExcerpt))
-            .ToHashSet();
-        if (decision.Evidence.Any(claim =>
-                !allowed.Contains((claim.Url.AbsoluteUri, claim.PublishedAt, claim.ExactExcerpt))))
-            throw new EvidenceVerificationException(
-                "Corrective evidence was not already independently verified.");
+        var selected = new List<VerifiedEvidence>(decision.Evidence.Count);
+        foreach (var claim in decision.Evidence)
+        {
+            var match = verifiedEvidence.FirstOrDefault(item =>
+                StringComparer.Ordinal.Equals(item.FinalUrl.AbsoluteUri, claim.Url.AbsoluteUri) &&
+                item.PublishedAt == claim.PublishedAt &&
+                StringComparer.Ordinal.Equals(item.ExactExcerpt, claim.ExactExcerpt));
+            if (match is null)
+                throw new EvidenceVerificationException(
+                    "Corrective evidence was not already independently verified.");
+            selected.Add(match);
+        }
+        return selected;
     }
 
     private async Task<IReadOnlyList<VerifiedEvidence>> VerifyEvidenceAsync(

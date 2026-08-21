@@ -457,6 +457,7 @@ public sealed class ExhibitionCycleTests
         using var posted = JsonDocument.Parse(api.Posts[0]);
         Assert.Equal("https://example.com/news",
             posted.RootElement.GetProperty("evidence")[0].GetProperty("url").GetString());
+        Assert.Equal(7, verifier.Calls);
     }
 
     [Fact]
