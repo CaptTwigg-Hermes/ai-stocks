@@ -42,10 +42,6 @@ def test_dockge_compose_separates_and_hardens_services():
     assert "DATABASE_URL" in services["app"]["environment"]
     assert "DATABASE_URL" not in services["ui"]["environment"]
     assert "HERMES_HOME" not in services["ui"]["environment"]
-    assert services["exhibition"]["environment"]["AI_EXHIBITION_STRATEGY_MEMORY_PATH"] == "/data/strategy-memory"
-    assert "exhibition-strategy-memory:/data/strategy-memory" in services["exhibition"]["volumes"]
-    assert "exhibition-strategy-memory" in compose["volumes"]
-    assert all("/data/strategy-memory" not in mount for mount in services["exhibition"].get("tmpfs", []))
     repository = "${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}"
     version = "${AISTOCKS_IMAGE_VERSION:-latest}"
     targets = {
@@ -193,8 +189,7 @@ def test_ai_exhibition_and_market_warmup_have_explicit_isolated_services():
     assert exhibition["environment"]["AI_EXHIBITION_KEY"].startswith("${AI_EXHIBITION_KEY:?")
     assert exhibition["environment"]["HERMES_CREDENTIAL_FILE"] == "/run/hermes-credentials/copilot.env"
     assert exhibition["volumes"] == [
-        "${HERMES_COPILOT_ENV_FILE:?set a mode-0600 Copilot-only Hermes env file}:/run/hermes-credentials/copilot.env:ro",
-        "exhibition-strategy-memory:/data/strategy-memory",
+        "${HERMES_COPILOT_ENV_FILE:?set a mode-0600 Copilot-only Hermes env file}:/run/hermes-credentials/copilot.env:ro"
     ]
     assert services["api"]["environment"]["AI_EXHIBITION_MODE"] == "1"
     assert services["api"]["environment"]["AI_EXHIBITION_KEY"].startswith("${AI_EXHIBITION_KEY:?")

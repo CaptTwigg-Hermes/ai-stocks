@@ -181,7 +181,7 @@ class _DocumentParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         lower = tag.lower()
-        if lower in {"script", "style", "noscript", "svg", "template"}:
+        if lower in {"head", "script", "style", "noscript", "svg", "template"}:
             self._blocked_depth += 1
         names = {key.lower() for key, _value in attrs}
         values: dict[str, str] = {}
@@ -226,7 +226,7 @@ class _DocumentParser(HTMLParser):
         if matching_index is not None and lower == "script" and self._structured_depth:
             self._structured_depth -= 1
         if (matching_index is not None and
-                lower in {"script", "style", "noscript", "svg", "template"} and self._blocked_depth):
+                lower in {"head", "script", "style", "noscript", "svg", "template"} and self._blocked_depth):
             self._blocked_depth -= 1
 
     def handle_data(self, data: str) -> None:
@@ -266,6 +266,7 @@ def extract_document(url: str, content_type: str, body: bytes) -> dict[str, obje
     except UnicodeDecodeError as exception:
         raise ValueError("Evidence content encoding is invalid or unsupported.") from exception
     publication: list[str] = []
+    authority_publication: list[str] = []
     structured: list[str] = []
     structured_publication: list[str] = []
     malformed_structured_metadata = False
@@ -286,6 +287,7 @@ def extract_document(url: str, content_type: str, body: bytes) -> dict[str, obje
             value[:MAXIMUM_PUBLICATION_ITEM_CHARACTERS]
             for value in dict.fromkeys(parser.publication)
         ][:20]
+        authority_publication = parser.publication
         has_external_stylesheet = parser.has_external_stylesheet
         has_css = parser.has_css
         has_unsupported_visibility = parser.has_unsupported_visibility
@@ -302,7 +304,7 @@ def extract_document(url: str, content_type: str, body: bytes) -> dict[str, obje
     else:
         visible = re.sub(r"\s+", " ", text).strip()
     structured = _bounded_unique_text(structured, MAXIMUM_STRUCTURED_CHARACTERS)
-    verifier_time = _one_verifier_publication_time(publication + structured_publication)
+    verifier_time = _one_verifier_publication_time(authority_publication + structured_publication)
     if malformed_structured_metadata:
         eligible = False
         reason = "malformed-structured-metadata"

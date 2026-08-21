@@ -12,7 +12,6 @@ RuntimePrerequisites.Verify(options);
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ExhibitionHealthState>();
-builder.Services.AddSingleton<IStrategyMemoryStore>(new StrategyMemoryStore(options.StrategyMemoryRoot));
 builder.Services.AddSingleton(new CredentialHomeFactory(options.HermesHomeRoot, options.CopilotCredentialFile));
 builder.Services.AddSingleton<IResearchProcessLauncher, SystemResearchProcessLauncher>();
 builder.Services.AddSingleton<IExhibitionModelInvoker, HermesExhibitionModelInvoker>();
@@ -80,8 +79,6 @@ static ExhibitionOptions LoadOptions(IConfiguration configuration)
         SearchBaseUrl = new Uri(configuration["Exhibition:SearchBaseUrl"] ??
             configuration["SEARXNG_URL"] ?? "http://search:8080", UriKind.Absolute),
         HermesHomeRoot = configuration["Exhibition:HermesHomeRoot"] ?? "/dev/shm/aistocks-exhibition",
-        StrategyMemoryRoot = configuration["Exhibition:StrategyMemoryRoot"] ??
-            configuration["AI_EXHIBITION_STRATEGY_MEMORY_PATH"] ?? "/var/lib/aistocks-exhibition/strategy-memory",
         HermesExecutable = configuration["Exhibition:HermesExecutable"] ?? "/opt/hermes/bin/hermes",
         CycleInterval = TimeSpan.FromSeconds(configuration.GetValue<int?>("Exhibition:CycleIntervalSeconds") ??
             configuration.GetValue("AI_EXHIBITION_INTERVAL_SECONDS", 3600)),
@@ -99,19 +96,6 @@ public static class RuntimePrerequisites
         Directory.CreateDirectory(options.HermesHomeRoot);
         if (!OperatingSystem.IsWindows() && !IsTmpfs(options.HermesHomeRoot))
             throw new InvalidOperationException("HermesHomeRoot must reside on tmpfs.");
-        Directory.CreateDirectory(options.StrategyMemoryRoot);
-        var probe = Path.Combine(options.StrategyMemoryRoot, $".write-probe-{Guid.NewGuid():N}");
-        try
-        {
-            using var stream = new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-                1, FileOptions.WriteThrough);
-            stream.WriteByte(0x01);
-            stream.Flush(flushToDisk: true);
-        }
-        finally
-        {
-            if (File.Exists(probe)) File.Delete(probe);
-        }
     }
 
     private static bool IsTmpfs(string path)

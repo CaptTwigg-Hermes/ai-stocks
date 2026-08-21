@@ -1,5 +1,6 @@
 import importlib.util
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -318,6 +319,34 @@ def test_html_without_css_normalizes_verifier_whitespace():
     result = module.extract_document("https://example.com/news", "text/html", document)
     assert result["evidence_candidates"] == ["Visible catalyst."]
     assert result["verifier_eligible"] is True
+
+
+def test_html_head_text_is_never_verifier_eligible_evidence():
+    module = load_module()
+    document = b'''<html><head><title>Head-only catalyst</title>
+    <meta name="datePublished" content="2026-08-19T08:00:00Z"></head>
+    <body><p>Body catalyst.</p></body></html>'''
+    result = module.extract_document("https://example.com/news", "text/html", document)
+    assert result["evidence_candidates"] == ["Body catalyst."]
+    assert "Head-only catalyst" not in result["discovery_text"]
+
+
+def test_all_publication_metadata_is_checked_before_output_bounding():
+    module = load_module()
+    instant = datetime(2026, 8, 19, 8, tzinfo=timezone.utc)
+    equivalent = "".join(
+        f'<meta name="datePublished" content="{instant.astimezone(timezone(timedelta(hours=offset))).isoformat()}">'
+        for offset in range(-9, 11)
+    )
+    document = (
+        '<html><head>' + equivalent +
+        '<meta name="datePublished" content="2026-08-20T08:00:00Z"></head>'
+        '<body><p>Visible catalyst.</p></body></html>'
+    ).encode()
+    result = module.extract_document("https://example.com/news", "text/html", document)
+    assert len(result["publication_metadata"]) == 20
+    assert result["verifier_eligible"] is False
+    assert result["ineligibility_reason"] == "ambiguous-publication-time"
 
 
 def test_html_without_css_rejects_transform_unstable_visible_text():

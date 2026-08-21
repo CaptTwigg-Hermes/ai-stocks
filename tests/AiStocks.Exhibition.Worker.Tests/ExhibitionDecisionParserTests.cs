@@ -138,19 +138,4 @@ public sealed class ExhibitionDecisionParserTests
         Assert.Equal(ExhibitionAction.Hold, parsed.Action);
         Assert.Empty(parsed.Evidence);
     }
-
-    [Fact]
-    public void Parse_AcceptsBoundedStructuredStrategyUpdate()
-    {
-        var json = """{"agentId":"AGENT_ID","modelId":"MODEL_ID","action":"hold","instrumentId":null,"quantity":0,"reason":"wait","confidence":0.5,"evidence":[],"strategyUpdate":{"philosophy":"Evidence-led quality","researchPlan":["Read primary filings"],"entryRules":["Require a dated catalyst"],"exitRules":["Exit on invalidation"],"riskRules":["Size conservatively"],"activeTheses":[{"thesis":"Margins recover","invalidation":"Guidance is cut"}],"lessons":["Prefer primary sources"],"journalNote":"No trade while evidence remains weak"}}"""
-            .Replace("AGENT_ID", Agent.Id.ToString("D"), StringComparison.Ordinal)
-            .Replace("MODEL_ID", Agent.ModelId, StringComparison.Ordinal);
-
-        var parsed = new ExhibitionDecisionParser().Parse(json, Agent, Observations);
-
-        var update = Assert.IsType<StrategyUpdate>(parsed.StrategyUpdate);
-        Assert.Equal("Evidence-led quality", update.Philosophy);
-        Assert.Single(update.ActiveTheses);
-        Assert.Equal("No trade while evidence remains weak", update.JournalNote);
-    }
 }

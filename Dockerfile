@@ -107,9 +107,6 @@ ENTRYPOINT ["dotnet", "AiStocks.Worker.dll"]
 FROM worker AS exhibition
 COPY --from=build --chown=aistocks:aistocks /out/exhibition /app
 COPY --chown=root:root scripts/public_https_fetch_mcp.py /app/public_https_fetch_mcp.py
-USER root
-RUN mkdir -p /data/strategy-memory && chown aistocks:aistocks /data/strategy-memory
-USER aistocks
 ENTRYPOINT ["dotnet", "AiStocks.Exhibition.Worker.dll"]
 
 FROM worker AS reporter

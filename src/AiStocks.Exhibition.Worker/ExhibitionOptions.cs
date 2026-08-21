@@ -7,7 +7,6 @@ public sealed record ExhibitionOptions
     public required string CopilotCredentialFile { get; init; }
     public Uri SearchBaseUrl { get; init; } = new("http://search:8080");
     public string HermesHomeRoot { get; init; } = "/dev/shm/aistocks-exhibition";
-    public string StrategyMemoryRoot { get; init; } = "/var/lib/aistocks-exhibition/strategy-memory";
     public string HermesExecutable { get; init; } = "/opt/hermes/bin/hermes";
     public TimeSpan CycleInterval { get; init; } = TimeSpan.FromHours(1);
     public TimeSpan HttpTimeout { get; init; } = TimeSpan.FromSeconds(30);
@@ -21,16 +20,8 @@ public sealed record ExhibitionOptions
             throw new InvalidOperationException("InternalKey must contain at least 32 characters.");
         if (!Path.IsPathFullyQualified(CopilotCredentialFile) ||
             !Path.IsPathFullyQualified(HermesHomeRoot) ||
-            !Path.IsPathFullyQualified(StrategyMemoryRoot) ||
             !Path.IsPathFullyQualified(HermesExecutable))
-            throw new InvalidOperationException("Credential, HERMES_HOME root, StrategyMemoryRoot, and executable paths must be absolute.");
-        var hermesRoot = Path.GetFullPath(HermesHomeRoot).TrimEnd(Path.DirectorySeparatorChar);
-        var memoryRoot = Path.GetFullPath(StrategyMemoryRoot).TrimEnd(Path.DirectorySeparatorChar);
-        var memoryRelativeToHermes = Path.GetRelativePath(hermesRoot, memoryRoot);
-        if (memoryRelativeToHermes == "." ||
-            !memoryRelativeToHermes.Equals("..", StringComparison.Ordinal) &&
-            !memoryRelativeToHermes.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            throw new InvalidOperationException("StrategyMemoryRoot must be separate from the ephemeral HERMES_HOME root.");
+            throw new InvalidOperationException("Credential, HERMES_HOME root, and executable paths must be absolute.");
         if (!SearchBaseUrl.IsAbsoluteUri || SearchBaseUrl.Scheme is not ("http" or "https") ||
             !string.IsNullOrEmpty(SearchBaseUrl.UserInfo) || !string.IsNullOrEmpty(SearchBaseUrl.Query) ||
             !string.IsNullOrEmpty(SearchBaseUrl.Fragment))

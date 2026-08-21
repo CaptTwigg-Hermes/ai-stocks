@@ -48,8 +48,7 @@ public sealed class ExhibitionCycle(
     IExhibitionModelInvoker invoker,
     IEvidenceVerifier evidenceVerifier,
     ExhibitionHealthState health,
-    ILogger<ExhibitionCycle> logger,
-    IStrategyMemoryStore? strategyMemoryStore = null)
+    ILogger<ExhibitionCycle> logger)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -61,13 +60,11 @@ public sealed class ExhibitionCycle(
         var firstInstrumentsJson = await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
         var firstObservations = ReadDelayedObservations(firstInstrumentsJson);
         var failures = new List<ExhibitionAgentFailure>();
-        var degradedErrors = new List<string>();
         var succeeded = 0;
         for (var agentIndex = 0; agentIndex < ContestContract.Agents.Count; agentIndex++)
         {
             var agent = ContestContract.Agents[agentIndex];
             var runId = CreateRunId(scheduledAt, agent);
-            StrategyUpdate? pendingStrategyUpdate = null;
             try
             {
                 await api.PostStatusAsync(StatusJson(runId, agent, "queued", null, scheduledAt), cancellationToken)
@@ -80,12 +77,10 @@ public sealed class ExhibitionCycle(
                 var observations = agentIndex == 0
                     ? firstObservations
                     : ReadDelayedObservations(instrumentsJson);
-                var memory = strategyMemoryStore?.Load(agent);
-                var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson, memory);
+                var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson);
                 var (execution, decision, verified, correctionUsed) = await InvokeVerifiedDecisionAsync(
                         agent, runId, prompt, observations, cancellationToken)
                     .ConfigureAwait(false);
-                pendingStrategyUpdate = decision.StrategyUpdate;
                 DelayedObservation? selectedObservation = null;
                 if (decision.InstrumentId is not null)
                 {
@@ -98,13 +93,12 @@ public sealed class ExhibitionCycle(
                     {
                         if (correctionUsed)
                             throw new InvalidOperationException("Delayed snapshot advanced after the decision's single corrective invocation.");
-                        var refreshedPrompt = ExhibitionPromptBuilder.Build(agent, runId, refreshedJson, progressJson, memory);
+                        var refreshedPrompt = ExhibitionPromptBuilder.Build(agent, runId, refreshedJson, progressJson);
                         execution = await invoker.InvokeAsync(agent,
                                 ExhibitionPromptBuilder.RetryAfterAdvancedSnapshot(
                                     refreshedPrompt, decision, verified), cancellationToken)
                             .ConfigureAwait(false);
                         decision = new ExhibitionDecisionParser().Parse(execution.StandardOutput, agent, refreshed);
-                        pendingStrategyUpdate = decision.StrategyUpdate;
                         verified = await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false);
                         if (decision.InstrumentId is not null &&
                             !refreshed.TryGetValue(decision.InstrumentId, out selectedObservation))
@@ -152,7 +146,6 @@ public sealed class ExhibitionCycle(
                 }, JsonOptions);
                 await api.PostDecisionAsync(runId, payload, cancellationToken).ConfigureAwait(false);
                 succeeded++;
-                SaveAcceptedStrategy(agent, runId, pendingStrategyUpdate, degradedErrors);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception exception)
@@ -163,7 +156,6 @@ public sealed class ExhibitionCycle(
                     if (IsAuthoritativeSuccess(authoritative, agent, runId))
                     {
                         succeeded++;
-                        SaveAcceptedStrategy(agent, runId, pendingStrategyUpdate, degradedErrors);
                         logger.LogWarning(exception,
                             "Exhibition decision response was lost for {AgentId} ({RunId}); authoritative API state confirms success",
                             agent.Id, runId);
@@ -190,26 +182,8 @@ public sealed class ExhibitionCycle(
                 logger.LogError(exception, "Exhibition agent {AgentId} ({ModelId}) failed for {RunId}; no result was fabricated", agent.Id, agent.ModelId, runId);
             }
         }
-        var healthError = failures.FirstOrDefault()?.Error ?? degradedErrors.FirstOrDefault();
-        health.Complete(DateTimeOffset.UtcNow, failures.Count + degradedErrors.Count, healthError);
+        health.Complete(DateTimeOffset.UtcNow, failures.Count, failures.FirstOrDefault()?.Error);
         return new ExhibitionCycleResult(scheduledAt, succeeded, failures);
-    }
-
-    private void SaveAcceptedStrategy(AgentDefinition agent, string runId, StrategyUpdate? update, List<string> degradedErrors)
-    {
-        if (strategyMemoryStore is null || update is null) return;
-        try
-        {
-            strategyMemoryStore.Save(agent, runId, update);
-        }
-        catch (Exception exception)
-        {
-            var error = BoundError("Strategy memory write failed: " + exception.Message);
-            degradedErrors.Add(error);
-            logger.LogError(exception,
-                "Accepted exhibition decision {RunId} for {AgentId}, but durable strategy memory could not be updated",
-                runId, agent.Id);
-        }
     }
 
     private static string BoundError(string error)
