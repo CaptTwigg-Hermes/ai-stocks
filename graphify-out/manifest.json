@@ -1095,8 +1095,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionCycle.cs": {
-    "mtime": 1787307472.2157078,
-    "ast_hash": "860ff9ce5c3e46777e50db653c4cd6c8",
+    "mtime": 1787308552.881852,
+    "ast_hash": "313fdf5be87bdaa1ceb3530c5458ec3a",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionDecisionParser.cs": {
@@ -1150,8 +1150,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionCycleTests.cs": {
-    "mtime": 1787307472.219708,
-    "ast_hash": "a98aa36181b225aeda06f08171dc4f71",
+    "mtime": 1787308522.905243,
+    "ast_hash": "f83e69d5944031ca7a61410d7d5c7fe2",
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionDecisionParserTests.cs": {
@@ -1212,11 +1212,6 @@
   "scripts/public_https_fetch_mcp.py": {
     "mtime": 1787308234.7593873,
     "ast_hash": "773c87b998f364c7fff85e23047ed50c",
-    "semantic_hash": ""
-  },
-  "tests/test_public_https_fetch_mcp.py": {
-    "mtime": 1787308162.2138956,
-    "ast_hash": "f96d31c77ea1c60de657ff7bce97461f",
     "semantic_hash": ""
   },
   "src/AiStocks.Api/PostgresPreviewRaceStatePersistence.cs": {
