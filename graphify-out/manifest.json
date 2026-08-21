@@ -1210,13 +1210,13 @@
     "semantic_hash": ""
   },
   "scripts/public_https_fetch_mcp.py": {
-    "mtime": 1787307404.8343222,
-    "ast_hash": "844cd942397a9c73948408a0a7ce3dd8",
+    "mtime": 1787307673.5358474,
+    "ast_hash": "5ebf1bb4f3971cbd0cb365434dbd240d",
     "semantic_hash": ""
   },
   "tests/test_public_https_fetch_mcp.py": {
-    "mtime": 1787307385.2619197,
-    "ast_hash": "53522208e2d45e42aa58ee34d585aa87",
+    "mtime": 1787307728.4409764,
+    "ast_hash": "c3a24972afd7089e4ff64fe405dcb0c2",
     "semantic_hash": ""
   },
   "src/AiStocks.Api/PostgresPreviewRaceStatePersistence.cs": {
