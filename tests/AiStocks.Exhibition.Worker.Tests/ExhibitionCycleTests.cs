@@ -388,7 +388,7 @@ public sealed class ExhibitionCycleTests
 
         Assert.Equal(4, result.Succeeded);
         Assert.Empty(result.Failures);
-        Assert.Equal(ContestContract.Agents.Count, api.InstrumentReads);
+        Assert.Equal(ContestContract.Agents.Count + 1, api.InstrumentReads);
         Assert.All(ContestContract.Agents, agent => Assert.Equal(1, invoker.InvocationCounts[agent.Id]));
         Assert.All(api.Posts, json =>
         {
@@ -409,9 +409,9 @@ public sealed class ExhibitionCycleTests
         var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
 
         Assert.Equal(4, result.Succeeded);
-        Assert.Equal(ContestContract.Agents.Count, api.InstrumentReads);
+        Assert.Equal(ContestContract.Agents.Count + 1, api.InstrumentReads);
         for (var index = 0; index < ContestContract.Agents.Count; index++)
-            Assert.Contains($"\"price\":{101 + index}",
+            Assert.Contains($"\"price\":{102 + index}",
                 invoker.Prompts[ContestContract.Agents[index].Id][0], StringComparison.Ordinal);
     }
 
@@ -536,7 +536,7 @@ public sealed class ExhibitionCycleTests
         public Task<string> GetInstrumentsAsync(CancellationToken cancellationToken)
         {
             InstrumentReads++;
-            var isRefreshRead = InstrumentReads % 2 == 0;
+            var isRefreshRead = InstrumentReads > 1 && InstrumentReads % 2 == 1;
             var instrumentId = isRefreshRead && OmitInstrumentAfterFirstRead
                 ? "SE9999999999" : "SE0000115446";
             var price = AdvancePriceOnEveryRead

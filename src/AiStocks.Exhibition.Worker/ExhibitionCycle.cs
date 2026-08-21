@@ -57,8 +57,8 @@ public sealed class ExhibitionCycle(
         var progressJson = await api.GetProgressAsync(cancellationToken).ConfigureAwait(false);
         // Validate the first snapshot before publishing any run statuses, preserving
         // fail-closed cycle behavior while avoiding one stale snapshot for all agents.
-        var firstInstrumentsJson = await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
-        var firstObservations = ReadDelayedObservations(firstInstrumentsJson);
+        var validationInstrumentsJson = await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
+        _ = ReadDelayedObservations(validationInstrumentsJson);
         var failures = new List<ExhibitionAgentFailure>();
         var succeeded = 0;
         for (var agentIndex = 0; agentIndex < ContestContract.Agents.Count; agentIndex++)
@@ -71,12 +71,8 @@ public sealed class ExhibitionCycle(
                     .ConfigureAwait(false);
                 await api.PostStatusAsync(StatusJson(runId, agent, "running", null, DateTimeOffset.UtcNow), cancellationToken)
                     .ConfigureAwait(false);
-                var instrumentsJson = agentIndex == 0
-                    ? firstInstrumentsJson
-                    : await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
-                var observations = agentIndex == 0
-                    ? firstObservations
-                    : ReadDelayedObservations(instrumentsJson);
+                var instrumentsJson = await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
+                var observations = ReadDelayedObservations(instrumentsJson);
                 var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson);
                 var (execution, decision, verified, correctionUsed) = await InvokeVerifiedDecisionAsync(
                         agent, runId, prompt, observations, cancellationToken)
