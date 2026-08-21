@@ -335,8 +335,8 @@
     "semantic_hash": ""
   },
   "scripts/verify-release.sh": {
-    "mtime": 1787253120.6113427,
-    "ast_hash": "dcd526089e042d26d02b6964020862bf",
+    "mtime": 1787306772.2334573,
+    "ast_hash": "50e4d6742dee2813b2da097ae8f0da9b",
     "semantic_hash": ""
   },
   "src/AiStocks.Collector/AiStocks.Collector.csproj": {
@@ -895,8 +895,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/publish-images.yml": {
-    "mtime": 1787253120.5993423,
-    "ast_hash": "aa2d7268d14b943d5e09854069ae6ad1",
+    "mtime": 1787306722.7204516,
+    "ast_hash": "719c24e4eda18d32c33f4e68fd0a942b",
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/009_operations_bootstrap_privileges.sql": {
@@ -1255,8 +1255,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Api/PostgresGlobalRaceStore.cs": {
-    "mtime": 1787253120.6113427,
-    "ast_hash": "2119f8fbb9cb0602b818f874805dca7f",
+    "mtime": 1787307055.76721,
+    "ast_hash": "94fe35dbdad85ea0eea359d1a90792e1",
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/019_v2_global_races.sql": {
@@ -1342,6 +1342,11 @@
   "tests/test_ui_trade_route.py": {
     "mtime": 1787255910.2062328,
     "ast_hash": "50ed2b06cc20e111fc4dd9fb31f0e2f0",
+    "semantic_hash": ""
+  },
+  "tests/test_release_artifacts.py": {
+    "mtime": 1787306787.5577683,
+    "ast_hash": "cefb52c04a5efc4459f140880b74640e",
     "semantic_hash": ""
   }
 }

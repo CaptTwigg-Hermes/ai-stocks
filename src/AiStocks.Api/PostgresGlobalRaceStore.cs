@@ -285,9 +285,9 @@ public sealed class PostgresGlobalRaceStore(NpgsqlDataSource dataSource, TimePro
         insert.Parameters.AddWithValue(quantity);
         insert.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Text, Value = note ?? (object)DBNull.Value });
         insert.Parameters.Add(new NpgsqlParameter
-            { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = rationale is null ? DBNull.Value : JsonSerializer.Serialize(rationale, JsonOptions) });
+        { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = rationale is null ? DBNull.Value : JsonSerializer.Serialize(rationale, JsonOptions) });
         insert.Parameters.Add(new NpgsqlParameter
-            { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = rationale is null ? DBNull.Value : JsonSerializer.Serialize(rationale.Evidence, JsonOptions) });
+        { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = rationale is null ? DBNull.Value : JsonSerializer.Serialize(rationale.Evidence, JsonOptions) });
         insert.Parameters.AddWithValue(key);
         insert.Parameters.AddWithValue(hash);
         var submittedAt = clock.GetUtcNow();
