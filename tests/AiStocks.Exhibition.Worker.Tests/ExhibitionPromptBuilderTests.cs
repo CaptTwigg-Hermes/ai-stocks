@@ -53,6 +53,24 @@ public sealed class ExhibitionPromptBuilderTests
     }
 
     [Fact]
+    public void Build_DescribesNordicPostTradeAndInformationalFxWithoutSwedishFixedRate()
+    {
+        var agent = ContestContract.Agents[0];
+        const string instruments = "{\"items\":[{\"id\":\"XCSE:DK0010181676:CARL-A\",\"name\":\"Carlsberg A/S\",\"exchange\":\"XCSE\",\"currency\":\"DKK\",\"price\":750,\"priceDkk\":750,\"fxToDkk\":1}],\"dataMode\":\"official-nasdaq-nordic-15m-delayed-ecb-fx\"}";
+        var portfolio = "{\"cashDkk\":100000,\"holdings\":[],\"dataMode\":\"official-nasdaq-nordic-15m-delayed-ecb-fx\",\"executionMode\":\"assumed-delayed-paper-fills-v2\"}";
+        var progress = "{\"participants\":[{\"agentId\":\"" + agent.Id.ToString("D") +
+            "\",\"portfolio\":" + portfolio + "}],\"dataMode\":\"official-nasdaq-nordic-15m-delayed-ecb-fx\",\"executionMode\":\"assumed-delayed-paper-fills-v2\",\"isNonLive\":true,\"strictContest\":false,\"holdOnly\":false,\"assumedFills\":true,\"assumedSekToDkk\":null,\"assumedFxToDkk\":{\"DKK\":1},\"assumedSlippagePercent\":1}";
+
+        var prompt = ExhibitionPromptBuilder.Build(agent, "run-nordic", instruments, progress);
+
+        Assert.Contains("XSTO, XCSE, XHEL, ONSE, and XICE", prompt, StringComparison.Ordinal);
+        Assert.Contains("delayed post-trade prices", prompt, StringComparison.Ordinal);
+        Assert.Contains("informational reference rates", prompt, StringComparison.Ordinal);
+        Assert.Contains("not licensed global market-data coverage", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("0.65 DKK/SEK", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RetryAfterInvalidFinalResponse_RequiresImmediateJsonWithoutMoreResearch()
     {
         var priorResponse = "MALFORMED_THESIS " + new string('x', 20_000) + "😀";

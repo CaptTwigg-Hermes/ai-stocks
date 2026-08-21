@@ -87,7 +87,8 @@ def test_exhibition_mode_replaces_human_workspace_without_breaking_preview_fallb
     assert "data.isNonLive !== true" in contract
     assert "data.holdOnly !== false" in contract
     assert "data.assumedFills !== true" in contract
-    assert "data.assumedSekToDkk !== 0.65" in contract
+    assert "if (!nordic) return data.assumedSekToDkk === 0.65;" in contract
+    assert "data.assumedFxToDkk" in contract
     assert "data.assumedSlippagePercent !== 1" in contract
     assert 'ui.tradePage.hidden = true' in script
     assert 'ui.aiRacePage.hidden = false' in script
@@ -117,17 +118,18 @@ def test_exhibition_cards_are_four_defensive_safe_complete_ai_participants():
     assert "link.rel = \"noopener noreferrer\"" in script
     assert "innerHTML" not in script
     assert 'id="data-badge"' in html
-    assert 'ui.dataBadge.textContent = "ASSUMED FILLS · Official Nasdaq XSTO · delayed · non-live · paper-only"' in script
-    assert html.count("official Nasdaq XSTO") >= 2
-    assert html.count("15-minute delayed") >= 2
-    assert html.count("non-live") >= 2
+    assert '"ASSUMED FILLS · Official Nasdaq XSTO · delayed · non-live · paper-only"' in script
+    assert '"ASSUMED FILLS · Nasdaq Nordic delayed post-trade · ECB reference FX · non-live"' in script
+    assert "checksum-bound ECB informational reference rates" in script
+    assert html.count("delayed post-trade observations") >= 2
+    assert script.count("non-live") >= 2
     assert html.count("paper-only") >= 2
     assert html.count("ASSUMED FILLS") >= 2
-    assert html.count("0.65 DKK/SEK") >= 2
-    assert html.count("1% adverse slippage") >= 2
+    assert "0.65 DKK/SEK" not in html
+    assert "fixed FX" not in html
     assert "HOLD-only" not in html
     assert "fixture-backed" not in html
-    assert html.count("Portfolios are volatile") >= 2
+    assert script.count("Portfolios are volatile") >= 2
     assert html.count("not the strict 2026 contest") >= 2
 
 
@@ -187,10 +189,10 @@ def test_exhibition_leaderboard_is_ai_only_and_uses_ai_refresh():
     assert 'element.hidden = false;' in script
     assert 'src="/exhibition-contract.js" defer' in html
     assert 'data.dataMode !== dataMode' in contract
-    assert 'data.executionMode !== executionMode' in contract
+    assert 'data.executionMode !== expectedExecutionMode' in contract
     assert 'data.holdOnly !== false' in contract
-    assert 'participant.portfolio?.dataMode === dataMode' in contract
-    assert 'participant.portfolio?.executionMode === executionMode' in contract
+    assert 'participant.portfolio?.dataMode === data.dataMode' in contract
+    assert 'participant.portfolio?.executionMode === expectedExecutionMode' in contract
     assert "window.aiStocksExhibitionContract?.isResponse(data) === true" in script
     assert 'document.body.classList.contains("exhibition-mode") ? refreshAiProgress(true) : refreshAll(true)' in script
 
@@ -229,5 +231,40 @@ if (contract.isResponse(payload(["preview-fixtures", ...exact.slice(1)], executi
 if (contract.isResponse(payload(exact, [undefined, ...executions.slice(1)]))) process.exit(13);
 if (contract.isResponse(payload(exact, ["strict-contest", ...executions.slice(1)]))) process.exit(14);
 if (contract.isResponse(payload(exact, [contract.executionMode, "strict-contest", ...executions.slice(2)]))) process.exit(15);
+"""
+    subprocess.run(["node", "-e", probe, str(contract_path)], check=True)
+
+
+def test_exhibition_contract_accepts_nordic_fx_provenance_and_rejects_missing_fx():
+    contract_path = UI / "exhibition-contract.js"
+    probe = r"""
+global.window = {};
+require(process.argv[1]);
+const contract = window.aiStocksExhibitionContract;
+const models = ["gpt-5.6-sol", "claude-opus-4.8", "claude-sonnet-5", "gemini-3.1-pro-preview"];
+function payload(fx) {
+  return {
+    dataMode: contract.nordicDataMode,
+    executionMode: contract.nordicExecutionMode,
+    strictContest: false,
+    isNonLive: true,
+    holdOnly: false,
+    assumedFills: true,
+    assumedSekToDkk: null,
+    assumedFxToDkk: fx,
+    assumedSlippagePercent: 1,
+    participants: models.map((modelId) => ({
+      modelId,
+      portfolio: {
+        dataMode: contract.nordicDataMode,
+        executionMode: contract.nordicExecutionMode
+      }
+    }))
+  };
+}
+if (!contract.isResponse(payload({ DKK: 1, SEK: 0.65, EUR: 7.46, NOK: 0.64, ISK: 0.05 }))) process.exit(20);
+if (contract.isResponse(payload(null))) process.exit(21);
+if (contract.isResponse(payload({ USD: 6.4 }))) process.exit(22);
+if (contract.isResponse(payload({ DKK: Number.NaN }))) process.exit(23);
 """
     subprocess.run(["node", "-e", probe, str(contract_path)], check=True)

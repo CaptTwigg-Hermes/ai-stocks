@@ -3,6 +3,9 @@
 
   const dataMode = "official-nasdaq-xsto-15m-delayed";
   const executionMode = "assumed-delayed-paper-fills-v1";
+  const nordicDataMode = "official-nasdaq-nordic-15m-delayed-ecb-fx";
+  const nordicExecutionMode = "assumed-delayed-paper-fills-v2";
+  const nordicCurrencies = new Set(["SEK", "DKK", "EUR", "NOK", "ISK"]);
   const modelIds = new Set([
     "gpt-5.6-sol",
     "claude-opus-4.8",
@@ -10,18 +13,32 @@
     "gemini-3.1-pro-preview"
   ]);
 
+  function validFx(data, nordic) {
+    if (!nordic) return data.assumedSekToDkk === 0.65;
+    if (data.assumedSekToDkk !== null || !data.assumedFxToDkk ||
+      typeof data.assumedFxToDkk !== "object" || Array.isArray(data.assumedFxToDkk)) return false;
+    const entries = Object.entries(data.assumedFxToDkk);
+    return entries.length > 0 && entries.every(([currency, value]) =>
+      nordicCurrencies.has(currency) && Number.isFinite(value) && value > 0);
+  }
+
   function isResponse(data) {
-    if (!data || data.dataMode !== dataMode || data.executionMode !== executionMode ||
+    if (!data) return false;
+    const nordic = data.dataMode === nordicDataMode;
+    const expectedExecutionMode = nordic ? nordicExecutionMode : executionMode;
+    if ((!nordic && data.dataMode !== dataMode) || data.executionMode !== expectedExecutionMode ||
       data.strictContest !== false || data.isNonLive !== true || data.holdOnly !== false ||
-      data.assumedFills !== true || data.assumedSekToDkk !== 0.65 ||
+      data.assumedFills !== true || !validFx(data, nordic) ||
       data.assumedSlippagePercent !== 1 || !Array.isArray(data.participants) ||
       data.participants.length !== 4) return false;
     if (!data.participants.every((participant) => participant &&
-      participant.portfolio?.dataMode === dataMode &&
-      participant.portfolio?.executionMode === executionMode)) return false;
+      participant.portfolio?.dataMode === data.dataMode &&
+      participant.portfolio?.executionMode === expectedExecutionMode)) return false;
     const responseModelIds = new Set(data.participants.map((participant) => participant.modelId));
     return responseModelIds.size === 4 && [...modelIds].every((modelId) => responseModelIds.has(modelId));
   }
 
-  window.aiStocksExhibitionContract = Object.freeze({ dataMode, executionMode, isResponse });
+  window.aiStocksExhibitionContract = Object.freeze({
+    dataMode, executionMode, nordicDataMode, nordicExecutionMode, isResponse
+  });
 })();

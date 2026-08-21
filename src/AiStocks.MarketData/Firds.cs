@@ -8,26 +8,49 @@ namespace AiStocks.MarketData;
 
 public sealed record FirdsInstrument(string Isin, string OrderBookId, string IssuerId, string Name, string Cfi,
     string Currency, string Venue, DateOnly? FirstTradeDate, DateOnly? TerminationDate);
-public sealed record FirdsSourceVersion(string Version, long Cursor, Uri SourceUrl, string Sha256, DateTimeOffset AppliedAt, bool IsFull, string RawPath);
+public sealed record FirdsSourceVersion(string Version, long Cursor, Uri SourceUrl, string Sha256,
+    DateTimeOffset AppliedAt, bool IsFull, string RawPath, string? Kind = null);
 public sealed record FirdsSnapshot(long Cursor, IReadOnlyList<FirdsInstrument> Instruments, IReadOnlyList<FirdsSourceVersion> Versions);
+
+public enum FirdsUniverse
+{
+    StockholmContest,
+    NordicExhibition
+}
 
 public sealed class FirdsUniverseParser
 {
+    private static readonly IReadOnlyDictionary<string, string> NordicPrimaryCurrencies =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["XSTO"] = "SEK",
+            ["XCSE"] = "DKK",
+            ["XHEL"] = "EUR",
+            ["ONSE"] = "NOK",
+            ["XICE"] = "ISK"
+        };
+    private readonly FirdsUniverse universe;
+
+    public FirdsUniverseParser(FirdsUniverse universe = FirdsUniverse.StockholmContest) =>
+        this.universe = universe;
+
     public IReadOnlyList<FirdsInstrument> ParseFull(Stream xml, DateOnly effectiveAt) =>
         Read(xml).Where(x => x.Operation is not Operation.Delete && IsEligible(x.Instrument, effectiveAt))
-            .Select(x => x.Instrument).GroupBy(x => (x.Isin, x.OrderBookId))
-            .Select(group => group.Last()).OrderBy(x => x.Isin, StringComparer.Ordinal).ThenBy(x => x.OrderBookId, StringComparer.Ordinal).ToArray();
+            .Select(x => x.Instrument).GroupBy(x => (x.Venue, x.Isin, x.OrderBookId))
+            .Select(group => group.Last()).OrderBy(x => x.Venue, StringComparer.Ordinal)
+            .ThenBy(x => x.Isin, StringComparer.Ordinal).ThenBy(x => x.OrderBookId, StringComparer.Ordinal).ToArray();
 
     public IReadOnlyList<FirdsInstrument> ApplyDelta(IEnumerable<FirdsInstrument> current, Stream deltaXml, DateOnly effectiveAt)
     {
-        var result = current.ToDictionary(x => (x.Isin, x.OrderBookId));
+        var result = current.ToDictionary(x => (x.Venue, x.Isin, x.OrderBookId));
         foreach (var change in Read(deltaXml))
         {
-            var key = (change.Instrument.Isin, change.Instrument.OrderBookId);
+            var key = (change.Instrument.Venue, change.Instrument.Isin, change.Instrument.OrderBookId);
             if (change.Operation == Operation.Delete || !IsEligible(change.Instrument, effectiveAt)) result.Remove(key);
             else result[key] = change.Instrument;
         }
-        return result.Values.OrderBy(x => x.Isin, StringComparer.Ordinal).ThenBy(x => x.OrderBookId, StringComparer.Ordinal).ToArray();
+        return result.Values.OrderBy(x => x.Venue, StringComparer.Ordinal)
+            .ThenBy(x => x.Isin, StringComparer.Ordinal).ThenBy(x => x.OrderBookId, StringComparer.Ordinal).ToArray();
     }
 
     private static IEnumerable<Change> Read(Stream xml)
@@ -74,10 +97,18 @@ public sealed class FirdsUniverseParser
         return item;
     }
 
-    private static bool IsEligible(FirdsInstrument item, DateOnly at) =>
-        item.Venue == "XSTO" && item.Currency == "SEK" && IsCommonOrdinaryShare(item.Cfi) &&
+    private bool IsEligible(FirdsInstrument item, DateOnly at) =>
+        IsEligibleVenueAndCurrency(item) && IsCommonOrdinaryShare(item.Cfi) &&
         (item.FirstTradeDate is null || item.FirstTradeDate <= at) &&
         (item.TerminationDate is null || item.TerminationDate > at);
+
+    private bool IsEligibleVenueAndCurrency(FirdsInstrument item) => universe switch
+    {
+        FirdsUniverse.StockholmContest => item.Venue == "XSTO" && item.Currency == "SEK",
+        FirdsUniverse.NordicExhibition =>
+            NordicPrimaryCurrencies.TryGetValue(item.Venue, out var currency) && item.Currency == currency,
+        _ => false
+    };
 
     private static bool IsCommonOrdinaryShare(string cfi) =>
         cfi.Length == 6 && cfi[0] == 'E' && cfi[1] == 'S' &&
@@ -92,9 +123,13 @@ public sealed class FirdsUniverseParser
 public sealed class DurableFirdsStore
 {
     private readonly string _path;
-    private readonly FirdsUniverseParser _parser = new();
+    private readonly FirdsUniverseParser _parser;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
-    public DurableFirdsStore(string path) => _path = Path.GetFullPath(path);
+    public DurableFirdsStore(string path, FirdsUniverse universe = FirdsUniverse.StockholmContest)
+    {
+        _path = Path.GetFullPath(path);
+        _parser = new FirdsUniverseParser(universe);
+    }
     public bool Exists => File.Exists(_path);
 
     public void ApplyFull(Stream xml, DateOnly effectiveAt, Uri sourceUrl, string sha256, string version, long cursor)
@@ -104,7 +139,8 @@ public sealed class DurableFirdsStore
         var current = File.Exists(_path) ? LoadVerified() : null;
         if (current is not null && (cursor <= current.Cursor || current.Versions.Any(x => x.Version == version)))
             throw new MarketDataException("FIRDS full cursor/version is not monotonic");
-        var versionRow = new FirdsSourceVersion(version, cursor, sourceUrl, sha256, DateTimeOffset.UtcNow, true, ArchiveRaw(bytes, sha256));
+        var versionRow = new FirdsSourceVersion(version, cursor, sourceUrl, sha256,
+            DateTimeOffset.UtcNow, true, ArchiveRaw(bytes, sha256), "full");
         Persist(new(cursor, instruments, current is null ? [versionRow] : current.Versions.Append(versionRow).ToArray()));
     }
 
@@ -114,7 +150,8 @@ public sealed class DurableFirdsStore
         if (cursor != current.Cursor + 1 || current.Versions.Any(x => x.Version == version)) throw new MarketDataException("FIRDS delta cursor/version replay or gap");
         var bytes = ReadAndVerify(xml, sourceUrl, sha256, version, cursor);
         var instruments = _parser.ApplyDelta(current.Instruments, OpenXmlPayload(bytes), effectiveAt);
-        Persist(new(cursor, instruments, current.Versions.Append(new(version, cursor, sourceUrl, sha256, DateTimeOffset.UtcNow, false, ArchiveRaw(bytes, sha256))).ToArray()));
+        Persist(new(cursor, instruments, current.Versions.Append(new(version, cursor, sourceUrl, sha256,
+            DateTimeOffset.UtcNow, false, ArchiveRaw(bytes, sha256), "delta")).ToArray()));
     }
 
     public void ApplyFullPart(Stream xml, DateOnly effectiveAt, Uri sourceUrl, string sha256, string version, long cursor)
@@ -124,10 +161,11 @@ public sealed class DurableFirdsStore
             throw new MarketDataException("FIRDS full-part cursor/version replay or gap");
         var bytes = ReadAndVerify(xml, sourceUrl, sha256, version, cursor);
         var instruments = current.Instruments.Concat(_parser.ParseFull(OpenXmlPayload(bytes), effectiveAt))
-            .GroupBy(x => (x.Isin, x.OrderBookId)).Select(group => group.Last())
-            .OrderBy(x => x.Isin, StringComparer.Ordinal).ThenBy(x => x.OrderBookId, StringComparer.Ordinal).ToArray();
+            .GroupBy(x => (x.Venue, x.Isin, x.OrderBookId)).Select(group => group.Last())
+            .OrderBy(x => x.Venue, StringComparer.Ordinal).ThenBy(x => x.Isin, StringComparer.Ordinal)
+            .ThenBy(x => x.OrderBookId, StringComparer.Ordinal).ToArray();
         Persist(new(cursor, instruments, current.Versions.Append(new(version, cursor, sourceUrl, sha256,
-            DateTimeOffset.UtcNow, true, ArchiveRaw(bytes, sha256))).ToArray()));
+            DateTimeOffset.UtcNow, true, ArchiveRaw(bytes, sha256), "full-part")).ToArray()));
     }
 
     public FirdsSnapshot LoadVerified()
@@ -147,6 +185,57 @@ public sealed class DurableFirdsStore
         catch (MarketDataException) { throw; }
         catch (Exception exception) when (exception is IOException or JsonException)
         { throw new MarketDataException("Durable FIRDS state is malformed", exception); }
+    }
+
+    public FirdsSnapshot ProjectVerifiedTo(DurableFirdsStore destination)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        var source = LoadVerified();
+        if (StringComparer.Ordinal.Equals(_path, destination._path)) return source;
+
+        var projected = destination.Exists ? destination.LoadVerified() : null;
+        if (projected is not null && projected.Cursor > source.Cursor)
+            throw new MarketDataException("Projected FIRDS state is ahead of its verified source");
+        foreach (var version in source.Versions.OrderBy(item => item.Cursor))
+        {
+            if (projected is not null && version.Cursor <= projected.Cursor) continue;
+            var bytes = File.ReadAllBytes(version.RawPath);
+            using var xml = new MemoryStream(bytes, writable: false);
+            var effectiveAt = SourceDate(version);
+            var kind = version.Kind ?? (projected is null ? "full" : version.IsFull ? "full-part" : "delta");
+            if (projected is null)
+            {
+                if (kind is not ("full" or "full-part"))
+                    throw new MarketDataException("Projected FIRDS state lacks a full baseline");
+                destination.ApplyFull(xml, effectiveAt, version.SourceUrl, version.Sha256,
+                    version.Version, version.Cursor);
+            }
+            else if (kind == "full")
+            {
+                destination.ApplyFull(xml, effectiveAt, version.SourceUrl, version.Sha256,
+                    version.Version, version.Cursor);
+            }
+            else if (kind == "full-part")
+            {
+                destination.ApplyFullPart(xml, effectiveAt, version.SourceUrl, version.Sha256,
+                    version.Version, version.Cursor);
+            }
+            else if (kind == "delta")
+            {
+                destination.ApplyDelta(xml, effectiveAt, version.SourceUrl, version.Sha256,
+                    version.Version, version.Cursor);
+            }
+            else throw new MarketDataException("Projected FIRDS source kind is invalid");
+            projected = destination.LoadVerified();
+        }
+        return projected ?? throw new MarketDataException("Projected FIRDS state contains no verified baseline");
+    }
+
+    private static DateOnly SourceDate(FirdsSourceVersion version)
+    {
+        foreach (var part in Path.GetFileName(version.SourceUrl.AbsolutePath).Split('_'))
+            if (part.Length == 8 && DateOnly.TryParseExact(part, "yyyyMMdd", out var value)) return value;
+        return DateOnly.FromDateTime(version.AppliedAt.UtcDateTime);
     }
 
     private static byte[] ReadAndVerify(Stream stream, Uri sourceUrl, string sha256, string version, long cursor)

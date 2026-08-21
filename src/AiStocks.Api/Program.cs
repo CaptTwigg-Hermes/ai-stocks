@@ -25,6 +25,15 @@ builder.Services.Configure<JsonOptions>(options =>
 
 var previewMode = builder.Configuration["PREVIEW_MODE"] == "1";
 var aiExhibitionMode = builder.Configuration["AI_EXHIBITION_MODE"] == "1";
+var aiExhibitionUniverse = builder.Configuration["AI_EXHIBITION_UNIVERSE"] ?? "stockholm";
+if (aiExhibitionUniverse is not ("stockholm" or "nordic"))
+    throw new InvalidOperationException("AI_EXHIBITION_UNIVERSE must be 'stockholm' or 'nordic'.");
+var selectedExhibitionDataMode = aiExhibitionUniverse == "nordic"
+    ? DelayedNasdaqInstrumentStore.NordicDataMode
+    : DelayedNasdaqInstrumentStore.DataMode;
+var selectedExhibitionExecutionMode = aiExhibitionUniverse == "nordic"
+    ? PreviewRaceStore.NordicAssumedExecutionMode
+    : PreviewRaceStore.AssumedExecutionMode;
 var globalV2Mode = builder.Configuration["GLOBAL_V2_MODE"] == "1";
 var localAuth = builder.Environment.IsEnvironment("Testing") || (builder.Environment.IsDevelopment() && previewMode);
 if (previewMode && !localAuth)
@@ -133,14 +142,20 @@ if (localAuth)
     if (aiExhibitionDatabaseUrl is not null)
     {
         builder.Services.AddSingleton(NpgsqlDataSource.Create(aiExhibitionDatabaseUrl));
-        builder.Services.AddSingleton<IPreviewRaceStatePersistence, PostgresPreviewRaceStatePersistence>();
+        builder.Services.AddSingleton<IPreviewRaceStatePersistence>(services =>
+            new PostgresPreviewRaceStatePersistence(services.GetRequiredService<NpgsqlDataSource>(),
+                aiExhibitionMode ? selectedExhibitionDataMode : PreviewRaceStore.DataMode));
     }
+    var persistedDataMode = aiExhibitionMode ? selectedExhibitionDataMode : PreviewRaceStore.DataMode;
+    var persistedExecutionMode = aiExhibitionMode ? selectedExhibitionExecutionMode : null;
     builder.Services.AddSingleton(services => new PreviewRaceStore(
-        services.GetRequiredService<TimeProvider>(), services.GetService<IPreviewRaceStatePersistence>()));
+        services.GetRequiredService<TimeProvider>(), services.GetService<IPreviewRaceStatePersistence>(),
+        persistedDataMode, persistedExecutionMode));
 }
 if (aiExhibitionArchivePath is not null)
     builder.Services.AddSingleton(services => new DelayedNasdaqInstrumentStore(
-        aiExhibitionArchivePath, services.GetRequiredService<TimeProvider>()));
+        aiExhibitionArchivePath, services.GetRequiredService<TimeProvider>(),
+        aiExhibitionUniverse == "nordic" ? FirdsUniverse.NordicExhibition : FirdsUniverse.StockholmContest));
 
 var app = builder.Build();
 app.UseAiStocksRequestLogging();
@@ -160,7 +175,7 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapGet("/healthz", () => Results.Ok(new HealthResponse("ready", localAuth ? "preview" : "access",
-    aiExhibitionMode ? DelayedNasdaqInstrumentStore.DataMode : localAuth ? PreviewRaceStore.DataMode : "disabled")));
+    aiExhibitionMode ? selectedExhibitionDataMode : localAuth ? PreviewRaceStore.DataMode : "disabled")));
 
 var api = app.MapGroup("/api/v1").RequireAuthorization();
 api.MapGet("/me", (ClaimsPrincipal user) => Results.Ok(new IdentityDto(Identity(user), Role(user))));

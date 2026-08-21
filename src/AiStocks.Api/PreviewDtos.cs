@@ -17,7 +17,12 @@ public sealed record InstrumentDto(
     [property: JsonPropertyName("source"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Source = null,
     [property: JsonPropertyName("delayMinutes"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? DelayMinutes = null,
     [property: JsonPropertyName("tradable"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Tradable = null,
-    [property: JsonPropertyName("paperTradable"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PaperTradable = null);
+    [property: JsonPropertyName("paperTradable"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PaperTradable = null,
+    [property: JsonPropertyName("fxToDkk"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? FxToDkk = null,
+    [property: JsonPropertyName("fxReferenceDate"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateOnly? FxReferenceDate = null,
+    [property: JsonPropertyName("fxAvailableAt"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? FxAvailableAt = null,
+    [property: JsonPropertyName("fxSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FxSource = null,
+    [property: JsonPropertyName("fxSha256"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FxSha256 = null);
 
 public sealed record InstrumentListDto(
     [property: JsonPropertyName("items")] IReadOnlyList<InstrumentDto> Items,
@@ -89,7 +94,8 @@ public sealed record AiProgressDto(
     [property: JsonPropertyName("assumedFills")] bool AssumedFills = false,
     [property: JsonPropertyName("assumedSekToDkk")] decimal? AssumedSekToDkk = null,
     [property: JsonPropertyName("assumedSlippagePercent")] decimal? AssumedSlippagePercent = null,
-    [property: JsonPropertyName("performance")] IReadOnlyList<PerformanceSeriesDto>? Performance = null);
+    [property: JsonPropertyName("performance")] IReadOnlyList<PerformanceSeriesDto>? Performance = null,
+    [property: JsonPropertyName("assumedFxToDkk"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, decimal>? AssumedFxToDkk = null);
 
 public sealed record PerformancePointDto(
     [property: JsonPropertyName("at")] DateTimeOffset At,
@@ -153,7 +159,15 @@ public sealed record AiAssumedPaperFillDto(
     [property: JsonPropertyName("observationExecutedAt")] DateTimeOffset ObservationExecutedAt,
     [property: JsonPropertyName("observationAvailableAt")] DateTimeOffset ObservationAvailableAt,
     [property: JsonPropertyName("filledAt")] DateTimeOffset FilledAt,
-    [property: JsonPropertyName("executionMode")] string ExecutionMode);
+    [property: JsonPropertyName("executionMode")] string ExecutionMode,
+    [property: JsonPropertyName("observedPrice")] decimal? ObservedPrice = null,
+    [property: JsonPropertyName("observedCurrency")] string? ObservedCurrency = null,
+    [property: JsonPropertyName("observedVenue")] string? ObservedVenue = null,
+    [property: JsonPropertyName("fxToDkk")] decimal? FxToDkk = null,
+    [property: JsonPropertyName("fxReferenceDate")] DateOnly? FxReferenceDate = null,
+    [property: JsonPropertyName("fxAvailableAt")] DateTimeOffset? FxAvailableAt = null,
+    [property: JsonPropertyName("fxSource")] string? FxSource = null,
+    [property: JsonPropertyName("fxSha256")] string? FxSha256 = null);
 
 public sealed record AiEvidenceDto(
     [property: JsonPropertyName("url")] string Url,
@@ -181,4 +195,13 @@ public sealed record AiDecisionRequestDto(
     [property: JsonPropertyName("reportSha256")] string ReportSha256,
     [property: JsonPropertyName("completedAt")] DateTimeOffset CompletedAt,
     [property: JsonPropertyName("observedPriceSek")] decimal? ObservedPriceSek = null,
-    [property: JsonPropertyName("observationAvailableAt")] DateTimeOffset? ObservationAvailableAt = null);
+    [property: JsonPropertyName("observationAvailableAt")] DateTimeOffset? ObservationAvailableAt = null,
+    [property: JsonPropertyName("observedPrice")] decimal? ObservedPrice = null,
+    [property: JsonPropertyName("observedCurrency")] string? ObservedCurrency = null,
+    [property: JsonPropertyName("observedVenue")] string? ObservedVenue = null,
+    [property: JsonPropertyName("observedFxToDkk")] decimal? ObservedFxToDkk = null,
+    [property: JsonPropertyName("observationExecutedAt")] DateTimeOffset? ObservationExecutedAt = null,
+    [property: JsonPropertyName("fxAvailableAt")] DateTimeOffset? FxAvailableAt = null,
+    [property: JsonPropertyName("fxSha256")] string? FxSha256 = null,
+    [property: JsonPropertyName("fxReferenceDate")] DateOnly? FxReferenceDate = null,
+    [property: JsonPropertyName("fxSource")] string? FxSource = null);

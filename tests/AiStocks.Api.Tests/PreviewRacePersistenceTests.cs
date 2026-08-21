@@ -46,6 +46,186 @@ public sealed class PreviewRacePersistenceTests
         Assert.Equal(savesBeforeReplay, persistence.SaveCalls);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Legacy_schema_state_loads_and_next_mutation_rewrites_current_schema(int schemaVersion)
+    {
+        var persistence = PersistedTradeState();
+        var document = JsonNode.Parse(persistence.Json!)!;
+        document["SchemaVersion"] = schemaVersion;
+        persistence.Seed(document.ToJsonString());
+        var restarted = new PreviewRaceStore(TimeProvider.System, persistence);
+        var nextAgent = ContestContract.Agents[1];
+
+        restarted.UpdateAiStatus(new("schema-migrate-001", nextAgent.Id, nextAgent.ModelId, "queued", null,
+            AvailableAt.AddMinutes(10)));
+
+        Assert.Equal(3, JsonNode.Parse(persistence.Json!)!["SchemaVersion"]!.GetValue<int>());
+    }
+
+    [Theory]
+    [InlineData(DelayedNasdaqInstrumentStore.DataMode, PreviewRaceStore.NordicAssumedExecutionMode)]
+    [InlineData(DelayedNasdaqInstrumentStore.NordicDataMode, PreviewRaceStore.AssumedExecutionMode)]
+    [InlineData(PreviewRaceStore.DataMode, PreviewRaceStore.NordicAssumedExecutionMode)]
+    [InlineData("unknown-data-mode", PreviewRaceStore.AssumedExecutionMode)]
+    [InlineData(DelayedNasdaqInstrumentStore.DataMode, "unknown-execution-mode")]
+    public void Store_rejects_unsupported_data_and_execution_mode_pairs(string dataMode, string executionMode)
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            new PreviewRaceStore(TimeProvider.System, null, dataMode, executionMode));
+
+        Assert.Contains("mode", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Persisted_state_cannot_be_reopened_under_a_different_exhibition_mode()
+    {
+        var persistence = new FakePersistence();
+        var stockholm = new PreviewRaceStore(TimeProvider.System, persistence,
+            DelayedNasdaqInstrumentStore.DataMode, PreviewRaceStore.AssumedExecutionMode);
+        stockholm.UpdateAiStatus(new("mode-bound-001", Agent.Id, Agent.ModelId, "queued", null, AvailableAt));
+
+        var exception = Assert.Throws<PreviewRacePersistenceException>(() => new PreviewRaceStore(
+            TimeProvider.System, persistence, DelayedNasdaqInstrumentStore.NordicDataMode,
+            PreviewRaceStore.NordicAssumedExecutionMode));
+
+        Assert.Contains("different exhibition mode", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Nordic_native_fx_trade_survives_store_recreation()
+    {
+        var (persistence, snapshot) = PersistedNordicTradeState();
+
+        var restarted = new PreviewRaceStore(TimeProvider.System, persistence,
+            DelayedNasdaqInstrumentStore.NordicDataMode, PreviewRaceStore.NordicAssumedExecutionMode);
+        var participant = restarted.AiProgress(snapshot).Participants.Single(item => item.AgentId == Agent.Id);
+
+        Assert.Equal("assumed-delayed-paper-fills-v2", participant.Portfolio.ExecutionMode);
+        Assert.Equal(7_500m, participant.Portfolio.HoldingsValueDkk);
+        Assert.Equal(7_575m, participant.LatestDecision!.AssumedPaperFill!.TotalDkk);
+    }
+
+    [Theory]
+    [InlineData("cross-mode-fill")]
+    [InlineData("wrong-venue-currency")]
+    [InlineData("tuple-mismatch")]
+    [InlineData("missing-mark-fx")]
+    [InlineData("future-fill-fx")]
+    [InlineData("future-mark-fx")]
+    [InlineData("future-fill-reference-date")]
+    [InlineData("future-mark-reference-date")]
+    public void Nordic_persisted_state_rejects_mode_tuple_and_fx_corruption(string corruption)
+    {
+        var (persistence, _) = PersistedNordicTradeState();
+        var document = JsonNode.Parse(persistence.Json!)!;
+        var account = document["Accounts"]!.AsArray().Single(item =>
+            item!["AgentId"]!.GetValue<Guid>() == Agent.Id)!;
+        var runFill = document["Runs"]![0]!["Decision"]!["assumedPaperFill"]!;
+        var latestFill = account["LatestDecision"]!["assumedPaperFill"]!;
+        switch (corruption)
+        {
+            case "cross-mode-fill":
+                runFill["executionMode"] = PreviewRaceStore.AssumedExecutionMode;
+                latestFill["executionMode"] = PreviewRaceStore.AssumedExecutionMode;
+                break;
+            case "wrong-venue-currency":
+                runFill["observedCurrency"] = "SEK";
+                latestFill["observedCurrency"] = "SEK";
+                break;
+            case "tuple-mismatch":
+                runFill["observedVenue"] = "XSTO";
+                runFill["observedCurrency"] = "SEK";
+                latestFill["observedVenue"] = "XSTO";
+                latestFill["observedCurrency"] = "SEK";
+                break;
+            case "missing-mark-fx":
+                var mark = account["Marks"]!["XCSE:DK0010181676:CARL-A"]!;
+                mark["fxToDkk"] = null;
+                mark["fxReferenceDate"] = null;
+                mark["fxAvailableAt"] = null;
+                mark["fxSource"] = null;
+                mark["fxSha256"] = null;
+                mark["priceDkk"] = 487.50m;
+                account["Performance"]!.AsArray()[^1]!["valueDkk"] = 97_300m;
+                break;
+            case "future-fill-fx":
+                var afterDecision = account["LatestDecision"]!["completedAt"]!
+                    .GetValue<DateTimeOffset>().AddMinutes(1);
+                runFill["fxAvailableAt"] = afterDecision;
+                latestFill["fxAvailableAt"] = afterDecision;
+                break;
+            case "future-mark-fx":
+                account["Marks"]!["XCSE:DK0010181676:CARL-A"]!["fxAvailableAt"] =
+                    account["Performance"]!.AsArray()[^1]!["at"]!.GetValue<DateTimeOffset>().AddMinutes(1);
+                break;
+            case "future-fill-reference-date":
+                runFill["fxReferenceDate"] = "2026-08-15";
+                latestFill["fxReferenceDate"] = "2026-08-15";
+                break;
+            case "future-mark-reference-date":
+                account["Marks"]!["XCSE:DK0010181676:CARL-A"]!["fxReferenceDate"] =
+                    "2026-08-15";
+                break;
+        }
+        persistence.Seed(document.ToJsonString());
+
+        Assert.Throws<PreviewRacePersistenceException>(() => new PreviewRaceStore(
+            TimeProvider.System, persistence, DelayedNasdaqInstrumentStore.NordicDataMode,
+            PreviewRaceStore.NordicAssumedExecutionMode));
+    }
+
+    [Fact]
+    public void Configured_store_rejects_a_snapshot_from_the_other_official_mode()
+    {
+        var (_, nordicSnapshot) = PersistedNordicTradeState();
+        var stockholmSnapshot = new InstrumentListDto(
+            [new("SE0000108656", "ERIC-B", "Ericsson B", "XSTO", "Sweden", "SEK", 100m, null, false,
+                ExecutedAt, AvailableAt, "Nasdaq Nordic MiFID II delayed post-trade", 15, false, true)],
+            DelayedNasdaqInstrumentStore.DataMode);
+
+        Assert.Throws<PreviewOrderException>(() =>
+            new PreviewRaceStore(TimeProvider.System, null, DelayedNasdaqInstrumentStore.DataMode,
+                PreviewRaceStore.AssumedExecutionMode).AiProgress(nordicSnapshot));
+        Assert.Throws<PreviewOrderException>(() =>
+            new PreviewRaceStore(TimeProvider.System, null, DelayedNasdaqInstrumentStore.NordicDataMode,
+                PreviewRaceStore.NordicAssumedExecutionMode).AiProgress(stockholmSnapshot));
+    }
+
+    [Theory]
+    [InlineData("missing-fx")]
+    [InlineData("tuple-mismatch")]
+    [InlineData("incomplete-provenance")]
+    [InlineData("price-mismatch")]
+    public void Nordic_hold_rejects_invalid_current_marks_before_persistence(string corruption)
+    {
+        var (persistence, snapshot) = PersistedNordicTradeState();
+        var instrument = snapshot.Items[0];
+        instrument = corruption switch
+        {
+            "missing-fx" => instrument with { FxToDkk = null },
+            "tuple-mismatch" => instrument with { Exchange = "XSTO", Currency = "SEK" },
+            "incomplete-provenance" => instrument with { FxSource = null },
+            "price-mismatch" => instrument with { PriceDkk = instrument.PriceDkk + 1m },
+            _ => throw new InvalidOperationException()
+        };
+        var invalidSnapshot = new InstrumentListDto([instrument], DelayedNasdaqInstrumentStore.NordicDataMode);
+        var store = new PreviewRaceStore(TimeProvider.System, persistence,
+            DelayedNasdaqInstrumentStore.NordicDataMode, PreviewRaceStore.NordicAssumedExecutionMode);
+        var hold = new AiDecisionRequestDto("nordic-hold-invalid-001", Agent.Id, Agent.ModelId, "hold", null, 0,
+            "No verified trade catalyst.", 0.5m, [], "copilot", Agent.ModelId, new string('d', 64),
+            AvailableAt.AddMinutes(10), null, null);
+        store.UpdateAiStatus(new(hold.RunId, hold.AgentId, hold.ModelId, "queued", null,
+            hold.CompletedAt.AddSeconds(-2)));
+        store.UpdateAiStatus(new(hold.RunId, hold.AgentId, hold.ModelId, "running", null,
+            hold.CompletedAt.AddSeconds(-1)));
+        var savesBeforeRejection = persistence.SaveCalls;
+
+        Assert.Throws<PreviewOrderException>(() => store.SubmitAi(hold, invalidSnapshot));
+        Assert.Equal(savesBeforeRejection, persistence.SaveCalls);
+    }
+
     [Fact]
     public void Hold_refreshes_all_persisted_marks_before_restart()
     {
@@ -111,7 +291,7 @@ public sealed class PreviewRacePersistenceTests
             dataSource = NpgsqlDataSource.Create(configuredBuilder.ConnectionString);
             await using (var schema = dataSource.CreateCommand("""
                 CREATE TABLE exhibition_preview_state (
-                  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+                  state_key text PRIMARY KEY CHECK (length(state_key) BETWEEN 1 AND 100),
                   revision bigint NOT NULL CHECK (revision > 0),
                   state_json jsonb NOT NULL CHECK (
                     jsonb_typeof(state_json) = 'object' AND octet_length(state_json::text) <= 4194304
@@ -121,6 +301,7 @@ public sealed class PreviewRacePersistenceTests
                 CREATE TABLE exhibition_preview_mutation_receipts (
                   mutation_id uuid PRIMARY KEY,
                   state_revision bigint NOT NULL CHECK (state_revision > 0),
+                  state_key text NOT NULL CHECK (length(state_key) BETWEEN 1 AND 100),
                   committed_at timestamptz NOT NULL DEFAULT clock_timestamp()
                 );
                 CREATE FUNCTION bound_exhibition_preview_mutation_receipts()
@@ -131,7 +312,7 @@ public sealed class PreviewRacePersistenceTests
                 AS $$
                 BEGIN
                   DELETE FROM public.exhibition_preview_mutation_receipts
-                  WHERE state_revision <= NEW.state_revision - 100000;
+                  WHERE state_key=NEW.state_key AND state_revision <= NEW.state_revision - 100000;
                   RETURN NULL;
                 END;
                 $$;
@@ -153,7 +334,8 @@ public sealed class PreviewRacePersistenceTests
             };
             dataSource = NpgsqlDataSource.Create(runtimeBuilder.ConnectionString);
 
-            var persistence = new PostgresPreviewRaceStatePersistence(dataSource);
+            var persistence = new PostgresPreviewRaceStatePersistence(dataSource,
+                DelayedNasdaqInstrumentStore.DataMode);
             var snapshot = new InstrumentListDto(
                 [new("SE0000108656", "ERIC-B", "Ericsson B", "XSTO", "Sweden", "SEK", 100m, null, false,
                     ExecutedAt, AvailableAt, "Nasdaq Nordic MiFID II delayed post-trade", 15, false, true)],
@@ -170,7 +352,7 @@ public sealed class PreviewRacePersistenceTests
             Assert.False(first.SubmitAi(request, snapshot).Replayed);
 
             var restarted = new PreviewRaceStore(TimeProvider.System,
-                new PostgresPreviewRaceStatePersistence(dataSource));
+                new PostgresPreviewRaceStatePersistence(dataSource, DelayedNasdaqInstrumentStore.DataMode));
             var participant = restarted.AiProgress(snapshot).Participants.Single(item => item.AgentId == Agent.Id);
             Assert.Equal("succeeded", participant.Status);
             Assert.Equal("postgres-buy-001", participant.LatestDecision!.RunId);
@@ -180,8 +362,9 @@ public sealed class PreviewRacePersistenceTests
             var oldReceipt = Guid.NewGuid();
             var newestReceipt = Guid.NewGuid();
             await using (var receipts = dataSource.CreateCommand("""
-                INSERT INTO exhibition_preview_mutation_receipts(mutation_id,state_revision)
-                VALUES ($1,1),($2,100001)
+                INSERT INTO exhibition_preview_mutation_receipts(mutation_id,state_revision,state_key)
+                VALUES ($1,1,'official-nasdaq-xsto-15m-delayed'),
+                       ($2,100001,'official-nasdaq-xsto-15m-delayed')
                 """))
             {
                 receipts.Parameters.AddWithValue(oldReceipt);
@@ -192,7 +375,7 @@ public sealed class PreviewRacePersistenceTests
             Assert.True(persistence.WasCommitted(newestReceipt));
 
             await using var oversized = dataSource.CreateCommand(
-                "UPDATE exhibition_preview_state SET state_json=$1::jsonb WHERE singleton=true");
+                "UPDATE exhibition_preview_state SET state_json=$1::jsonb WHERE state_key='official-nasdaq-xsto-15m-delayed'");
             oversized.Parameters.AddWithValue($"{{\"payload\":\"{new string('x', 4 * 1024 * 1024)}\"}}");
             var rejected = await Assert.ThrowsAsync<PostgresException>(() => oversized.ExecuteNonQueryAsync());
             Assert.Equal(PostgresErrorCodes.CheckViolation, rejected.SqlState);
@@ -508,7 +691,8 @@ public sealed class PreviewRacePersistenceTests
         const string secret = "not-a-real-secret-password";
         using var dataSource = NpgsqlDataSource.Create(
             $"Host=127.0.0.1;Port=1;Database=private_database;Username=private_user;Password={secret};Timeout=1");
-        var persistence = new PostgresPreviewRaceStatePersistence(dataSource);
+        var persistence = new PostgresPreviewRaceStatePersistence(dataSource,
+            DelayedNasdaqInstrumentStore.DataMode);
 
         var exception = Assert.Throws<PreviewRacePersistenceException>(() => persistence.Load());
 
@@ -539,6 +723,32 @@ public sealed class PreviewRacePersistenceTests
             throw new NotSupportedException();
 
         public bool WasCommitted(Guid mutationId) => false;
+    }
+
+    private static (FakePersistence Persistence, InstrumentListDto Snapshot) PersistedNordicTradeState()
+    {
+        var persistence = new FakePersistence();
+        var fxAvailableAt = DateTimeOffset.Parse("2026-08-14T14:10:00Z");
+        var instrument = new InstrumentDto("XCSE:DK0010181676:CARL-A", "CARL-A", "Carlsberg A A/S",
+            "XCSE", "Denmark", "DKK", 750m, 750m, false, ExecutedAt, AvailableAt,
+            "Nasdaq Nordic MiFID II delayed post-trade", 15, false, true, 1m,
+            new DateOnly(2026, 8, 14), fxAvailableAt, MarketDataProvenance.EcbInformationalReferenceRates,
+            new string('c', 64));
+        var snapshot = new InstrumentListDto([instrument], DelayedNasdaqInstrumentStore.NordicDataMode);
+        var request = new AiDecisionRequestDto("durable-nordic-001", Agent.Id, Agent.ModelId, "buy",
+            instrument.Id, 10, "Verified durable Nordic decision.", 0.75m,
+            [new("https://example.com/research", AvailableAt, "Exact verified excerpt.", new string('a', 64))],
+            "copilot", Agent.ModelId, new string('b', 64), AvailableAt.AddMinutes(2), null, AvailableAt,
+            750m, "DKK", "XCSE", 1m, ExecutedAt, fxAvailableAt, new string('c', 64),
+            new DateOnly(2026, 8, 14), MarketDataProvenance.EcbInformationalReferenceRates);
+        var store = new PreviewRaceStore(TimeProvider.System, persistence,
+            DelayedNasdaqInstrumentStore.NordicDataMode, PreviewRaceStore.NordicAssumedExecutionMode);
+        store.UpdateAiStatus(new(request.RunId, request.AgentId, request.ModelId, "queued", null,
+            request.CompletedAt.AddSeconds(-2)));
+        store.UpdateAiStatus(new(request.RunId, request.AgentId, request.ModelId, "running", null,
+            request.CompletedAt.AddSeconds(-1)));
+        store.SubmitAi(request, snapshot);
+        return (persistence, snapshot);
     }
 
     private static FakePersistence PersistedTradeState()

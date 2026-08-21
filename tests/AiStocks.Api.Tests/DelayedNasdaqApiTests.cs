@@ -42,6 +42,148 @@ public sealed class DelayedNasdaqApiTests
     }
 
     [Fact]
+    public void Nordic_exhibition_uses_verified_primary_venue_quotes_and_ecb_fx()
+    {
+        using var data = DelayedNasdaqFixture.Create();
+        data.AddNordicReportAndFx();
+        var clock = new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:20:00Z"));
+
+        var response = new DelayedNasdaqInstrumentStore(
+            data.Path, clock, universe: FirdsUniverse.NordicExhibition).CurrentSnapshot();
+
+        Assert.Equal(DelayedNasdaqInstrumentStore.NordicDataMode, response.DataMode);
+        Assert.Equal(2, response.Items.Count);
+        var danish = Assert.Single(response.Items, item => item.Id == "XCSE:DK0010181676:CARL-A");
+        Assert.Equal("XCSE", danish.Exchange);
+        Assert.Equal("Denmark", danish.Country);
+        Assert.Equal("DKK", danish.Currency);
+        Assert.Equal(1m, danish.FxToDkk);
+        Assert.Equal(750m, danish.PriceDkk);
+        Assert.Equal("ECB euro foreign exchange reference rates (informational, not transaction rates)", danish.FxSource);
+        Assert.Equal(DateTimeOffset.Parse("2026-08-16T10:17:00Z"), danish.AvailableAt);
+        Assert.Equal(DateTimeOffset.Parse("2026-08-16T10:19:00Z"), danish.FxAvailableAt);
+        var swedish = Assert.Single(response.Items,
+            item => item.Id == "XSTO:SE0000108656:ERIC-B");
+        Assert.Equal(91.25m * (7.4758m / 11.0625m), swedish.PriceDkk);
+    }
+
+    [Fact]
+    public async Task Nordic_universe_setting_wires_the_HTTP_API_to_v2_data()
+    {
+        using var data = DelayedNasdaqFixture.Create();
+        data.AddNordicReportAndFx();
+        await using var factory = new DelayedNasdaqApiFactory(data.Path, "nordic");
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-User-Email", "viewer@example.com");
+
+        var health = await client.GetFromJsonAsync<JsonElement>("/healthz");
+        var response = await client.GetFromJsonAsync<JsonElement>("/api/v1/instruments");
+
+        Assert.Equal(DelayedNasdaqInstrumentStore.NordicDataMode,
+            health.GetProperty("dataMode").GetString());
+        Assert.Equal(DelayedNasdaqInstrumentStore.NordicDataMode,
+            response.GetProperty("dataMode").GetString());
+        Assert.Contains(response.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("exchange").GetString() == "XCSE" &&
+                    item.GetProperty("currency").GetString() == "DKK" &&
+                    item.GetProperty("fxToDkk").GetDecimal() == 1m);
+    }
+
+    [Fact]
+    public void Nordic_snapshot_fails_closed_without_current_status_state()
+    {
+        using var data = DelayedNasdaqFixture.Create();
+        data.AddNordicReportAndFx();
+        File.Delete(System.IO.Path.Combine(data.Path, "status-state.json"));
+        var store = new DelayedNasdaqInstrumentStore(data.Path,
+            new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:20:00Z")),
+            FirdsUniverse.NordicExhibition);
+
+        var exception = Assert.Throws<MarketDataException>(() => store.CurrentSnapshot());
+
+        Assert.Contains("status state", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Nordic_snapshot_fails_closed_when_status_state_is_stale()
+    {
+        using var data = DelayedNasdaqFixture.Create();
+        data.AddNordicReportAndFx(DateTimeOffset.Parse("2026-08-16T10:09:00Z"));
+        var store = new DelayedNasdaqInstrumentStore(data.Path,
+            new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:20:00Z")),
+            FirdsUniverse.NordicExhibition);
+
+        var exception = Assert.Throws<MarketDataException>(() => store.CurrentSnapshot());
+
+        Assert.Contains("status state", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Nordic_snapshot_excludes_a_suspended_instrument()
+    {
+        using var data = DelayedNasdaqFixture.Create();
+        data.AddNordicReportAndFx();
+        data.Suspend("DK0010181676");
+        var store = new DelayedNasdaqInstrumentStore(data.Path,
+            new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:20:00Z")),
+            FirdsUniverse.NordicExhibition);
+
+        var snapshot = store.CurrentSnapshot();
+
+        Assert.DoesNotContain(snapshot.Items,
+            item => item.Id.Contains("DK0010181676", StringComparison.Ordinal));
+        Assert.Contains(snapshot.Items, item => item.Id == "XSTO:SE0000108656:ERIC-B");
+    }
+
+    [Fact]
+    public void Nordic_snapshot_fails_closed_without_current_corporate_action_state()
+    {
+        using var data = DelayedNasdaqFixture.Create();
+        data.AddNordicReportAndFx();
+        File.Delete(System.IO.Path.Combine(data.Path, "nordic-unsupported-corporate-actions.json"));
+        var store = new DelayedNasdaqInstrumentStore(data.Path,
+            new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:20:00Z")),
+            FirdsUniverse.NordicExhibition);
+
+        var exception = Assert.Throws<MarketDataException>(() => store.CurrentSnapshot());
+
+        Assert.Contains("corporate-action state", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Nordic_snapshot_excludes_instruments_with_unsupported_corporate_actions()
+    {
+        using var data = DelayedNasdaqFixture.Create();
+        data.AddNordicReportAndFx();
+        data.BlockCorporateAction("XCSE", "DK0010181676", "CARL-A");
+        var store = new DelayedNasdaqInstrumentStore(data.Path,
+            new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:20:00Z")),
+            FirdsUniverse.NordicExhibition);
+
+        var snapshot = store.CurrentSnapshot();
+
+        Assert.DoesNotContain(snapshot.Items,
+            item => item.Id.Contains("DK0010181676", StringComparison.Ordinal));
+        Assert.Contains(snapshot.Items, item => item.Id == "XSTO:SE0000108656:ERIC-B");
+    }
+
+    [Fact]
+    public void Nordic_public_snapshot_is_bounded_and_round_robins_across_venues()
+    {
+        var venues = new[] { "XSTO", "XCSE", "XHEL", "ONSE", "XICE" };
+        var instruments = venues.SelectMany((venue, venueIndex) => Enumerable.Range(1, 10).Select(index =>
+            new InstrumentDto($"{venue}:ISIN{venueIndex}{index:00}:BOOK{index:00}", $"{venue}-{index:00}",
+                $"{venue} issuer {index:00}", venue, "Nordic", venue == "XSTO" ? "SEK" : "DKK",
+                index, index, false))).ToArray();
+
+        var selected = DelayedNasdaqInstrumentStore.BalancedNordicPublicSnapshot(instruments, 20);
+
+        Assert.Equal(20, selected.Count);
+        Assert.All(venues, venue => Assert.Equal(4, selected.Count(item => item.Exchange == venue)));
+        Assert.Equal(venues, selected.Take(5).Select(item => item.Exchange));
+    }
+
+    [Fact]
     public void Query_is_applied_after_the_bounded_newest_report_window_is_aggregated()
     {
         using var data = DelayedNasdaqFixture.Create();
@@ -204,13 +346,14 @@ internal sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
     public override DateTimeOffset GetUtcNow() => value;
 }
 
-internal sealed class DelayedNasdaqApiFactory(string archivePath) : WebApplicationFactory<Program>
+internal sealed class DelayedNasdaqApiFactory(string archivePath, string universe = "stockholm") : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("PREVIEW_MODE", "1");
         builder.UseSetting("AI_EXHIBITION_MODE", "1");
+        builder.UseSetting("AI_EXHIBITION_UNIVERSE", universe);
         builder.UseSetting("AI_EXHIBITION_KEY", AiExhibitionApiFactory.Secret);
         builder.UseSetting("AI_EXHIBITION_ARCHIVE_PATH", archivePath);
         builder.ConfigureServices(services =>
@@ -238,6 +381,75 @@ internal sealed class DelayedNasdaqFixture : IDisposable
             new Uri($"https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName={report}"),
             DateTimeOffset.Parse("2026-08-16T10:16:00Z"));
         return new(path);
+    }
+
+    public void AddNordicReportAndFx(DateTimeOffset? statusAsOf = null)
+    {
+        const string xml = """
+            <Document xmlns="urn:iso:std:iso:20022:tech:xsd:auth.017.001.02">
+              <RefData><FinInstrmGnlAttrbts><Id>DK0010181676</Id><FullNm>Carlsberg A A/S</FullNm><ClssfctnTp>ESEUFN</ClssfctnTp><NtnlCcy>DKK</NtnlCcy></FinInstrmGnlAttrbts><Issr>5299001O0WJQYB5GYZ19</Issr><TradgVnRltdAttrbts><Id>XCSE</Id><TradgVnInstrmId>CARL-A</TradgVnInstrmId><FrstTradDt>2000-01-01T00:00:00Z</FrstTradDt></TradgVnRltdAttrbts></RefData>
+            </Document>
+            """;
+        var xmlBytes = Encoding.UTF8.GetBytes(xml);
+        var strictFirds = new DurableFirdsStore(System.IO.Path.Combine(Path, "firds-state.json"));
+        strictFirds.ApplyFullPart(
+            new MemoryStream(xmlBytes), DateOnly.Parse("2026-08-16"),
+            new Uri("https://firds.esma.europa.eu/firds/FULINS_E_20260816_02of02.zip"),
+            Convert.ToHexStringLower(SHA256.HashData(xmlBytes)), "full-2", 2);
+        strictFirds.ProjectVerifiedTo(new DurableFirdsStore(
+            System.IO.Path.Combine(Path, "firds-nordic-state.json"), FirdsUniverse.NordicExhibition));
+        var statuses = NasdaqStatusMachine.LoadPublicRssBestEffort(
+            System.IO.Path.Combine(Path, "status-state.json"));
+        statuses.InitializeBestEffortUniverse(["SE0000108656", "DK0010181676"],
+            statusAsOf ?? DateTimeOffset.Parse("2026-08-16T10:17:00Z"));
+
+        const string report = "NordicEquity-posttrade-2026-08-16T1017";
+        var csv = Encoding.UTF8.GetBytes("\"sep=;\"\nTrading date and time;Instrument identification code;Price;Price currency;Price notation;Quantity;Venue of execution;Publication date and time;Transaction identification code;Flags\n2026-08-16T10:02:00Z;DK0010181676;750;DKK;MONE;10;XCSE;2026-08-16T10:02:01Z;danish;\n");
+        new ImmutableArchive(Path).Archive(report, csv,
+            new Uri($"https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName={report}"),
+            DateTimeOffset.Parse("2026-08-16T10:17:00Z"));
+
+        const string fx = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01" xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">
+              <Cube><Cube time="2026-08-14"><Cube currency="DKK" rate="7.4758"/><Cube currency="SEK" rate="11.0625"/><Cube currency="NOK" rate="10.8675"/><Cube currency="ISK" rate="141.60"/></Cube></Cube>
+            </gesmes:Envelope>
+            """;
+        new EcbFxStore(Path).Archive(Encoding.UTF8.GetBytes(fx), EcbFxStore.OfficialSource,
+            DateTimeOffset.Parse("2026-08-16T10:19:00Z"));
+        var corporateActionInput = System.IO.Path.Combine(Path, "corporate-action-input");
+        Directory.CreateDirectory(corporateActionInput);
+        new UnsupportedCorporateActionStore(Path).RefreshFromDirectory(corporateActionInput,
+            DateTimeOffset.Parse("2026-08-16T10:19:00Z"));
+    }
+
+    public void BlockCorporateAction(string venue, string isin, string orderBookId)
+    {
+        var input = System.IO.Path.Combine(Path, "corporate-action-input");
+        File.WriteAllText(System.IO.Path.Combine(input, "unsupported.json"), $$"""
+            {
+              "schemaVersion": "1",
+              "venue": "{{venue}}",
+              "isin": "{{isin}}",
+              "orderBookId": "{{orderBookId}}",
+              "actionType": "SPLIT",
+              "effectiveAt": "2026-08-17T00:00:00Z"
+            }
+            """);
+        new UnsupportedCorporateActionStore(Path).RefreshFromDirectory(input,
+            DateTimeOffset.Parse("2026-08-16T10:19:30Z"));
+    }
+
+    public void Suspend(string isin)
+    {
+        var statuses = NasdaqStatusMachine.LoadPublicRssBestEffort(
+            System.IO.Path.Combine(Path, "status-state.json"));
+        var rss = Encoding.UTF8.GetBytes($"""
+            <rss><channel><item><guid>suspend-{isin}</guid><title>Suspension {isin}</title>
+            <description>Trading suspended</description><pubDate>Sun, 16 Aug 2026 10:18:00 GMT</pubDate>
+            <link>https://view.news.eu.nasdaq.com/view?id=suspend</link></item></channel></rss>
+            """);
+        statuses.ApplyRss(new MemoryStream(rss, writable: false));
     }
 
     public void AddAdditionalReports(int count)

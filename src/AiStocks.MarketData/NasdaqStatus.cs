@@ -52,7 +52,8 @@ public sealed partial class NasdaqStatusMachine
 
     private NasdaqStatusMachine(Dictionary<string, InstrumentTradingState> states, DateTimeOffset seedAsOf,
         string signerKeyId, string signerKeySha256, string durableStatePath, Dictionary<string, InstrumentTradingState> seedStates,
-        IEnumerable<NasdaqStatusEvent>? events = null, IEnumerable<NasdaqRssArtifact>? rssArtifacts = null)
+        IEnumerable<NasdaqStatusEvent>? events = null, IEnumerable<NasdaqRssArtifact>? rssArtifacts = null,
+        DateTimeOffset? latestUpdatedAt = null)
     {
         _states = states; _seedStates = seedStates.ToDictionary(); SeedAsOf = seedAsOf;
         SignerKeyId = signerKeyId; SignerKeySha256 = signerKeySha256;
@@ -62,6 +63,8 @@ public sealed partial class NasdaqStatusMachine
         _eventIds = _events.Select(x => x.Id).ToHashSet(StringComparer.Ordinal);
         _latestPublishedAt = _events.Count == 0 ? seedAsOf : DateTimeOffset.Compare(seedAsOf, _events.Max(x => x.PublishedAt)) >= 0
             ? seedAsOf : _events.Max(x => x.PublishedAt);
+        if (latestUpdatedAt is not null && latestUpdatedAt > _latestPublishedAt)
+            _latestPublishedAt = latestUpdatedAt.Value;
     }
 
     public IReadOnlyList<NasdaqStatusEvent> Events => _events;
@@ -99,7 +102,8 @@ public sealed partial class NasdaqStatusMachine
                 throw new MarketDataException("Durable best-effort status state identity or checksum mismatch");
             return new(envelope.State.States.ToDictionary(StringComparer.Ordinal), envelope.State.SeedAsOf,
                 envelope.State.SignerKeyId, envelope.State.SignerKeySha256, path,
-                envelope.State.SeedStates.ToDictionary(StringComparer.Ordinal), envelope.State.Events, envelope.State.RssArtifacts);
+                envelope.State.SeedStates.ToDictionary(StringComparer.Ordinal), envelope.State.Events,
+                envelope.State.RssArtifacts, envelope.State.LatestUpdatedAt);
         }
         catch (MarketDataException) { throw; }
         catch (Exception exception) when (exception is IOException or JsonException)
@@ -220,7 +224,8 @@ public sealed partial class NasdaqStatusMachine
     {
         var state = new StatusState(SeedAsOf, SignerKeyId, SignerKeySha256,
             _states.OrderBy(x => x.Key, StringComparer.Ordinal).ToDictionary(), _events.ToArray(), _rssArtifacts.ToArray(),
-            SignerKeyId == "public-rss-best-effort" ? _seedStates.OrderBy(x => x.Key, StringComparer.Ordinal).ToDictionary() : null);
+            SignerKeyId == "public-rss-best-effort" ? _seedStates.OrderBy(x => x.Key, StringComparer.Ordinal).ToDictionary() : null,
+            _latestPublishedAt);
         var checksum = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(state, JsonOptions)));
         AtomicFile.Write(_durableStatePath, JsonSerializer.SerializeToUtf8Bytes(new StatusEnvelope(checksum, state), JsonOptions));
     }
@@ -270,7 +275,8 @@ public sealed partial class NasdaqStatusMachine
     private sealed record StatusState(DateTimeOffset SeedAsOf, string SignerKeyId, string SignerKeySha256,
         Dictionary<string, InstrumentTradingState> States, IReadOnlyList<NasdaqStatusEvent> Events,
         IReadOnlyList<NasdaqRssArtifact>? RssArtifacts = null,
-        Dictionary<string, InstrumentTradingState>? SeedStates = null);
+        Dictionary<string, InstrumentTradingState>? SeedStates = null,
+        DateTimeOffset? LatestUpdatedAt = null);
     private sealed record StatusEnvelope(string Sha256, StatusState State);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {

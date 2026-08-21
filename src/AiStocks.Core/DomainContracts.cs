@@ -3,6 +3,12 @@ using System.Net;
 
 namespace AiStocks.Core;
 
+public static class MarketDataProvenance
+{
+    public const string EcbInformationalReferenceRates =
+        "ECB euro foreign exchange reference rates (informational, not transaction rates)";
+}
+
 public static class ContestContract
 {
     public const string Currency = "SEK";

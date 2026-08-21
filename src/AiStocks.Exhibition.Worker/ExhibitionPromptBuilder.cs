@@ -78,25 +78,49 @@ public static class ExhibitionPromptBuilder
         return char.IsHighSurrogate(bounded[^1]) ? bounded[..^1] : bounded;
     }
 
+    private static bool ValidFxContract(JsonElement root, bool nordic)
+    {
+        if (!root.TryGetProperty("assumedSekToDkk", out var sekFx)) return false;
+        if (!nordic)
+            return sekFx.TryGetDecimal(out var fx) && fx == ExhibitionDataContract.AssumedSekToDkk;
+        if (sekFx.ValueKind is not JsonValueKind.Null ||
+            !root.TryGetProperty("assumedFxToDkk", out var fxMap) || fxMap.ValueKind != JsonValueKind.Object)
+            return false;
+        var count = 0;
+        foreach (var property in fxMap.EnumerateObject())
+        {
+            if (!ExhibitionDataContract.NordicCurrencies.Contains(property.Name) ||
+                !property.Value.TryGetDecimal(out var value) || value <= 0m) return false;
+            count++;
+        }
+        return count > 0;
+    }
+
     public static string Build(AgentDefinition agent, string runId, string instrumentsJson, string progressJson)
     {
         if (!ContestContract.IsExactAgent(agent.Id, agent.ModelId)) throw new InvalidOperationException("Unknown contest agent.");
         using var instruments = StrictJson.Parse(instrumentsJson, 2 * 1024 * 1024);
         if (instruments.RootElement.ValueKind != JsonValueKind.Object ||
             !instruments.RootElement.TryGetProperty("items", out var instrumentItems) || instrumentItems.ValueKind != JsonValueKind.Array ||
-            !instruments.RootElement.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != ExhibitionDataContract.DataMode)
-            throw new InvalidOperationException("Instrument response must contain official delayed Nasdaq XSTO data.");
+            !instruments.RootElement.TryGetProperty("dataMode", out var dataModeElement) || dataModeElement.ValueKind != JsonValueKind.String)
+            throw new InvalidOperationException("Instrument response must contain official delayed Nasdaq data.");
+        var dataMode = dataModeElement.GetString();
+        if (dataMode is not (ExhibitionDataContract.StockholmDataMode or ExhibitionDataContract.NordicDataMode))
+            throw new InvalidOperationException("Instrument response uses an unsupported delayed-data mode.");
+        var nordic = dataMode == ExhibitionDataContract.NordicDataMode;
+        var expectedExecutionMode = nordic
+            ? ExhibitionDataContract.NordicExecutionMode
+            : ExhibitionDataContract.StockholmExecutionMode;
         using var progress = StrictJson.Parse(progressJson, 2 * 1024 * 1024);
         if (progress.RootElement.ValueKind != JsonValueKind.Object ||
             !progress.RootElement.TryGetProperty("participants", out var agents) || agents.ValueKind != JsonValueKind.Array ||
-            !progress.RootElement.TryGetProperty("dataMode", out var progressDataMode) || progressDataMode.GetString() != ExhibitionDataContract.DataMode ||
-            !progress.RootElement.TryGetProperty("executionMode", out var executionMode) || executionMode.GetString() != ExhibitionDataContract.ExecutionMode ||
+            !progress.RootElement.TryGetProperty("dataMode", out var progressDataMode) || progressDataMode.GetString() != dataMode ||
+            !progress.RootElement.TryGetProperty("executionMode", out var executionMode) || executionMode.GetString() != expectedExecutionMode ||
             !progress.RootElement.TryGetProperty("isNonLive", out var isNonLive) || isNonLive.ValueKind != JsonValueKind.True ||
             !progress.RootElement.TryGetProperty("strictContest", out var strictContest) || strictContest.ValueKind != JsonValueKind.False ||
             !progress.RootElement.TryGetProperty("holdOnly", out var holdOnly) || holdOnly.ValueKind != JsonValueKind.False ||
             !progress.RootElement.TryGetProperty("assumedFills", out var assumedFills) || assumedFills.ValueKind != JsonValueKind.True ||
-            !progress.RootElement.TryGetProperty("assumedSekToDkk", out var assumedSekToDkk) ||
-            !assumedSekToDkk.TryGetDecimal(out var fx) || fx != ExhibitionDataContract.AssumedSekToDkk ||
+            !ValidFxContract(progress.RootElement, nordic) ||
             !progress.RootElement.TryGetProperty("assumedSlippagePercent", out var assumedSlippage) ||
             !assumedSlippage.TryGetDecimal(out var slippage) || slippage != ExhibitionDataContract.AssumedSlippagePercent)
             throw new InvalidOperationException("AI progress response must contain the exact assumed-fill exhibition contract.");
@@ -107,10 +131,10 @@ public static class ExhibitionPromptBuilder
                 participantPortfolio.ValueKind != JsonValueKind.Object ||
                 !participantPortfolio.TryGetProperty("dataMode", out var portfolioDataMode) ||
                 portfolioDataMode.ValueKind != JsonValueKind.String ||
-                portfolioDataMode.GetString() != ExhibitionDataContract.DataMode ||
+                portfolioDataMode.GetString() != dataMode ||
                 !participantPortfolio.TryGetProperty("executionMode", out var portfolioExecutionMode) ||
                 portfolioExecutionMode.ValueKind != JsonValueKind.String ||
-                portfolioExecutionMode.GetString() != ExhibitionDataContract.ExecutionMode))
+                portfolioExecutionMode.GetString() != expectedExecutionMode))
             throw new InvalidOperationException("Every AI portfolio must use the exact delayed-data and assumed-fill execution modes.");
         var matches = participants.Where(item =>
             item.TryGetProperty("agentId", out var id) && id.ValueKind == JsonValueKind.String &&
@@ -118,12 +142,18 @@ public static class ExhibitionPromptBuilder
         if (matches.Length != 1 || !matches[0].TryGetProperty("portfolio", out var portfolio))
             throw new InvalidOperationException("AI progress must contain exactly one portfolio for the requested fixed agent.");
 
+        var heading = nordic
+            ? "LOCAL NORDIC DELAYED POST-TRADE ASSUMED-FILL EXHIBITION. Inputs cover approved XSTO, XCSE, XHEL, ONSE, and XICE primary listings. Nasdaq observations are at least 15-minute delayed post-trade prices—not live or executable quotes. DKK conversions use checksum-bound ECB informational reference rates—not transaction rates. This private local project is not licensed global market-data coverage. No brokerage or real orders exist; no real money is used."
+            : "OFFICIAL NASDAQ XSTO DELAYED-DATA ASSUMED-FILL EXHIBITION. Inputs are official Nasdaq XSTO observations, at least 15-minute delayed and non-live. This is a separate assumed-fill paper exhibition, not the strict contest. No brokerage or real orders exist; no real money is used.";
+        var executionAssumptions = nordic
+            ? "Paper execution assumptions: use each observation's checksum-bound native-currency-to-DKK ECB informational reference-rate conversion and 1% adverse slippage. A buy order may cost at most 10,000 DKK after conversion/slippage. A marked position may be at most 25,000 DKK after the buy."
+            : "Paper execution assumptions: fixed 0.65 DKK/SEK conversion and 1% adverse slippage. A buy order may cost at most 10,000 DKK after assumed FX/slippage. A marked position may be at most 25,000 DKK after the buy.";
         return $$"""
-            OFFICIAL NASDAQ XSTO DELAYED-DATA ASSUMED-FILL EXHIBITION. Inputs are official Nasdaq XSTO observations, at least 15-minute delayed and non-live. This is a separate assumed-fill paper exhibition, not the strict contest. No brokerage or real orders exist; no real money is used.
+            {{heading}}
             You are fixed agent {{agent.Id:D}} using exact model {{agent.ModelId}} via provider copilot. No fallback or substitution is allowed.
             Immutable idempotent run ID: {{runId}}
             You may research only public HTTPS web sources. Before deciding, you MUST use web_search to investigate at least three diverse currently observed issuers (or every issuer when fewer than three are shown); expand up to eight only while no verifier-eligible catalyst has been found, and stop broad surveying once one credible candidate is available. Search each issuer by its full name together with terms such as financial results, guidance, corporate action, material announcement, valuation, or outlook and the current year. A search-result snippet is discovery only, not evidence. For promising results, MUST use mcp_research_fetch_public_https_tool. Its discovery_text cannot be submitted as evidence. Submit a source only when verifier_eligible=true, using the exact verifier_publication_time and an exact sentence from evidence_candidates. If verifier_eligible=false or evidence_candidates is empty, immediately choose another source host. Prefer issuer investor-relations, regulatory-news, or syndicated press-release pages. Do not claim that research is unavailable without first calling web_search and the fetch tool. Do not seek rival state. The only portfolio context below is your own.
-            Paper execution assumptions: fixed 0.65 DKK/SEK conversion and 1% adverse slippage. A buy order may cost at most 10,000 DKK after assumed FX/slippage. A marked position may be at most 25,000 DKK after the buy.
+            {{executionAssumptions}}
             Your objective is to maximize ending portfolio value, not merely preserve starting cash; remaining fully in cash can lose the exhibition to a competitor with profitable positions. Take evidence-backed risk when research supports positive expected value; certainty or guaranteed profit is not required. A small exploratory position is valid when the catalyst is credible but confidence is moderate. HOLD remains valid after broad research finds no positive expected-value opportunity; never manufacture a trade.
 
             OFFICIAL DELAYED INSTRUMENT OBSERVATIONS (eligible only for assumed paper fills):
@@ -141,11 +171,22 @@ public static class ExhibitionPromptBuilder
 
 internal static class ExhibitionDataContract
 {
-    internal const string DataMode = "official-nasdaq-xsto-15m-delayed";
-    internal const string ExecutionMode = "assumed-delayed-paper-fills-v1";
+    internal const string StockholmDataMode = "official-nasdaq-xsto-15m-delayed";
+    internal const string NordicDataMode = "official-nasdaq-nordic-15m-delayed-ecb-fx";
+    internal const string StockholmExecutionMode = "assumed-delayed-paper-fills-v1";
+    internal const string NordicExecutionMode = "assumed-delayed-paper-fills-v2";
     internal const string Source = "Nasdaq Nordic MiFID II delayed post-trade";
+    internal const string FxSource = MarketDataProvenance.EcbInformationalReferenceRates;
     internal const decimal AssumedSekToDkk = 0.65m;
     internal const decimal AssumedSlippagePercent = 1m;
+    internal static readonly HashSet<string> NordicCurrencies = ["SEK", "DKK", "EUR", "NOK", "ISK"];
+
+    internal static bool IsNordicPair(string venue, string currency) => (venue, currency) switch
+    {
+        ("XSTO", "SEK") or ("XCSE", "DKK") or ("XHEL", "EUR") or
+        ("ONSE", "NOK") or ("XICE", "ISK") => true,
+        _ => false
+    };
 }
 
 internal static class StrictJson

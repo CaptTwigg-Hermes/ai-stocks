@@ -703,7 +703,16 @@
     document.querySelectorAll("[data-exhibition-only]").forEach((element) => {
       element.hidden = false;
     });
-    ui.dataBadge.textContent = "ASSUMED FILLS · Official Nasdaq XSTO · delayed · non-live · paper-only";
+    const nordic = data.dataMode === "official-nasdaq-nordic-15m-delayed-ecb-fx";
+    ui.dataBadge.textContent = nordic
+      ? "ASSUMED FILLS · Nasdaq Nordic delayed post-trade · ECB reference FX · non-live"
+      : "ASSUMED FILLS · Official Nasdaq XSTO · delayed · non-live · paper-only";
+    const disclosure = nordic
+      ? "Inputs are official Nasdaq Nordic observations at least 15-minute delayed and non-live. DKK conversions use checksum-bound ECB informational reference rates—not executable transaction rates. Paper fills use 1% adverse slippage; no broker or real orders exist. Portfolios are volatile. This private exhibition is not licensed global coverage or the strict 2026 contest."
+      : "Inputs are official Nasdaq XSTO observations at least 15-minute delayed and non-live. Paper fills use fixed 0.65 DKK/SEK and 1% adverse slippage; no broker or real orders exist. Portfolios are volatile. This is not the strict 2026 contest.";
+    document.querySelectorAll("[data-exhibition-disclosure-copy]").forEach((element) => {
+      element.textContent = disclosure;
+    });
     document.querySelector('[data-route="trade"]').textContent = "AI Race";
     ui.leaderboardIntro.textContent = "Four fixed AI participants ranked by assumed-fill paper portfolio value in DKK.";
     ui.leaderboardMode.textContent = "ASSUMED FILLS · AI-only non-live exhibition";

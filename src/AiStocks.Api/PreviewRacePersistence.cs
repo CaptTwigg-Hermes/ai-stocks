@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AiStocks.Core;
 
+
 namespace AiStocks.Api;
 
 public sealed record PreviewRacePersistedState(long Revision, string Json);
@@ -16,7 +17,7 @@ public sealed class PreviewRacePersistenceException(string message) : InvalidOpe
 
 public sealed partial class PreviewRaceStore
 {
-    private const int PersistenceSchemaVersion = 1;
+    private const int PersistenceSchemaVersion = 3;
     private const int MaximumPersistedStateCharacters = 4 * 1024 * 1024;
 
     private T PersistMutation<T>(Func<T> mutation)
@@ -127,7 +128,7 @@ public sealed partial class PreviewRaceStore
             aiRuns.OrderBy(item => item.Key, StringComparer.Ordinal)
                 .Select(item => new PersistedAiRun(item.Key, item.Value.AgentId, item.Value.ModelId,
                     item.Value.Fingerprint, item.Value.Decision)).ToArray(),
-            aiActivity.ToArray());
+            aiActivity.ToArray(), persistedDataMode, persistedExecutionMode);
         return JsonSerializer.Serialize(state);
     }
 
@@ -149,15 +150,26 @@ public sealed partial class PreviewRaceStore
         if (state.Accounts is null || state.Runs is null || state.Activity is null ||
             state.Accounts.Any(item => item is null) || state.Runs.Any(item => item is null) ||
             state.Activity.Any(item => item is null) ||
-            state.SchemaVersion != PersistenceSchemaVersion || state.Accounts.Length != ContestContract.Agents.Count ||
+            state.SchemaVersion is < 1 or > PersistenceSchemaVersion || state.Accounts.Length != ContestContract.Agents.Count ||
             state.Runs.Length > MaximumIdempotencyEntries || state.Activity.Length > 100)
             throw new PreviewRacePersistenceException("Persisted preview state violates its bounded schema.");
+        if (state.SchemaVersion == PersistenceSchemaVersion)
+        {
+            if (state.DataMode != persistedDataMode || state.ExecutionMode != persistedExecutionMode)
+                throw new PreviewRacePersistenceException("Persisted preview state belongs to a different exhibition mode.");
+        }
+        else if (persistedDataMode != DelayedNasdaqInstrumentStore.DataMode ||
+                 persistedExecutionMode != AssumedExecutionMode)
+        {
+            throw new PreviewRacePersistenceException(
+                "Legacy persisted preview state is not bound to the selected exhibition mode.");
+        }
 
         var restored = new Dictionary<Guid, AiAccount>();
         foreach (var persisted in state.Accounts)
         {
             if (!ContestContract.IsExactAgent(persisted.AgentId, persisted.ModelId) ||
-                !restored.TryAdd(persisted.AgentId, RestoreAccount(persisted)))
+                !restored.TryAdd(persisted.AgentId, RestoreAccount(persisted, persistedExecutionMode!)))
                 throw new PreviewRacePersistenceException("Persisted preview state contains an invalid agent identity.");
         }
         if (ContestContract.Agents.Any(agent => !restored.ContainsKey(agent.Id)))
@@ -168,7 +180,7 @@ public sealed partial class PreviewRaceStore
             if (!ContestContract.IsExactAgent(run.AgentId, run.ModelId) || !ValidRunId(run.RunId) ||
                 !Bounded(run.Fingerprint, 1_000_000) || run.Decision is null ||
                 !string.Equals(run.RunId, run.Decision.RunId, StringComparison.Ordinal) ||
-                !ValidDecision(run.Decision, run.ModelId) ||
+                !ValidDecision(run.Decision, run.ModelId, persistedExecutionMode!) ||
                 !restoredRuns.TryAdd(run.RunId, new(run.AgentId, run.ModelId, run.Fingerprint, run.Decision)))
                 throw new PreviewRacePersistenceException("Persisted preview state contains an invalid run identity.");
 
@@ -210,7 +222,7 @@ public sealed partial class PreviewRaceStore
                  persisted.LatestDecision.CompletedAt != persisted.CompletedAt))
                 throw new PreviewRacePersistenceException("Persisted preview account has no latest decision for its run.");
             if (persisted.LatestDecision is not null &&
-                (!ValidDecision(persisted.LatestDecision, persisted.ModelId) ||
+                (!ValidDecision(persisted.LatestDecision, persisted.ModelId, persistedExecutionMode!) ||
                  !restoredRuns.TryGetValue(persisted.LatestDecision.RunId, out var accepted) ||
                  accepted.AgentId != persisted.AgentId || accepted.ModelId != persisted.ModelId ||
                  !JsonEquivalent(JsonSerializer.Serialize(persisted.LatestDecision), JsonSerializer.Serialize(accepted.Decision))))
@@ -237,7 +249,7 @@ public sealed partial class PreviewRaceStore
         aiActivity.AddRange(state.Activity);
     }
 
-    private static AiAccount RestoreAccount(PersistedAiAccount persisted)
+    private static AiAccount RestoreAccount(PersistedAiAccount persisted, string expectedExecutionMode)
     {
         if (persisted.SeenRunIds is null || persisted.Holdings is null || persisted.CostBasisDkk is null ||
             persisted.Marks is null || persisted.Performance is null || persisted.CashDkk < 0m ||
@@ -254,7 +266,8 @@ public sealed partial class PreviewRaceStore
             persisted.Marks.Keys.Any(key => !persisted.Holdings.ContainsKey(key)) ||
             persisted.Marks.Any(item => !Bounded(item.Key, 128) || item.Value is null ||
                 !string.Equals(item.Key, item.Value.Id, StringComparison.Ordinal) || item.Value.Price <= 0m ||
-                item.Value.PriceDkk != Money(item.Value.Price * AssumedSekToDkk) ||
+                !ValidPersistedMark(item.Value, expectedExecutionMode,
+                    persisted.Performance.LastOrDefault()?.At ?? default) ||
                 !Bounded(item.Value.Symbol, 64) || !Bounded(item.Value.Name, 512) ||
                 !Bounded(item.Value.Exchange, 64) || !Bounded(item.Value.Country, 64) || !Bounded(item.Value.Currency, 16) ||
                 item.Value.ExecutedAt is null || item.Value.AvailableAt is null || item.Value.DelayMinutes is null or < 0 ||
@@ -308,7 +321,8 @@ public sealed partial class PreviewRaceStore
         _ => false
     };
 
-    private static bool ValidDecision(AiDecisionDto decision, string expectedModelId) =>
+    private static bool ValidDecision(AiDecisionDto decision, string expectedModelId,
+        string expectedExecutionMode) =>
         ValidRunId(decision.RunId) && Bounded(decision.Action, 16) && Bounded(decision.Reason, 2_000) &&
         decision.Action is "hold" or "buy" or "sell" && decision.Quantity >= 0 &&
         (decision.Action == "hold" ? decision.Quantity == 0 && decision.InstrumentId is null
@@ -321,24 +335,82 @@ public sealed partial class PreviewRaceStore
             Bounded(item.ExactExcerpt, 2_000) && Sha256(item.ContentSha256)) &&
         decision.Attestation.RuntimeProvider == "copilot" &&
         decision.Attestation.RuntimeModel == expectedModelId &&
-        Sha256(decision.Attestation.ReportSha256) && ValidFill(decision);
+        Sha256(decision.Attestation.ReportSha256) && ValidFill(decision, expectedExecutionMode);
 
-    private static bool ValidFill(AiDecisionDto decision)
+    private static bool ValidFill(AiDecisionDto decision, string expectedExecutionMode)
     {
         var fill = decision.AssumedPaperFill;
         if (decision.Action == "hold") return fill is null;
-        if (fill is null || fill.ObservedPriceSek <= 0m || fill.AssumedSekToDkk != AssumedSekToDkk ||
-            fill.AssumedSlippagePercent != AssumedSlippagePercent ||
+        if (fill is null || fill.ObservedPriceSek <= 0m || fill.AssumedSlippagePercent != AssumedSlippagePercent ||
             fill.ObservationExecutedAt == default || fill.ObservationAvailableAt == default || fill.FilledAt == default ||
             fill.ObservationExecutedAt > fill.ObservationAvailableAt ||
-            fill.ObservationAvailableAt > decision.CompletedAt || fill.FilledAt < decision.CompletedAt ||
-            fill.ExecutionMode != AssumedExecutionMode)
+            fill.ObservationAvailableAt > decision.CompletedAt || fill.FilledAt < decision.CompletedAt)
             return false;
-        var expectedFillPrice = Money(fill.ObservedPriceSek * AssumedSekToDkk *
+        decimal fxToDkk;
+        if (expectedExecutionMode == AssumedExecutionMode && fill.ExecutionMode == AssumedExecutionMode)
+        {
+            if (fill.AssumedSekToDkk != AssumedSekToDkk || !ValidStockholmIdentity(decision.InstrumentId) ||
+                fill.ObservedPrice is not null || fill.ObservedCurrency is not null || fill.ObservedVenue is not null ||
+                fill.FxToDkk is not null || fill.FxReferenceDate is not null || fill.FxAvailableAt is not null ||
+                fill.FxSource is not null || fill.FxSha256 is not null) return false;
+            fxToDkk = AssumedSekToDkk;
+        }
+        else if (expectedExecutionMode == NordicAssumedExecutionMode &&
+                 fill.ExecutionMode == NordicAssumedExecutionMode)
+        {
+            if (fill.ObservedPrice != fill.ObservedPriceSek || fill.ObservedPrice is null or <= 0m ||
+                !ValidNordicIdentity(decision.InstrumentId, fill.ObservedVenue, fill.ObservedCurrency) ||
+                fill.FxToDkk is null or <= 0m || fill.AssumedSekToDkk != fill.FxToDkk ||
+                fill.FxReferenceDate is null || fill.FxAvailableAt is null ||
+                !ValidFxTiming(fill.FxReferenceDate, fill.FxAvailableAt, decision.CompletedAt) ||
+                fill.FxSource != MarketDataProvenance.EcbInformationalReferenceRates ||
+                !Sha256(fill.FxSha256)) return false;
+            fxToDkk = fill.FxToDkk.Value;
+        }
+        else return false;
+        var expectedFillPrice = Money(fill.ObservedPriceSek * fxToDkk *
             (decision.Action == "buy" ? 1m + (AssumedSlippagePercent / 100m) :
                 1m - (AssumedSlippagePercent / 100m)));
         return fill.FillPriceDkk == expectedFillPrice && fill.TotalDkk == Money(expectedFillPrice * decision.Quantity);
     }
+
+    private static bool ValidPersistedMark(InstrumentDto mark, string expectedExecutionMode,
+        DateTimeOffset markAsOf)
+    {
+        if (expectedExecutionMode == AssumedExecutionMode)
+            return ValidStockholmIdentity(mark.Id) && mark.Exchange == "XSTO" && mark.Currency == "SEK" &&
+                   mark.PriceDkk == Money(mark.Price * AssumedSekToDkk) && mark.FxToDkk is null &&
+                   mark.FxReferenceDate is null && mark.FxAvailableAt is null && mark.FxSource is null &&
+                   mark.FxSha256 is null;
+        if (expectedExecutionMode != NordicAssumedExecutionMode ||
+            !ValidNordicIdentity(mark.Id, mark.Exchange, mark.Currency) || mark.FxToDkk is null or <= 0m)
+            return false;
+        return mark.PriceDkk == Money(mark.Price * mark.FxToDkk.Value) && mark.FxReferenceDate is not null &&
+               mark.FxAvailableAt is not null && ValidFxTiming(mark.FxReferenceDate, mark.FxAvailableAt, markAsOf) &&
+               mark.FxSource == MarketDataProvenance.EcbInformationalReferenceRates && Sha256(mark.FxSha256);
+    }
+
+    private static bool ValidFxTiming(DateOnly? referenceDate, DateTimeOffset? availableAt,
+        DateTimeOffset asOf) =>
+        referenceDate is not null && availableAt is not null && availableAt.Value != default && asOf != default &&
+        availableAt.Value <= asOf &&
+        referenceDate.Value <= DateOnly.FromDateTime(availableAt.Value.UtcDateTime);
+
+    private static bool ValidStockholmIdentity(string? instrumentId) =>
+        ValidIsin(instrumentId) && !instrumentId!.Contains(':');
+
+    private static bool ValidNordicIdentity(string? instrumentId, string? venue, string? currency)
+    {
+        if (instrumentId is null || venue is null || currency is null) return false;
+        var parts = instrumentId.Split(':');
+        if (parts.Length != 3 || parts[0] != venue || !ValidIsin(parts[1]) || !Bounded(parts[2], 64)) return false;
+        return (venue, currency) is ("XSTO", "SEK") or ("XCSE", "DKK") or ("XHEL", "EUR") or
+            ("ONSE", "NOK") or ("XICE", "ISK");
+    }
+
+    private static bool ValidIsin(string? value) => value is { Length: 12 } &&
+        value.Take(2).All(character => character is >= 'A' and <= 'Z') &&
+        value.Skip(2).All(character => character is >= 'A' and <= 'Z' or >= '0' and <= '9');
 
     private static bool ValidAccounting(PersistedAiAccount account, IEnumerable<AiRun> acceptedRuns)
     {
@@ -410,7 +482,8 @@ public sealed partial class PreviewRaceStore
         uri.Scheme == Uri.UriSchemeHttps && Bounded(value, 2_048);
 
     private sealed record PersistedState(int SchemaVersion, PersistedAiAccount[] Accounts,
-        PersistedAiRun[] Runs, AiActivityDto[] Activity);
+        PersistedAiRun[] Runs, AiActivityDto[] Activity, string? DataMode = null,
+        string? ExecutionMode = null);
 
     private sealed record PersistedAiAccount(Guid AgentId, string ModelId, string Status, string? RunId,
         DateTimeOffset? QueuedAt, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt, string? Error,

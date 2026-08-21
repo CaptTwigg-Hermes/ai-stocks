@@ -1,4 +1,5 @@
 using AiStocks.Core;
+
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -9,6 +10,7 @@ public sealed partial class PreviewRaceStore
     public const decimal StartingCashDkk = 100_000m;
     public const string DataMode = "preview-fixtures";
     public const string AssumedExecutionMode = "assumed-delayed-paper-fills-v1";
+    public const string NordicAssumedExecutionMode = "assumed-delayed-paper-fills-v2";
     public const decimal AssumedSekToDkk = 0.65m;
     public const decimal AssumedSlippagePercent = 1m;
     public const decimal MaximumAssumedOrderDkk = 10_000m;
@@ -38,12 +40,23 @@ public sealed partial class PreviewRaceStore
     private readonly List<AiActivityDto> aiActivity = [];
     private readonly TimeProvider clock;
     private readonly IPreviewRaceStatePersistence? persistence;
+    private readonly string? persistedDataMode;
+    private readonly string? persistedExecutionMode;
     private long? persistenceRevision;
 
-    public PreviewRaceStore(TimeProvider clock, IPreviewRaceStatePersistence? persistence = null)
+    public PreviewRaceStore(TimeProvider clock, IPreviewRaceStatePersistence? persistence = null,
+        string? persistedDataMode = null, string? persistedExecutionMode = null)
     {
         this.clock = clock;
         this.persistence = persistence;
+        this.persistedDataMode = persistedDataMode ?? DelayedNasdaqInstrumentStore.DataMode;
+        this.persistedExecutionMode = persistedExecutionMode ?? AssumedExecutionMode;
+        if (!(((this.persistedDataMode == DataMode ||
+                this.persistedDataMode == DelayedNasdaqInstrumentStore.DataMode) &&
+               this.persistedExecutionMode == AssumedExecutionMode) ||
+              (this.persistedDataMode == DelayedNasdaqInstrumentStore.NordicDataMode &&
+               this.persistedExecutionMode == NordicAssumedExecutionMode)))
+            throw new ArgumentException("Unsupported preview data and execution mode pair.");
         var persisted = persistence?.Load();
         if (persisted is null) return;
         RestoreState(persisted.Json);
@@ -122,7 +135,7 @@ public sealed partial class PreviewRaceStore
 
     public AiProgressDto AiProgress(InstrumentListDto snapshot)
     {
-        var instruments = Snapshot(snapshot);
+        var instruments = Snapshot(snapshot, clock.GetUtcNow());
         lock (sync)
         {
             RefreshDurableState();
@@ -130,11 +143,14 @@ public sealed partial class PreviewRaceStore
                 .Select(account => new AiProgressAgentDto(account.AgentId, account.ModelId, account.ModelId,
                     account.Status, account.RunId, account.QueuedAt, account.StartedAt, account.CompletedAt,
                     account.Error, PortfolioFor(account.Account, snapshot.DataMode, instruments), account.LatestDecision)).ToArray();
+            var nordic = snapshot.DataMode == DelayedNasdaqInstrumentStore.NordicDataMode;
             return new(participants,
                 aiActivity.OrderByDescending(item => item.OccurredAt).Take(100).ToArray(), snapshot.DataMode,
-                IsNonLive: true, StrictContest: false, HoldOnly: false, AssumedExecutionMode,
-                AssumedFills: true, AssumedSekToDkk, AssumedSlippagePercent,
-                BuildPerformance(participants));
+                IsNonLive: true, StrictContest: false, HoldOnly: false,
+                ExecutionMode: nordic ? NordicAssumedExecutionMode : AssumedExecutionMode,
+                AssumedFills: true, AssumedSekToDkk: nordic ? null : AssumedSekToDkk,
+                AssumedSlippagePercent, Performance: BuildPerformance(participants),
+                AssumedFxToDkk: nordic ? FxMap(instruments) : null);
         }
     }
 
@@ -155,7 +171,7 @@ public sealed partial class PreviewRaceStore
 
     public PreviewLeaderboardDto AiLeaderboard(InstrumentListDto snapshot)
     {
-        var instruments = Snapshot(snapshot);
+        var instruments = Snapshot(snapshot, clock.GetUtcNow());
         lock (sync)
         {
             RefreshDurableState();
@@ -217,7 +233,7 @@ public sealed partial class PreviewRaceStore
     public AiDecisionSubmission SubmitAi(AiDecisionRequestDto request, InstrumentListDto snapshot)
     {
         ValidateAi(request);
-        var instruments = Snapshot(snapshot);
+        var instruments = Snapshot(snapshot, request.CompletedAt);
         var fingerprint = JsonSerializer.Serialize(request);
         return PersistMutation<AiDecisionSubmission>(() =>
         {
@@ -241,20 +257,51 @@ public sealed partial class PreviewRaceStore
                 if (matches.Length != 1)
                     throw new PreviewOrderException("instrument-not-found", "Instrument must be one exact current delayed item.");
                 var instrument = matches[0];
-                if (instrument.Currency != "SEK" || instrument.Exchange != "XSTO" || instrument.Tradable != false ||
-                    instrument.PaperTradable != true || instrument.ExecutedAt is null || instrument.AvailableAt is null ||
+                var nordic = snapshot.DataMode == DelayedNasdaqInstrumentStore.NordicDataMode;
+                if (instrument.Tradable != false || instrument.PaperTradable != true ||
+                    instrument.ExecutedAt is null || instrument.AvailableAt is null ||
                     instrument.Price <= 0m || string.IsNullOrWhiteSpace(instrument.Source))
-                    throw new PreviewOrderException("invalid-observation", "Instrument is not a verified delayed XSTO observation.");
-                if (request.ObservedPriceSek != instrument.Price || request.ObservationAvailableAt != instrument.AvailableAt)
-                    throw new PreviewOrderException("observation-mismatch",
-                        "Trade must bind to the exact delayed observation supplied to the worker.");
+                    throw new PreviewOrderException("invalid-observation", "Instrument is not a verified delayed observation.");
+
+                decimal fxToDkk;
+                string executionMode;
+                if (nordic)
+                {
+                    if (instrument.PriceDkk is null or <= 0m || instrument.FxToDkk is null or <= 0m ||
+                        instrument.FxReferenceDate is null || instrument.FxAvailableAt is null ||
+                        instrument.FxSource != MarketDataProvenance.EcbInformationalReferenceRates ||
+                        !LowerSha256.IsMatch(instrument.FxSha256 ?? string.Empty))
+                        throw new PreviewOrderException("invalid-fx", "Instrument lacks verified current DKK FX.");
+                    if (request.ObservedPrice != instrument.Price || request.ObservedCurrency != instrument.Currency ||
+                        request.ObservedVenue != instrument.Exchange || request.ObservedFxToDkk != instrument.FxToDkk ||
+                        request.ObservationExecutedAt != instrument.ExecutedAt ||
+                        request.ObservationAvailableAt != instrument.AvailableAt ||
+                        request.FxReferenceDate != instrument.FxReferenceDate ||
+                        request.FxAvailableAt != instrument.FxAvailableAt ||
+                        request.FxSource != instrument.FxSource || request.FxSha256 != instrument.FxSha256)
+                        throw new PreviewOrderException("observation-mismatch",
+                            "Trade must bind to the exact delayed observation and FX supplied to the worker.");
+                    fxToDkk = instrument.FxToDkk.Value;
+                    executionMode = NordicAssumedExecutionMode;
+                }
+                else
+                {
+                    if (instrument.Currency != "SEK" || instrument.Exchange != "XSTO" ||
+                        request.ObservedPriceSek != instrument.Price ||
+                        request.ObservationAvailableAt != instrument.AvailableAt)
+                        throw new PreviewOrderException("observation-mismatch",
+                            "Trade must bind to the exact delayed observation supplied to the worker.");
+                    fxToDkk = AssumedSekToDkk;
+                    executionMode = AssumedExecutionMode;
+                }
                 if (request.CompletedAt < instrument.AvailableAt.Value)
                     throw new PreviewOrderException("observation-not-available", "The delayed observation was not available when the decision completed.");
                 if (request.Evidence.Any(item => item.PublishedAt > instrument.AvailableAt.Value))
                     throw new PreviewOrderException("evidence-lookahead", "Trade evidence cannot postdate the selected observation's availability.");
 
                 account.Account.Holdings.TryGetValue(instrument.Id, out var held);
-                var fillPrice = Money(instrument.Price * AssumedSekToDkk * (action == "buy" ? 1.01m : 0.99m));
+                var markPriceDkk = CurrentPriceDkk(instrument, snapshot.DataMode);
+                var fillPrice = Money(markPriceDkk * (action == "buy" ? 1.01m : 0.99m));
                 var total = Money(fillPrice * request.Quantity);
                 if (action == "buy" && total > MaximumAssumedOrderDkk)
                     throw new PreviewOrderException("maximum-order-total", "Assumed buy order total cannot exceed DKK 10,000.");
@@ -262,7 +309,7 @@ public sealed partial class PreviewRaceStore
                 {
                     if (account.Account.CashDkk < total)
                         throw new PreviewOrderException("insufficient-cash", "The paper account has insufficient DKK cash.");
-                    if (Money((held + request.Quantity) * instrument.Price * AssumedSekToDkk) > MaximumAssumedPositionDkk)
+                    if (Money((held + request.Quantity) * markPriceDkk) > MaximumAssumedPositionDkk)
                         throw new PreviewOrderException("maximum-position-value", "The resulting marked position cannot exceed DKK 25,000.");
                     account.Account.CashDkk = Money(account.Account.CashDkk - total);
                     account.Account.Holdings[instrument.Id] = held + request.Quantity;
@@ -286,11 +333,19 @@ public sealed partial class PreviewRaceStore
                         account.Account.CostBasisDkk[instrument.Id] = Money(averageCost * (held - request.Quantity));
                     }
                 }
-                fill = new(instrument.Price, AssumedSekToDkk, AssumedSlippagePercent, fillPrice, total,
-                    instrument.ExecutedAt.Value, instrument.AvailableAt.Value, clock.GetUtcNow(), AssumedExecutionMode);
+                fill = new(instrument.Price, fxToDkk, AssumedSlippagePercent, fillPrice, total,
+                    instrument.ExecutedAt.Value, instrument.AvailableAt.Value, clock.GetUtcNow(), executionMode,
+                    ObservedPrice: nordic ? instrument.Price : null,
+                    ObservedCurrency: nordic ? instrument.Currency : null,
+                    ObservedVenue: nordic ? instrument.Exchange : null,
+                    FxToDkk: nordic ? fxToDkk : null,
+                    FxReferenceDate: nordic ? instrument.FxReferenceDate : null,
+                    FxAvailableAt: nordic ? instrument.FxAvailableAt : null,
+                    FxSource: nordic ? instrument.FxSource : null,
+                    FxSha256: nordic ? instrument.FxSha256 : null);
             }
 
-            RefreshPersistedMarks(account.Account, instruments);
+            RefreshPersistedMarks(account.Account, instruments, snapshot.DataMode);
             var decision = new AiDecisionDto(request.RunId, action, request.InstrumentId, request.Quantity,
                 request.Reason.Trim(), request.Confidence, request.Evidence,
                 new(request.RuntimeProvider, request.RuntimeModel, request.ReportSha256), request.CompletedAt, fill);
@@ -397,14 +452,36 @@ public sealed partial class PreviewRaceStore
         aiRuns.Add(request.RunId, new(request.AgentId, request.ModelId, fingerprint, decision));
     }
 
-    private static InstrumentDto[] Snapshot(InstrumentListDto snapshot)
+    private static IReadOnlyDictionary<string, decimal> FxMap(IReadOnlyCollection<InstrumentDto> instruments)
     {
-        if (snapshot.DataMode != DelayedNasdaqInstrumentStore.DataMode)
-            throw new PreviewOrderException("invalid-data-mode", "Assumed fills require the official delayed Nasdaq data mode.");
-        return snapshot.Items?.ToArray() ?? throw new PreviewOrderException("invalid-snapshot", "A current delayed snapshot is required.");
+        var result = new Dictionary<string, decimal>(StringComparer.Ordinal);
+        foreach (var instrument in instruments)
+        {
+            _ = CurrentPriceDkk(instrument, DelayedNasdaqInstrumentStore.NordicDataMode);
+            var fxToDkk = instrument.FxToDkk!.Value;
+            if (result.TryGetValue(instrument.Currency, out var existing) && existing != fxToDkk)
+                throw new PreviewOrderException("inconsistent-fx", "Nordic snapshot contains conflicting DKK FX.");
+            result[instrument.Currency] = fxToDkk;
+        }
+        return result;
     }
 
-    private static void RefreshPersistedMarks(Account account, IReadOnlyCollection<InstrumentDto> current)
+    private InstrumentDto[] Snapshot(InstrumentListDto snapshot, DateTimeOffset asOf)
+    {
+        if (snapshot.DataMode is not (DelayedNasdaqInstrumentStore.DataMode or DelayedNasdaqInstrumentStore.NordicDataMode))
+            throw new PreviewOrderException("invalid-data-mode", "Assumed fills require an official delayed Nasdaq data mode.");
+        if (snapshot.DataMode != persistedDataMode)
+            throw new PreviewOrderException("exhibition-mode-mismatch",
+                "The delayed snapshot does not match the configured exhibition mode.");
+        var instruments = snapshot.Items?.ToArray()
+            ?? throw new PreviewOrderException("invalid-snapshot", "A current delayed snapshot is required.");
+        if (snapshot.DataMode == DelayedNasdaqInstrumentStore.NordicDataMode)
+            foreach (var instrument in instruments) _ = CurrentPriceDkk(instrument, snapshot.DataMode, asOf);
+        return instruments;
+    }
+
+    private static void RefreshPersistedMarks(Account account, IReadOnlyCollection<InstrumentDto> current,
+        string dataMode)
     {
         foreach (var stale in account.Marks.Keys.Except(account.Holdings.Keys, StringComparer.Ordinal).ToArray())
             account.Marks.Remove(stale);
@@ -415,9 +492,39 @@ public sealed partial class PreviewRaceStore
                     "AI exhibition portfolio cannot be persisted without a current delayed observation.");
             account.Marks[holding.Key] = instrument with
             {
-                PriceDkk = Money(instrument.Price * AssumedSekToDkk)
+                PriceDkk = Money(CurrentPriceDkk(instrument, dataMode))
             };
         }
+    }
+
+    private static decimal CurrentPriceDkk(InstrumentDto instrument, string dataMode,
+        DateTimeOffset? asOf = null)
+    {
+        if (instrument.Price <= 0m || instrument.ExecutedAt is null || instrument.AvailableAt is null ||
+            string.IsNullOrWhiteSpace(instrument.Source))
+            throw new PreviewOrderException("invalid-observation",
+                "Portfolio marks require a verified current delayed observation.");
+        if (dataMode == DelayedNasdaqInstrumentStore.DataMode)
+        {
+            if (!ValidStockholmIdentity(instrument.Id) || instrument.Exchange != "XSTO" ||
+                instrument.Currency != "SEK" || instrument.FxToDkk is not null ||
+                instrument.FxReferenceDate is not null || instrument.FxAvailableAt is not null ||
+                instrument.FxSource is not null || instrument.FxSha256 is not null)
+                throw new PreviewOrderException("invalid-observation",
+                    "Stockholm marks must retain the strict XSTO/SEK identity and conversion contract.");
+            return instrument.Price * AssumedSekToDkk;
+        }
+        if (dataMode != DelayedNasdaqInstrumentStore.NordicDataMode ||
+            !ValidNordicIdentity(instrument.Id, instrument.Exchange, instrument.Currency) ||
+            instrument.PriceDkk is null or <= 0m || instrument.FxToDkk is null or <= 0m ||
+            instrument.PriceDkk != instrument.Price * instrument.FxToDkk.Value ||
+            instrument.FxReferenceDate is null || instrument.FxAvailableAt is null ||
+            asOf is not null && !ValidFxTiming(instrument.FxReferenceDate, instrument.FxAvailableAt, asOf.Value) ||
+            instrument.FxSource != MarketDataProvenance.EcbInformationalReferenceRates ||
+            !LowerSha256.IsMatch(instrument.FxSha256 ?? string.Empty))
+            throw new PreviewOrderException("invalid-fx",
+                "Nordic marks require canonical identity and complete verified DKK FX provenance.");
+        return instrument.PriceDkk.Value;
     }
 
     private static bool StatusDetailsMatch(AiAccount account, string status, AiStatusRequestDto request) => status switch
@@ -568,14 +675,17 @@ public sealed partial class PreviewRaceStore
                 var instrument = current.SingleOrDefault(candidate => candidate.Id == item.Key)
                     ?? throw new PreviewOrderException("stale-portfolio-mark",
                         "AI exhibition portfolio cannot be valued without a current delayed observation.");
-                var priceDkk = Money(instrument.Price * AssumedSekToDkk);
+                var priceDkk = Money(CurrentPriceDkk(instrument, dataMode));
                 return Holding(account, instrument, item.Value, priceDkk);
             }).ToArray();
         var holdingsValue = Money(holdings.Sum(item => item.ValueDkk));
         var total = Money(account.CashDkk + holdingsValue);
+        var executionMode = dataMode == DelayedNasdaqInstrumentStore.NordicDataMode
+            ? NordicAssumedExecutionMode
+            : AssumedExecutionMode;
         return new(account.DisplayName, StartingCashDkk, account.CashDkk, holdingsValue, total,
             Percent((total - StartingCashDkk) / StartingCashDkk * 100m), holdings, dataMode,
-            AssumedExecutionMode);
+            executionMode);
     }
 
     private static InstrumentDto Instrument(string id, string symbol, string name, string exchange,

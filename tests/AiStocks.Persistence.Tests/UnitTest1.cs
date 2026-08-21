@@ -93,12 +93,23 @@ public sealed class PersistenceContractTests
     [Fact]
     public void MigrationChecksumIsStableAndSha256()
     {
-        Assert.Equal(19, MigrationCatalog.All.Count);
+        Assert.Equal(20, MigrationCatalog.All.Count);
         foreach (var migration in MigrationCatalog.All)
         {
             Assert.Matches("^[0-9a-f]{64}$", migration.Sha256);
             Assert.Equal(migration.Sha256, MigrationCatalog.ComputeSha256(migration.Sql));
         }
+    }
+
+    [Fact]
+    public void ExhibitionStateMigrationSeparatesStockholmAndNordicNamespaces()
+    {
+        var sql = MigrationCatalog.All.Single(migration =>
+            migration.Id == "020_exhibition_state_namespaces").Sql;
+        Assert.Contains("state_key text", sql, StringComparison.Ordinal);
+        Assert.Contains("official-nasdaq-xsto-15m-delayed", sql, StringComparison.Ordinal);
+        Assert.Contains("WHERE state_key = NEW.state_key", sql, StringComparison.Ordinal);
+        Assert.Contains("PRIMARY KEY (state_key)", sql, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -29,19 +29,30 @@ broker integration and cannot place real orders.
 - `migrate` and `backup-tools` are one-shot services under the
   `operations` profile.
 
-The separate `api`, `ui`, and least-privilege `exhibition` worker are an
-explicit **local AI exhibition** under the `preview` profile. Four pinned
-Copilot models research independently and submit validated paper-only decisions
-against clearly labelled, non-live fixture prices. Each starts with 100,000 DKK.
-Human search and trading routes are not exposed in this mode. Exhibition state
-resets on API restart, has no broker/provider connection, is not the strict
-contest ledger, and must not be routed through the production Cloudflare
-hostname. The preview profile reuses port 3232, so never enable `contest` and
-`preview` together.
+The separate `api`, `ui`, least-privilege `exhibition` worker, and
+`preview-collector` are an explicit **local AI exhibition** under the `preview`
+profile. Four pinned Copilot models research independently and submit validated
+paper-only decisions against clearly labelled, non-live delayed post-trade
+observations. Each starts with 100,000 DKK. `AI_EXHIBITION_UNIVERSE=stockholm`
+retains the v1 XSTO/SEK exhibition. Explicitly selecting `nordic` enables the
+private v2 Nordic venue/native-currency profile with checksum-bound ECB
+informational DKK reference conversions. Human search and trading routes are
+not exposed in this mode. Exhibition state is durable in PostgreSQL, has no
+broker capability, is not the strict contest ledger, and must not be routed
+through the production Cloudflare hostname. The preview profile reuses port
+3232, so never enable `contest` and `preview` together.
 
-The `warmup` profile runs only `warmup-collector`. It may run beside the local
-AI exhibition to accumulate the strict contest's 20 verified sessions. It must
-not run beside the contest `collector`.
+Nordic preview startup also requires a current reviewed corporate-action input
+directory. The collector emits an append-only block state every poll; the API
+fails closed if that state is absent or stale and excludes every listed
+venue/ISIN/order-book identity because corporate actions are not applied by the
+preview ledger.
+
+The `warmup` profile runs only `warmup-collector`. It accumulates the strict
+contest's 20 verified sessions and must run separately from both contest and
+preview because all collector modes share the same immutable archive. Stop
+preview before enabling warmup, and stop warmup before enabling preview or
+contest.
 
 Do not start the legacy contest until every release gate in
 [`docs/acceptance-contract.md`](docs/acceptance-contract.md) has passed. Its gate
@@ -187,7 +198,8 @@ the other is active and forbids additive `--profile` arguments:
 
 ```bash
 scripts/compose-mode.sh contest stop app worker collector reporter
-scripts/compose-mode.sh preview up -d api ui exhibition
+# Set AI_EXHIBITION_UNIVERSE=nordic in Dockge/.env for the local Nordic v2 profile.
+scripts/compose-mode.sh preview up -d preview-collector api ui exhibition
 scripts/compose-mode.sh preview ps
 ```
 

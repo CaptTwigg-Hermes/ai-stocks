@@ -8,15 +8,26 @@ public sealed class MarketReferenceAcquirer(
     DurableFirdsStore firds,
     NasdaqStatusMachine statuses,
     string firdsPlanPath,
-    string rssArchivePath)
+    string rssArchivePath,
+    DurableFirdsStore? nordicFirds = null)
 {
     private static readonly Uri StatusRss = new("https://api.news.eu.nasdaq.com/news/rss/mainMarketNotices");
+
+    public static HttpMessageHandler CreatePrimaryHandler() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false,
+        AutomaticDecompression = System.Net.DecompressionMethods.None
+    };
 
     public async Task AcquireAsync(DateTimeOffset fetchedAt, CancellationToken cancellationToken)
     {
         var plan = await LoadPlanAsync(cancellationToken).ConfigureAwait(false);
         FirdsSnapshot? current = null;
-        if (firds.Exists) current = firds.LoadVerified();
+        if (firds.Exists)
+        {
+            current = firds.LoadVerified();
+            if (nordicFirds is not null) firds.ProjectVerifiedTo(nordicFirds);
+        }
 
         foreach (var item in plan.Artifacts.OrderBy(x => x.Cursor))
         {
@@ -31,6 +42,7 @@ public sealed class MarketReferenceAcquirer(
             else if (item.Kind == "delta") firds.ApplyDelta(stream, item.EffectiveAt, item.SourceUrl, item.Sha256, item.Version, item.Cursor);
             else throw new MarketDataException("FIRDS acquisition plan kind is invalid");
             current = firds.LoadVerified();
+            if (nordicFirds is not null) firds.ProjectVerifiedTo(nordicFirds);
         }
         if (current is null) throw new MarketDataException("FIRDS acquisition plan did not provide an initial full artifact");
 
@@ -47,7 +59,12 @@ public sealed class MarketReferenceAcquirer(
         if (!File.Exists(rawPath)) AtomicFile.Write(rawPath, rss);
         statuses.ApplyRssSnapshot(new MemoryStream(rss, writable: false), StatusRss, fetchedAt, hash, rawPath);
         if (statuses.SignerKeyId == "public-rss-best-effort")
-            statuses.InitializeBestEffortUniverse(current.Instruments.Select(x => x.Isin), fetchedAt);
+        {
+            var statusUniverse = current.Instruments.Select(x => x.Isin);
+            if (nordicFirds is not null)
+                statusUniverse = statusUniverse.Concat(nordicFirds.LoadVerified().Instruments.Select(x => x.Isin));
+            statuses.InitializeBestEffortUniverse(statusUniverse, fetchedAt);
+        }
     }
 
     private async Task<FirdsPlan> LoadPlanAsync(CancellationToken cancellationToken)

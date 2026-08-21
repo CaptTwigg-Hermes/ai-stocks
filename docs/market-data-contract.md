@@ -112,6 +112,37 @@ paper-only, and must be labelled **ASSUMED FILLS** in the UI. Missing,
 stale, invalid, or tampered observations fail closed without fixture
 fallback. Production still aborts if either preview mode is enabled.
 
+### Local Nordic exhibition profile
+
+A private, explicitly selected `AI_EXHIBITION_UNIVERSE=nordic` profile may broaden only the
+assumed-fill exhibition. It does not alter the strict Stockholm contest. The profile uses:
+
+- exact primary venue/currency pairs `XSTO`/SEK, `XCSE`/DKK, `XHEL`/EUR,
+  `ONSE`/NOK, and `XICE`/ISK;
+- identity keyed by venue, ISIN, and order book, with a separate
+  checksum-derived `firds-nordic-state.json` projection;
+- checksum-verified ECB daily reference rates converted through EUR/DKK;
+- `assumed-delayed-paper-fills-v2`, binding native price, venue, currency,
+  execution/availability times, FX value/date/availability/source/checksum, and
+  `1%` adverse slippage to every BUY or SELL;
+- a public 20-item response selected deterministically across venues, while
+  authoritative valuation and execution retain the complete bounded snapshot.
+
+Nasdaq observations remain delayed post-trade prices, not live or executable
+quotes. ECB rates are informational reference rates, not transaction rates.
+Missing or stale identity, mark, or required FX fails closed. The profile is a
+local non-commercial experiment, not licensed global market-data coverage.
+The preview collector also publishes a checksum-bound, append-only
+`nordic-unsupported-corporate-actions.json` state from the reviewed
+`CORPORATE_ACTION_INPUT_DIR`. Missing or older-than-five-minute state blocks the
+Nordic snapshot, and any listed venue/ISIN/order-book identity is excluded
+because the exhibition does not apply corporate actions. Non-XSTO inputs must
+include their exact `venue`; omitted venue retains the strict XSTO default.
+Nasdaq's report-page permission language and general anti-capture/storage terms
+remain in conflict; this profile must not be publicly or commercially
+redistributed without written authorization. `ONSE` is preserved as reported
+and is never silently substituted with `XOSL`.
+
 ## Corporate actions
 
 Use issuer disclosures distributed through Nasdaq's official RSS:

@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 
 import yaml
+import pytest
 
 ROOT = Path(__file__).parents[1]
 PINNED_HERMES = "226b095a59df0be88e195a90fbd209f236665b7b"
@@ -12,7 +13,7 @@ def test_dockge_compose_separates_and_hardens_services():
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     services = compose["services"]
     assert {
-        "api", "ui", "exhibition", "app", "collector", "warmup-collector", "worker"
+        "api", "ui", "exhibition", "preview-collector", "app", "collector", "warmup-collector", "worker"
     } <= set(services)
     assert services["app"]["ports"] == ["${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8080"]
     assert services["ui"]["ports"] == ["${APP_BIND_ADDRESS:-192.168.50.2}:${APP_PORT:-3232}:8080"]
@@ -21,6 +22,7 @@ def test_dockge_compose_separates_and_hardens_services():
     assert services["api"]["profiles"] == ["preview"]
     assert services["ui"]["profiles"] == ["preview"]
     assert services["exhibition"]["profiles"] == ["preview"]
+    assert services["preview-collector"]["profiles"] == ["preview"]
     for name in ("collector", "worker", "reporter"):
         assert services[name]["profiles"] == ["contest"]
     assert services["warmup-collector"]["profiles"] == ["warmup"]
@@ -33,7 +35,9 @@ def test_dockge_compose_separates_and_hardens_services():
         assert services[name]["depends_on"]["preview-guard"]["condition"] == "service_completed_successfully"
     assert services["api"]["environment"]["PREVIEW_MODE"] == "1"
     assert services["api"]["environment"]["ASPNETCORE_ENVIRONMENT"] == "Development"
-    for name in ("api", "ui", "exhibition", "app", "collector", "warmup-collector", "worker"):
+    assert services["api"]["depends_on"]["preview-collector"]["condition"] == "service_healthy"
+    assert services["api"]["environment"]["AI_EXHIBITION_UNIVERSE"] == "${AI_EXHIBITION_UNIVERSE:-stockholm}"
+    for name in ("api", "ui", "exhibition", "preview-collector", "app", "collector", "warmup-collector", "worker"):
         service = services[name]
         assert service["read_only"] is True
         assert service["cap_drop"] == ["ALL"]
@@ -51,6 +55,7 @@ def test_dockge_compose_separates_and_hardens_services():
         "exhibition": "exhibition",
         "collector": "collector",
         "warmup-collector": "collector",
+        "preview-collector": "collector",
         "worker": "worker",
         "reporter": "reporter",
         "migrate": "operations",
@@ -64,7 +69,11 @@ def test_dockge_compose_separates_and_hardens_services():
         "${MARKET_BOOTSTRAP_DIR:?set the reviewed FIRDS plan directory}:/run/market-bootstrap:ro",
         "${CORPORATE_ACTION_INPUT_DIR:?set the reviewed corporate-action input directory}:/run/corporate-actions:ro",
     ]
+    assert services["preview-collector"]["volumes"] == services["collector"]["volumes"]
     collector_environment = services["collector"]["environment"]
+    assert "COLLECT_NORDIC_EXHIBITION" not in collector_environment
+    assert "COLLECT_NORDIC_EXHIBITION" not in services["warmup-collector"]["environment"]
+    assert services["preview-collector"]["environment"]["COLLECT_NORDIC_EXHIBITION"] == "1"
     assert collector_environment["CORPORATE_ACTION_INPUT_PATH"] == "/run/corporate-actions"
     assert collector_environment["FIRDS_ACQUISITION_PLAN_PATH"] == "/run/market-bootstrap/firds-plan.json"
     assert not any(name.startswith("STATUS_SEED_") for name in collector_environment)
@@ -87,6 +96,9 @@ def test_dockge_compose_separates_and_hardens_services():
     assert services["exhibition"]["healthcheck"]["test"] == expected_health
     expected_health[-1] = "http://127.0.0.1:8080/readyz"
     assert services["collector"]["healthcheck"]["test"] == expected_health
+    assert services["warmup-collector"]["healthcheck"]["test"] == expected_health
+    expected_health[-1] = "http://127.0.0.1:8080/healthz"
+    assert services["preview-collector"]["healthcheck"]["test"] == expected_health
 
 
 def test_compose_mode_preflight_rejects_running_opposite_profile(tmp_path):
@@ -106,6 +118,40 @@ def test_compose_mode_preflight_rejects_running_opposite_profile(tmp_path):
     assert result.returncode != 0
     assert "preview runtime is still active" in result.stderr
     assert "--profile contest up" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("mode", "running", "label"),
+    [
+        ("contest", "preview-collector", "preview"),
+        ("preview", "warmup-collector", "warmup"),
+        ("warmup", "preview-collector", "preview"),
+    ],
+)
+def test_compose_mode_rejects_concurrent_archive_writers(tmp_path, mode, running, label):
+    fake = tmp_path / "docker-compose"
+    fake.write_text(
+        "#!/bin/sh\n"
+        "if [ \"$1\" = \"ps\" ]; then\n"
+        f"  printf '%s\\n' {running}\n"
+        "  exit 0\n"
+        "fi\n"
+        "printf '%s\\n' \"$*\"\n"
+    )
+    fake.chmod(0o755)
+    env = os.environ | {
+        "COMPOSE": str(fake),
+        "CONTEST_DATABASE_URL": "postgresql://contest",
+        "COLLECTOR_DATABASE_URL": "postgresql://collector",
+    }
+
+    result = subprocess.run(
+        [str(ROOT / "scripts" / "compose-mode.sh"), mode, "up", "-d"],
+        cwd=ROOT, env=env, text=True, capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert f"{label} runtime is still active" in result.stderr
 
 
 def test_compose_mode_rejects_global_options_before_action(tmp_path):
@@ -419,7 +465,11 @@ def test_release_gate_and_restore_fail_closed_with_scheduled_backup():
     assert "scripts/compose-mode.sh contest config -q" in verify
     assert "scripts/compose-mode.sh preview config -q" in verify
     assert "scripts/compose-mode.sh warmup config -q" in verify
-    assert "volatile" in readme.lower() and "fixture" in readme.lower()
+    assert "volatile" in readme.lower() and "delayed post-trade" in readme.lower()
+    collector_program = (ROOT / "src" / "AiStocks.Collector" / "Program.cs").read_text()
+    assert 'AddHttpClient("ecb-fx"' in collector_program
+    assert "HttpClientHandler { AllowAutoRedirect = false }" in collector_program
+    assert "ConfigurePrimaryHttpMessageHandler(MarketReferenceAcquirer.CreatePrimaryHandler)" in collector_program
     assert "restored migration checksums or contest invariants failed verification" in restore
     assert "120000" in restore
     assert "backup or restore verification failed" in cycle

@@ -31,6 +31,34 @@ public sealed class ExhibitionCycleTests
     }
 
     [Fact]
+    public async Task RunAsync_NordicModeBindsNativeObservationAndVerifiedFx()
+    {
+        var api = new FakeApi { Nordic = true, InstrumentExchange = "XCSE", InstrumentCurrency = "DKK" };
+        var invoker = new FakeInvoker
+        {
+            FailingAgentId = null,
+            Action = "buy",
+            InstrumentId = "XCSE:DK0010181676:CARL-A"
+        };
+        var cycle = new ExhibitionCycle(api, invoker, new FakeVerifier(), new ExhibitionHealthState(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(4, result.Succeeded);
+        Assert.All(api.Posts, post =>
+        {
+            using var document = JsonDocument.Parse(post);
+            var root = document.RootElement;
+            Assert.Equal(100m, root.GetProperty("observedPrice").GetDecimal());
+            Assert.Equal("DKK", root.GetProperty("observedCurrency").GetString());
+            Assert.Equal("XCSE", root.GetProperty("observedVenue").GetString());
+            Assert.Equal(1m, root.GetProperty("observedFxToDkk").GetDecimal());
+            Assert.Equal(new string('f', 64), root.GetProperty("fxSha256").GetString());
+        });
+    }
+
+    [Fact]
     public async Task RunAsync_QueueStatusFailureForOneAgent_DoesNotPreventOtherAgents()
     {
         var failedAgent = ContestContract.Agents[0];
@@ -553,6 +581,7 @@ public sealed class ExhibitionCycleTests
         public bool InstrumentPaperTradable { get; init; } = true;
         public bool OmitRootExecutionMode { get; init; }
         public bool WrongPortfolioExecutionMode { get; init; }
+        public bool Nordic { get; init; }
         private string? committedDecision;
         public int InstrumentReads { get; private set; }
         public List<string> Posts { get; } = [];
@@ -562,20 +591,25 @@ public sealed class ExhibitionCycleTests
             InstrumentReads++;
             var isRefreshRead = InstrumentReads > 1 && InstrumentReads % 2 == 1;
             var instrumentId = isRefreshRead && OmitInstrumentAfterFirstRead
-                ? "SE9999999999" : "SE0000115446";
+                ? "SE9999999999" : Nordic ? "XCSE:DK0010181676:CARL-A" : "SE0000115446";
             var price = AdvancePriceOnEveryRead
                 ? InstrumentPrice + InstrumentReads
                 : isRefreshRead && RefreshedInstrumentPrice is not null
                     ? RefreshedInstrumentPrice.Value : InstrumentPrice;
             var availableAt = isRefreshRead && RefreshedInstrumentAvailableAt is not null
                 ? RefreshedInstrumentAvailableAt.Value : DateTimeOffset.Parse("2026-08-16T10:15:00Z");
-            var priceDkk = IncludeInstrumentPriceDkk ? ",\"priceDkk\":123.45" : string.Empty;
+            var priceDkk = Nordic ? ",\"priceDkk\":" + price.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : IncludeInstrumentPriceDkk ? ",\"priceDkk\":123.45" : string.Empty;
+            var nordicMetadata = Nordic
+                ? ",\"fxToDkk\":1,\"fxReferenceDate\":\"2026-08-15\",\"fxAvailableAt\":\"2026-08-16T10:16:00Z\",\"fxSource\":\"ECB euro foreign exchange reference rates (informational, not transaction rates)\",\"fxSha256\":\"" + new string('f', 64) + "\""
+                : string.Empty;
+            var dataMode = Nordic ? "official-nasdaq-nordic-15m-delayed-ecb-fx" : "official-nasdaq-xsto-15m-delayed";
             return Task.FromResult("{\"items\":[{\"id\":\"" + instrumentId + "\",\"exchange\":\"" + InstrumentExchange +
                 "\",\"currency\":\"" + InstrumentCurrency + "\",\"isPreviewPrice\":" +
                 InstrumentIsPreviewPrice.ToString().ToLowerInvariant() + priceDkk +
                 ",\"price\":" + price.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                 ",\"executedAt\":\"2026-08-16T10:00:00Z\",\"availableAt\":\"" + availableAt.ToString("O") + "\",\"source\":\"Nasdaq Nordic MiFID II delayed post-trade\",\"delayMinutes\":15,\"tradable\":false,\"paperTradable\":" +
-                InstrumentPaperTradable.ToString().ToLowerInvariant() + "}],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\"}");
+                InstrumentPaperTradable.ToString().ToLowerInvariant() + nordicMetadata + "}],\"dataMode\":\"" + dataMode + "\"}");
         }
         public Task<string> GetProgressAsync(CancellationToken cancellationToken)
         {
@@ -643,9 +677,14 @@ public sealed class ExhibitionCycleTests
                 };
                 return Task.FromResult(JsonSerializer.Serialize(snapshot));
             }
-            var executionMode = WrongPortfolioExecutionMode ? "wrong" : "assumed-delayed-paper-fills-v1";
-            var rootExecutionMode = OmitRootExecutionMode ? string.Empty : ",\"executionMode\":\"assumed-delayed-paper-fills-v1\"";
-            return Task.FromResult("{\"participants\":[" + string.Join(',', ContestContract.Agents.Select(a => "{\"agentId\":\"" + a.Id.ToString("D") + "\",\"portfolio\":{\"cashDkk\":100000,\"holdings\":[],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\",\"executionMode\":\"" + executionMode + "\"}}")) + "],\"dataMode\":\"official-nasdaq-xsto-15m-delayed\"" + rootExecutionMode + ",\"isNonLive\":true,\"strictContest\":false,\"holdOnly\":false,\"assumedFills\":true,\"assumedSekToDkk\":0.65,\"assumedSlippagePercent\":1}");
+            var expectedExecutionMode = Nordic ? "assumed-delayed-paper-fills-v2" : "assumed-delayed-paper-fills-v1";
+            var dataMode = Nordic ? "official-nasdaq-nordic-15m-delayed-ecb-fx" : "official-nasdaq-xsto-15m-delayed";
+            var executionMode = WrongPortfolioExecutionMode ? "wrong" : expectedExecutionMode;
+            var rootExecutionMode = OmitRootExecutionMode ? string.Empty : ",\"executionMode\":\"" + expectedExecutionMode + "\"";
+            var fxContract = Nordic
+                ? "\"assumedSekToDkk\":null,\"assumedFxToDkk\":{\"DKK\":1}"
+                : "\"assumedSekToDkk\":0.65";
+            return Task.FromResult("{\"participants\":[" + string.Join(',', ContestContract.Agents.Select(a => "{\"agentId\":\"" + a.Id.ToString("D") + "\",\"portfolio\":{\"cashDkk\":100000,\"holdings\":[],\"dataMode\":\"" + dataMode + "\",\"executionMode\":\"" + executionMode + "\"}}")) + "],\"dataMode\":\"" + dataMode + "\"" + rootExecutionMode + ",\"isNonLive\":true,\"strictContest\":false,\"holdOnly\":false,\"assumedFills\":true," + fxContract + ",\"assumedSlippagePercent\":1}");
         }
         public Task PostDecisionAsync(string runId, string json, CancellationToken cancellationToken)
         {
@@ -676,6 +715,7 @@ public sealed class ExhibitionCycleTests
         public Guid? MalformedFirstAgentId { get; init; }
         public Guid? MalformedSecondAgentId { get; init; }
         public string Action { get; init; } = "hold";
+        public string InstrumentId { get; init; } = "SE0000115446";
         public bool AlternateEvidenceOnSecondInvocation { get; init; }
         public bool RejectedEvidenceSecondOnFirstInvocation { get; init; }
         public bool ReuseRejectedEvidenceOnSecondInvocation { get; init; }
@@ -689,7 +729,7 @@ public sealed class ExhibitionCycleTests
             if (!Prompts.TryGetValue(agent.Id, out var prompts)) Prompts[agent.Id] = prompts = [];
             prompts.Add(prompt);
             if (agent.Id == FailingAgentId) throw new InvalidOperationException(FailureMessage);
-            var instrument = Action == "hold" ? "null" : "\"SE0000115446\"";
+            var instrument = Action == "hold" ? "null" : "\"" + InstrumentId + "\"";
             var quantity = Action == "hold" ? 0 : 1;
             var evidenceUrl = ReuseRejectedEvidenceOnSecondInvocation && InvocationCounts[agent.Id] == 2
                 ? "https://rejected.example/news"

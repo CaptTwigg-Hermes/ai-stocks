@@ -26,13 +26,23 @@ var artifactRoot = builder.Configuration["ARTIFACT_ROOT"] ?? AppContext.BaseDire
 var databaseUrl = builder.Configuration["COLLECTOR_DATABASE_URL"]
     ?? throw new InvalidOperationException("COLLECTOR_DATABASE_URL is required");
 var firdsPath = builder.Configuration["FIRDS_STATE_PATH"] ?? Path.Combine(archivePath, "firds-state.json");
+var nordicFirdsPath = builder.Configuration["NORDIC_FIRDS_STATE_PATH"]
+    ?? Path.Combine(archivePath, "firds-nordic-state.json");
+var collectNordicExhibition = builder.Configuration.GetValue("COLLECT_NORDIC_EXHIBITION", false);
 var firdsPlanPath = builder.Configuration["FIRDS_ACQUISITION_PLAN_PATH"]
     ?? throw new InvalidOperationException("FIRDS_ACQUISITION_PLAN_PATH is required");
 StockholmCalendar.VerifyPinnedArtifacts(artifactRoot);
 
+var strictFirds = new DurableFirdsStore(firdsPath);
+var nordicFirds = collectNordicExhibition
+    ? new DurableFirdsStore(nordicFirdsPath, FirdsUniverse.NordicExhibition)
+    : null;
+var ecbFx = new EcbFxStore(archivePath);
+var unsupportedCorporateActions = new UnsupportedCorporateActionStore(archivePath);
 builder.Services.AddSingleton(new ImmutableArchive(archivePath));
 builder.Services.AddSingleton(new SessionManifestStore(archivePath));
-builder.Services.AddSingleton(new DurableFirdsStore(firdsPath));
+builder.Services.AddSingleton(strictFirds);
+builder.Services.AddSingleton(ecbFx);
 builder.Services.AddSingleton(_ => NasdaqStatusMachine.LoadPublicRssBestEffort(Path.Combine(archivePath, "status-state.json")));
 var collectorPollSeconds = builder.Configuration.GetValue("COLLECTOR_POLL_SECONDS", 15);
 builder.Services.AddSingleton(new CollectorHealth(
@@ -48,11 +58,19 @@ builder.Services.AddHttpClient("market-reference", client =>
 {
     client.Timeout = TimeSpan.FromMinutes(5);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("ai-stocks-collector/1.0 authoritative-reference-acquisition");
-});
+}).ConfigurePrimaryHttpMessageHandler(MarketReferenceAcquirer.CreatePrimaryHandler);
+builder.Services.AddHttpClient("ecb-fx", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("ai-stocks-collector/1.0 ecb-reference-fx");
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddSingleton(serviceProvider => new MarketReferenceAcquirer(
     serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("market-reference"),
-    serviceProvider.GetRequiredService<DurableFirdsStore>(), serviceProvider.GetRequiredService<NasdaqStatusMachine>(),
-    firdsPlanPath, Path.Combine(archivePath, "status-rss")));
+    strictFirds, serviceProvider.GetRequiredService<NasdaqStatusMachine>(),
+    firdsPlanPath, Path.Combine(archivePath, "status-rss"), nordicFirds));
+builder.Services.AddSingleton(serviceProvider => new EcbFxAcquirer(
+    serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("ecb-fx"), ecbFx));
+builder.Services.AddSingleton(unsupportedCorporateActions);
 builder.Services.AddSingleton(serviceProvider => new NasdaqCollector(
     serviceProvider.GetRequiredService<NasdaqPostTradeClient>(), serviceProvider.GetRequiredService<ImmutableArchive>(),
     serviceProvider.GetRequiredService<SessionManifestStore>(), new CollectorDownloadPolicy(

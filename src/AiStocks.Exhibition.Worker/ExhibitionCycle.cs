@@ -23,7 +23,18 @@ public interface IExhibitionModelInvoker
 public sealed record ExhibitionAgentFailure(Guid AgentId, string ModelId, string Error);
 public sealed record ExhibitionCycleResult(DateTimeOffset ScheduledAt, int Succeeded, IReadOnlyList<ExhibitionAgentFailure> Failures);
 public sealed record ExhibitionHealth(string Status, bool PrerequisitesReady, DateTimeOffset? LastCycleCompletedAt, int LastCycleFailures, string? LastError);
-public sealed record DelayedObservation(decimal PriceSek, DateTimeOffset AvailableAt);
+public sealed record DelayedObservation(
+    decimal PriceSek,
+    DateTimeOffset AvailableAt,
+    DateTimeOffset? ExecutedAt = null,
+    string Venue = "XSTO",
+    string Currency = "SEK",
+    decimal? PriceDkk = null,
+    decimal? FxToDkk = null,
+    DateOnly? FxReferenceDate = null,
+    DateTimeOffset? FxAvailableAt = null,
+    string? FxSource = null,
+    string? FxSha256 = null);
 
 public sealed class ExhibitionHealthState
 {
@@ -138,7 +149,16 @@ public sealed class ExhibitionCycle(
                     completedAt = provenance.CompletedAt,
                     promptSha256 = provenance.PromptSha256,
                     observedPriceSek = selectedObservation?.PriceSek,
-                    observationAvailableAt = selectedObservation?.AvailableAt
+                    observationAvailableAt = selectedObservation?.AvailableAt,
+                    observedPrice = selectedObservation?.PriceSek,
+                    observedCurrency = selectedObservation?.Currency,
+                    observedVenue = selectedObservation?.Venue,
+                    observedFxToDkk = selectedObservation?.FxToDkk,
+                    observationExecutedAt = selectedObservation?.ExecutedAt,
+                    fxReferenceDate = selectedObservation?.FxReferenceDate,
+                    fxAvailableAt = selectedObservation?.FxAvailableAt,
+                    fxSource = selectedObservation?.FxSource,
+                    fxSha256 = selectedObservation?.FxSha256
                 }, JsonOptions);
                 await api.PostDecisionAsync(runId, payload, cancellationToken).ConfigureAwait(false);
                 succeeded++;
@@ -297,8 +317,13 @@ public sealed class ExhibitionCycle(
         using var document = StrictJson.Parse(json, 2 * 1024 * 1024);
         if (document.RootElement.ValueKind != JsonValueKind.Object ||
             !document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array ||
-            !document.RootElement.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != ExhibitionDataContract.DataMode)
-            throw new InvalidOperationException("Instrument response must contain official delayed Nasdaq XSTO data.");
+            !document.RootElement.TryGetProperty("dataMode", out var dataModeElement) ||
+            dataModeElement.ValueKind != JsonValueKind.String)
+            throw new InvalidOperationException("Instrument response must contain official delayed Nasdaq data.");
+        var dataMode = dataModeElement.GetString();
+        if (dataMode is not (ExhibitionDataContract.StockholmDataMode or ExhibitionDataContract.NordicDataMode))
+            throw new InvalidOperationException("Instrument response uses an unsupported delayed-data mode.");
+        var nordic = dataMode == ExhibitionDataContract.NordicDataMode;
         var result = new Dictionary<string, DelayedObservation>(StringComparer.Ordinal);
         foreach (var item in items.EnumerateArray())
         {
@@ -309,34 +334,67 @@ public sealed class ExhibitionCycle(
                 !item.TryGetProperty("executedAt", out var executedElement) || !executedElement.TryGetDateTimeOffset(out var executedAt) ||
                 !item.TryGetProperty("availableAt", out var availableElement) || !availableElement.TryGetDateTimeOffset(out var availableAt) ||
                 availableAt < executedAt.AddMinutes(15) ||
-                !item.TryGetProperty("exchange", out var exchange) || exchange.GetString() != "XSTO" ||
-                !item.TryGetProperty("currency", out var currency) || currency.GetString() != "SEK" ||
+                !item.TryGetProperty("exchange", out var exchange) || exchange.ValueKind != JsonValueKind.String ||
+                !item.TryGetProperty("currency", out var currency) || currency.ValueKind != JsonValueKind.String ||
                 !item.TryGetProperty("isPreviewPrice", out var isPreviewPrice) || isPreviewPrice.ValueKind != JsonValueKind.False ||
-                item.TryGetProperty("priceDkk", out var priceDkk) && priceDkk.ValueKind != JsonValueKind.Null ||
                 !item.TryGetProperty("source", out var source) || source.GetString() != ExhibitionDataContract.Source ||
                 !item.TryGetProperty("delayMinutes", out var delayMinutes) || !delayMinutes.TryGetInt32(out var delay) || delay != 15 ||
                 !item.TryGetProperty("tradable", out var tradable) || tradable.ValueKind != JsonValueKind.False ||
                 !item.TryGetProperty("paperTradable", out var paperTradable) || paperTradable.ValueKind != JsonValueKind.True)
-                throw new InvalidOperationException("Every delayed instrument must have a positive price, timestamps, and exact assumed-fill Nasdaq metadata.");
-            result.Add(id.GetString()!, new(price, availableAt));
+                throw new InvalidOperationException("Every delayed instrument must have positive prices, timestamps, and exact assumed-fill metadata.");
+            var venue = exchange.GetString()!;
+            var nativeCurrency = currency.GetString()!;
+            if (!nordic)
+            {
+                if (venue != "XSTO" || nativeCurrency != "SEK" ||
+                    item.TryGetProperty("priceDkk", out var strictPriceDkk) && strictPriceDkk.ValueKind != JsonValueKind.Null)
+                    throw new InvalidOperationException("Stockholm observations must remain exact XSTO/SEK delayed data.");
+                result.Add(id.GetString()!, new(price, availableAt, executedAt));
+                continue;
+            }
+            if (!ExhibitionDataContract.IsNordicPair(venue, nativeCurrency) ||
+                !item.TryGetProperty("priceDkk", out var priceDkkElement) ||
+                !priceDkkElement.TryGetDecimal(out var priceDkk) || priceDkk <= 0m ||
+                !item.TryGetProperty("fxToDkk", out var fxElement) || !fxElement.TryGetDecimal(out var fxToDkk) || fxToDkk <= 0m ||
+                priceDkk != price * fxToDkk ||
+                !item.TryGetProperty("fxReferenceDate", out var fxDateElement) || !fxDateElement.TryGetDateTime(out var fxDateTime) ||
+                !item.TryGetProperty("fxAvailableAt", out var fxAvailableElement) ||
+                !fxAvailableElement.TryGetDateTimeOffset(out var fxAvailableAt) || fxAvailableAt == default ||
+                !item.TryGetProperty("fxSource", out var fxSourceElement) ||
+                fxSourceElement.GetString() != ExhibitionDataContract.FxSource ||
+                !item.TryGetProperty("fxSha256", out var fxShaElement) || !ValidSha256(fxShaElement.GetString()))
+                throw new InvalidOperationException("Nordic observations require an approved venue/currency pair and checksum-bound ECB conversion.");
+            result.Add(id.GetString()!, new(price, availableAt, executedAt, venue, nativeCurrency,
+                priceDkk, fxToDkk, DateOnly.FromDateTime(fxDateTime), fxAvailableAt,
+                fxSourceElement.GetString(), fxShaElement.GetString()));
         }
         if (result.Count == 0) throw new InvalidOperationException("Delayed instrument response cannot be empty.");
         return result;
     }
+
+    private static bool ValidSha256(string? value) =>
+        value is { Length: 64 } && value.All(character =>
+            character is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F');
 
     private static bool IsAuthoritativeSuccess(string json, AgentDefinition agent, string runId)
     {
         using var document = StrictJson.Parse(json, 2 * 1024 * 1024);
         var root = document.RootElement;
         if (root.ValueKind != JsonValueKind.Object ||
-            !root.TryGetProperty("dataMode", out var dataMode) || dataMode.GetString() != ExhibitionDataContract.DataMode ||
-            !root.TryGetProperty("executionMode", out var executionMode) || executionMode.GetString() != ExhibitionDataContract.ExecutionMode ||
+            !root.TryGetProperty("dataMode", out var dataModeElement) || dataModeElement.ValueKind != JsonValueKind.String)
+            return false;
+        var dataMode = dataModeElement.GetString();
+        var nordic = dataMode == ExhibitionDataContract.NordicDataMode;
+        if (!nordic && dataMode != ExhibitionDataContract.StockholmDataMode) return false;
+        var expectedExecutionMode = nordic
+            ? ExhibitionDataContract.NordicExecutionMode
+            : ExhibitionDataContract.StockholmExecutionMode;
+        if (!root.TryGetProperty("executionMode", out var executionMode) || executionMode.GetString() != expectedExecutionMode ||
             !root.TryGetProperty("isNonLive", out var isNonLive) || isNonLive.ValueKind != JsonValueKind.True ||
             !root.TryGetProperty("strictContest", out var strictContest) || strictContest.ValueKind != JsonValueKind.False ||
             !root.TryGetProperty("holdOnly", out var holdOnly) || holdOnly.ValueKind != JsonValueKind.False ||
             !root.TryGetProperty("assumedFills", out var assumedFills) || assumedFills.ValueKind != JsonValueKind.True ||
-            !root.TryGetProperty("assumedSekToDkk", out var assumedSekToDkk) ||
-            !assumedSekToDkk.TryGetDecimal(out var fx) || fx != ExhibitionDataContract.AssumedSekToDkk ||
+            !ValidProgressFx(root, nordic) ||
             !root.TryGetProperty("assumedSlippagePercent", out var assumedSlippage) ||
             !assumedSlippage.TryGetDecimal(out var slippage) || slippage != ExhibitionDataContract.AssumedSlippagePercent ||
             !root.TryGetProperty("participants", out var participants) || participants.ValueKind != JsonValueKind.Array)
@@ -348,9 +406,9 @@ public sealed class ExhibitionCycle(
             if (participant.ValueKind != JsonValueKind.Object ||
                 !participant.TryGetProperty("portfolio", out var portfolio) || portfolio.ValueKind != JsonValueKind.Object ||
                 !portfolio.TryGetProperty("dataMode", out var portfolioDataMode) ||
-                portfolioDataMode.GetString() != ExhibitionDataContract.DataMode ||
+                portfolioDataMode.GetString() != dataMode ||
                 !portfolio.TryGetProperty("executionMode", out var portfolioExecutionMode) ||
-                portfolioExecutionMode.GetString() != ExhibitionDataContract.ExecutionMode)
+                portfolioExecutionMode.GetString() != expectedExecutionMode)
                 return false;
             if (!participant.TryGetProperty("agentId", out var agentId) || !agentId.TryGetGuid(out var parsedAgentId) ||
                 parsedAgentId != agent.Id)
@@ -376,6 +434,24 @@ public sealed class ExhibitionCycle(
             if (matchingParticipants > 1) return false;
         }
         return matchingParticipants == 1;
+    }
+
+    private static bool ValidProgressFx(JsonElement root, bool nordic)
+    {
+        if (!root.TryGetProperty("assumedSekToDkk", out var sekFx)) return false;
+        if (!nordic)
+            return sekFx.TryGetDecimal(out var value) && value == ExhibitionDataContract.AssumedSekToDkk;
+        if (sekFx.ValueKind != JsonValueKind.Null ||
+            !root.TryGetProperty("assumedFxToDkk", out var fxMap) || fxMap.ValueKind != JsonValueKind.Object)
+            return false;
+        var count = 0;
+        foreach (var property in fxMap.EnumerateObject())
+        {
+            if (!ExhibitionDataContract.NordicCurrencies.Contains(property.Name) ||
+                !property.Value.TryGetDecimal(out var value) || value <= 0m) return false;
+            count++;
+        }
+        return count > 0;
     }
 
     private static bool HasValidDecisionAudit(JsonElement decision)

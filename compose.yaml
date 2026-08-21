@@ -75,11 +75,14 @@ services:
     depends_on:
       preview-guard:
         condition: service_completed_successfully
+      preview-collector:
+        condition: service_healthy
     image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:api-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       PREVIEW_MODE: "1"
       AI_EXHIBITION_MODE: "1"
+      AI_EXHIBITION_UNIVERSE: ${AI_EXHIBITION_UNIVERSE:-stockholm}
       AI_EXHIBITION_KEY: ${AI_EXHIBITION_KEY:?set a random AI exhibition internal key}
       AI_EXHIBITION_ARCHIVE_PATH: /data/nasdaq
       DATABASE_URL: ${WEB_DATABASE_URL:?set the web PostgreSQL URL}
@@ -230,6 +233,38 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    networks: [egress]
+
+  preview-collector:
+    <<: *runtime-security
+    profiles: ["preview"]
+    depends_on:
+      preview-guard:
+        condition: service_completed_successfully
+    image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:collector-${AISTOCKS_IMAGE_VERSION:-latest}
+    environment:
+      APP_ENV: production
+      COLLECT_NORDIC_EXHIBITION: "1"
+      COLLECTOR_DATABASE_URL: ${COLLECTOR_DATABASE_URL:?set the least-privilege collector PostgreSQL URL}
+      ARCHIVE_PATH: /data/nasdaq
+      FIRDS_ACQUISITION_PLAN_PATH: /run/market-bootstrap/firds-plan.json
+      CORPORATE_ACTION_INPUT_PATH: /run/corporate-actions
+      COLLECTOR_POLL_SECONDS: ${COLLECTOR_POLL_SECONDS:-15}
+      COLLECTOR_MAX_DOWNLOADS_PER_POLL: ${COLLECTOR_MAX_DOWNLOADS_PER_POLL:-32}
+      COLLECTOR_CONFLICT_REFETCH_MINUTES: ${COLLECTOR_CONFLICT_REFETCH_MINUTES:-360}
+      TZ: Europe/Stockholm
+    volumes:
+      - ${NASDAQ_ARCHIVE_DIR:?set a UID-10001 writable Nasdaq archive dataset}:/data/nasdaq
+      - ${MARKET_BOOTSTRAP_DIR:?set the reviewed FIRDS plan directory}:/run/market-bootstrap:ro
+      - ${CORPORATE_ACTION_INPUT_DIR:?set the reviewed corporate-action input directory}:/run/corporate-actions:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 4

@@ -160,7 +160,7 @@ public sealed class MarketDataTests
     }
 
     [Fact]
-    public void FirdsFullAndDeltaKeepOnlyActiveXstoCommonShares()
+    public void FirdsFullAndDeltaAreEffectiveDatedAndChecksumBound()
     {
         var parser = new FirdsUniverseParser();
         var full = parser.ParseFull(File.OpenRead(Fixture("firds-full.xml")), FullDay);
@@ -169,6 +169,271 @@ public sealed class MarketDataTests
         Assert.Equal("5493001KJTIIGC8Y1R12", full[0].IssuerId);
         var updated = parser.ApplyDelta(full, File.OpenRead(Fixture("firds-delta.xml")), FullDay);
         Assert.Empty(updated);
+    }
+
+    [Fact]
+    public void NordicExhibitionFirdsKeepsOnlyPrimaryVenueCurrencyCommonShares()
+    {
+        const string xml = """
+            <Document xmlns="urn:iso:std:iso:20022:tech:xsd:auth.017.001.02">
+              <RefData><FinInstrmGnlAttrbts><Id>SE0000108656</Id><FullNm>Ericsson B</FullNm><ClssfctnTp>ESEUFR</ClssfctnTp><NtnlCcy>SEK</NtnlCcy></FinInstrmGnlAttrbts><Issr>5493001KJTIIGC8Y1R12</Issr><TradgVnRltdAttrbts><Id>XSTO</Id></TradgVnRltdAttrbts></RefData>
+              <RefData><FinInstrmGnlAttrbts><Id>DK0010181676</Id><FullNm>Carlsberg A A/S</FullNm><ClssfctnTp>ESEUFN</ClssfctnTp><NtnlCcy>DKK</NtnlCcy></FinInstrmGnlAttrbts><Issr>5299001O0WJQYB5GYZ19</Issr><TradgVnRltdAttrbts><Id>XCSE</Id></TradgVnRltdAttrbts></RefData>
+              <RefData><FinInstrmGnlAttrbts><Id>FI0009800395</Id><FullNm>Raisio Plc K</FullNm><ClssfctnTp>ESETFR</ClssfctnTp><NtnlCcy>EUR</NtnlCcy></FinInstrmGnlAttrbts><Issr>74370083282NHIP4QD02</Issr><TradgVnRltdAttrbts><Id>XHEL</Id></TradgVnRltdAttrbts></RefData>
+              <RefData><FinInstrmGnlAttrbts><Id>NO0003399917</Id><FullNm>Odfjell SE B</FullNm><ClssfctnTp>ESNUFR</ClssfctnTp><NtnlCcy>NOK</NtnlCcy></FinInstrmGnlAttrbts><Issr>5967007LIEEXZXJ8QG45</Issr><TradgVnRltdAttrbts><Id>ONSE</Id></TradgVnRltdAttrbts></RefData>
+              <RefData><FinInstrmGnlAttrbts><Id>IS0000000040</Id><FullNm>Iceland Common</FullNm><ClssfctnTp>ESEUFR</ClssfctnTp><NtnlCcy>ISK</NtnlCcy></FinInstrmGnlAttrbts><Issr>529900T8BM49AURSDO55</Issr><TradgVnRltdAttrbts><Id>XICE</Id></TradgVnRltdAttrbts></RefData>
+              <RefData><FinInstrmGnlAttrbts><Id>SE0000000001</Id><FullNm>Wrong currency</FullNm><ClssfctnTp>ESEUFR</ClssfctnTp><NtnlCcy>EUR</NtnlCcy></FinInstrmGnlAttrbts><Issr>529900T8BM49AURSDO56</Issr><TradgVnRltdAttrbts><Id>XSTO</Id></TradgVnRltdAttrbts></RefData>
+              <RefData><FinInstrmGnlAttrbts><Id>SE0000000002</Id><FullNm>First North</FullNm><ClssfctnTp>ESEUFR</ClssfctnTp><NtnlCcy>SEK</NtnlCcy></FinInstrmGnlAttrbts><Issr>529900T8BM49AURSDO57</Issr><TradgVnRltdAttrbts><Id>FNSE</Id></TradgVnRltdAttrbts></RefData>
+            </Document>
+            """;
+        var parser = new FirdsUniverseParser(FirdsUniverse.NordicExhibition);
+
+        var instruments = parser.ParseFull(new MemoryStream(Encoding.UTF8.GetBytes(xml)), FullDay);
+
+        Assert.Equal(["ONSE", "XCSE", "XHEL", "XICE", "XSTO"],
+            instruments.Select(item => item.Venue).Order(StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public void NordicExhibitionFirdsKeysCrossListingsByVenue()
+    {
+        const string full = """
+            <Document xmlns="urn:iso:std:iso:20022:tech:xsd:auth.017.001.02">
+              <RefData><FinInstrmGnlAttrbts><Id>SE0000000001</Id><FullNm>Dual Listed</FullNm><ClssfctnTp>ESEUFN</ClssfctnTp><NtnlCcy>SEK</NtnlCcy></FinInstrmGnlAttrbts><Issr>54930000000000000001</Issr><TradgVnRltdAttrbts><Id>XSTO</Id><TradgVnInstrmId>DUAL</TradgVnInstrmId><FrstTradDt>2020-01-01T00:00:00Z</FrstTradDt></TradgVnRltdAttrbts></RefData>
+              <RefData><FinInstrmGnlAttrbts><Id>SE0000000001</Id><FullNm>Dual Listed</FullNm><ClssfctnTp>ESEUFN</ClssfctnTp><NtnlCcy>DKK</NtnlCcy></FinInstrmGnlAttrbts><Issr>54930000000000000001</Issr><TradgVnRltdAttrbts><Id>XCSE</Id><TradgVnInstrmId>DUAL</TradgVnInstrmId><FrstTradDt>2020-01-01T00:00:00Z</FrstTradDt></TradgVnRltdAttrbts></RefData>
+            </Document>
+            """;
+        const string delta = """
+            <Document xmlns="urn:iso:std:iso:20022:tech:xsd:auth.017.001.02">
+              <TermntdRcrd><FinInstrmGnlAttrbts><Id>SE0000000001</Id><FullNm>Dual Listed</FullNm><ClssfctnTp>ESEUFN</ClssfctnTp><NtnlCcy>DKK</NtnlCcy></FinInstrmGnlAttrbts><Issr>54930000000000000001</Issr><TradgVnRltdAttrbts><Id>XCSE</Id><TradgVnInstrmId>DUAL</TradgVnInstrmId><FrstTradDt>2020-01-01T00:00:00Z</FrstTradDt></TradgVnRltdAttrbts></TermntdRcrd>
+            </Document>
+            """;
+        var parser = new FirdsUniverseParser(FirdsUniverse.NordicExhibition);
+
+        var instruments = parser.ParseFull(new MemoryStream(Encoding.UTF8.GetBytes(full)), new DateOnly(2026, 8, 21));
+        Assert.Equal(2, instruments.Count);
+
+        var afterDelete = parser.ApplyDelta(instruments,
+            new MemoryStream(Encoding.UTF8.GetBytes(delta)), new DateOnly(2026, 8, 21));
+        var remaining = Assert.Single(afterDelete);
+        Assert.Equal("XSTO", remaining.Venue);
+    }
+
+    [Fact]
+    public void EcbFxArchiveProvidesChecksumVerifiedDkkCrossRates()
+    {
+        using var temp = new TemporaryDirectory();
+        var fetchedAt = DateTimeOffset.Parse("2026-08-21T14:10:00Z");
+        const string xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01" xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">
+              <Cube><Cube time="2026-08-21">
+                <Cube currency="DKK" rate="7.4758"/><Cube currency="SEK" rate="11.0625"/>
+                <Cube currency="NOK" rate="10.8675"/><Cube currency="ISK" rate="141.60"/>
+              </Cube></Cube>
+            </gesmes:Envelope>
+            """;
+        var store = new EcbFxStore(temp.Path);
+
+        store.Archive(Encoding.UTF8.GetBytes(xml), EcbFxStore.OfficialSource, fetchedAt);
+        var snapshot = store.LoadVerified(fetchedAt.AddMinutes(1));
+
+        Assert.Equal(new DateOnly(2026, 8, 21), snapshot.ReferenceDate);
+        Assert.Equal(1m, snapshot.DkkPerUnit["DKK"]);
+        Assert.Equal(7.4758m, snapshot.DkkPerUnit["EUR"]);
+        Assert.Equal(7.4758m / 11.0625m, snapshot.DkkPerUnit["SEK"]);
+        Assert.Equal(7.4758m / 10.8675m, snapshot.DkkPerUnit["NOK"]);
+        Assert.Equal(7.4758m / 141.60m, snapshot.DkkPerUnit["ISK"]);
+        Assert.Equal(fetchedAt, snapshot.AvailableAt);
+        File.AppendAllText(snapshot.RawPath, "tamper");
+        Assert.Throws<MarketDataException>(() => store.LoadVerified(fetchedAt.AddMinutes(2)));
+    }
+
+    [Fact]
+    public void EcbFxArchiveRejectsReferenceDateAndAcquisitionTimeRegression()
+    {
+        using var temp = new TemporaryDirectory();
+        const string current = """
+            <gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01" xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">
+              <Cube><Cube time="2026-08-21"><Cube currency="DKK" rate="7.4758"/><Cube currency="SEK" rate="11.0625"/><Cube currency="NOK" rate="10.8675"/><Cube currency="ISK" rate="141.60"/></Cube></Cube>
+            </gesmes:Envelope>
+            """;
+        var store = new EcbFxStore(temp.Path);
+        var firstFetchedAt = DateTimeOffset.Parse("2026-08-21T14:10:00Z");
+        store.Archive(Encoding.UTF8.GetBytes(current), EcbFxStore.OfficialSource, firstFetchedAt);
+
+        var older = current.Replace("2026-08-21", "2026-08-20", StringComparison.Ordinal);
+
+        Assert.Throws<MarketDataException>(() => store.Archive(Encoding.UTF8.GetBytes(older),
+            EcbFxStore.OfficialSource, firstFetchedAt.AddHours(1)));
+        Assert.Throws<MarketDataException>(() => store.Archive(Encoding.UTF8.GetBytes(current),
+            EcbFxStore.OfficialSource, firstFetchedAt));
+        Assert.Equal(new DateOnly(2026, 8, 21), store.LoadVerified(firstFetchedAt.AddHours(2)).ReferenceDate);
+    }
+
+    [Fact]
+    public void NordicCorporateActionStateIsFreshBoundedAndAppendOnly()
+    {
+        using var temp = new TemporaryDirectory();
+        var input = Path.Combine(temp.Path, "actions");
+        Directory.CreateDirectory(input);
+        var actionPath = Path.Combine(input, "split.json");
+        File.WriteAllText(actionPath, """
+            {
+              "schemaVersion":"1",
+              "venue":"XCSE",
+              "isin":"DK0010181676",
+              "orderBookId":"CARL-A",
+              "actionType":"SPLIT",
+              "effectiveAt":"2026-08-22T00:00:00Z"
+            }
+            """);
+        var store = new UnsupportedCorporateActionStore(temp.Path);
+        var refreshedAt = DateTimeOffset.Parse("2026-08-21T14:10:00Z");
+
+        var snapshot = store.RefreshFromDirectory(input, refreshedAt);
+
+        Assert.Single(snapshot.Actions);
+        Assert.True(store.IsBlocked("XCSE", "DK0010181676", "CARL-A", refreshedAt.AddMinutes(1)));
+        Assert.Throws<MarketDataException>(() => store.LoadVerified(refreshedAt.AddMinutes(6)));
+        File.Delete(actionPath);
+        Assert.Throws<MarketDataException>(() =>
+            store.RefreshFromDirectory(input, refreshedAt.AddMinutes(1)));
+    }
+
+    [Fact]
+    public void NordicCorporateActionInputRejectsBytesBeyondTheReadBound()
+    {
+        using var temp = new TemporaryDirectory();
+        var input = Path.Combine(temp.Path, "actions");
+        Directory.CreateDirectory(input);
+        File.WriteAllBytes(Path.Combine(input, "oversized.json"), new byte[1_048_577]);
+
+        var exception = Assert.Throws<MarketDataException>(() =>
+            new UnsupportedCorporateActionStore(temp.Path).RefreshFromDirectory(
+                input, DateTimeOffset.Parse("2026-08-21T14:10:00Z")));
+
+        Assert.Contains("invalid", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void NordicCorporateActionInputRejectsSymbolicLinks()
+    {
+        using var temp = new TemporaryDirectory();
+        var input = Path.Combine(temp.Path, "actions");
+        Directory.CreateDirectory(input);
+        var target = Path.Combine(temp.Path, "target.json");
+        File.WriteAllText(target, "{}");
+        File.CreateSymbolicLink(Path.Combine(input, "linked.json"), target);
+
+        Assert.Throws<MarketDataException>(() =>
+            new UnsupportedCorporateActionStore(temp.Path).RefreshFromDirectory(
+                input, DateTimeOffset.Parse("2026-08-21T14:10:00Z")));
+    }
+
+    [Fact]
+    public void NordicCorporateActionStateRejectsSymbolicLinks()
+    {
+        using var temp = new TemporaryDirectory();
+        var target = Path.Combine(temp.Path, "target-state.json");
+        File.WriteAllText(target, "{}");
+        File.CreateSymbolicLink(
+            Path.Combine(temp.Path, "nordic-unsupported-corporate-actions.json"), target);
+
+        Assert.Throws<MarketDataException>(() =>
+            new UnsupportedCorporateActionStore(temp.Path).LoadVerified(DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public void NordicCorporateActionRawArchiveRejectsSymbolicLinks()
+    {
+        using var temp = new TemporaryDirectory();
+        var input = Path.Combine(temp.Path, "actions");
+        Directory.CreateDirectory(input);
+        File.WriteAllText(Path.Combine(input, "action.json"), """
+            {"schemaVersion":"1","venue":"XCSE","isin":"DK0010181676","orderBookId":"CARL-A","actionType":"SPLIT","effectiveAt":"2026-08-18T00:00:00Z"}
+            """);
+        var store = new UnsupportedCorporateActionStore(temp.Path);
+        var now = DateTimeOffset.Parse("2026-08-16T10:00:00Z");
+        store.RefreshFromDirectory(input, now);
+        var raw = Directory.EnumerateFiles(
+            Path.Combine(temp.Path, "nordic-unsupported-corporate-actions.json.raw"), "*.json").Single();
+        var target = Path.Combine(temp.Path, "target-raw.json");
+        File.Copy(raw, target);
+        File.Delete(raw);
+        File.CreateSymbolicLink(raw, target);
+
+        Assert.Throws<MarketDataException>(() => store.LoadVerified(now));
+    }
+
+    [Fact]
+    public void MarketReferencePrimaryHandlerDoesNotFollowRedirects()
+    {
+        using var handler = Assert.IsType<HttpClientHandler>(MarketReferenceAcquirer.CreatePrimaryHandler());
+
+        Assert.False(handler.AllowAutoRedirect);
+        Assert.Equal(System.Net.DecompressionMethods.None, handler.AutomaticDecompression);
+    }
+
+    [Fact]
+    public void NordicProjectionReplaysVerifiedRawFirdsWithoutWeakeningStockholmState()
+    {
+        using var temp = new TemporaryDirectory();
+        const string xml = """
+            <Document xmlns="urn:iso:std:iso:20022:tech:xsd:auth.017.001.02">
+              <RefData><FinInstrmGnlAttrbts><Id>SE0000108656</Id><FullNm>Ericsson B</FullNm><ClssfctnTp>ESEUFR</ClssfctnTp><NtnlCcy>SEK</NtnlCcy></FinInstrmGnlAttrbts><Issr>5493001KJTIIGC8Y1R12</Issr><TradgVnRltdAttrbts><Id>XSTO</Id></TradgVnRltdAttrbts></RefData>
+              <RefData><FinInstrmGnlAttrbts><Id>DK0010181676</Id><FullNm>Carlsberg A A/S</FullNm><ClssfctnTp>ESEUFN</ClssfctnTp><NtnlCcy>DKK</NtnlCcy></FinInstrmGnlAttrbts><Issr>5299001O0WJQYB5GYZ19</Issr><TradgVnRltdAttrbts><Id>XCSE</Id></TradgVnRltdAttrbts></RefData>
+            </Document>
+            """;
+        var bytes = Encoding.UTF8.GetBytes(xml);
+        var sha256 = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        var store = new DurableFirdsStore(Path.Combine(temp.Path, "firds-state.json"));
+        store.ApplyFull(new MemoryStream(bytes), new DateOnly(2026, 8, 8),
+            new Uri("https://firds.esma.europa.eu/firds/FULINS_E_20260808_01of01.zip"),
+            sha256, "full-2026-08-08-1", 1);
+
+        var stockholm = store.LoadVerified();
+        var nordicStore = new DurableFirdsStore(Path.Combine(temp.Path, "firds-nordic-state.json"),
+            FirdsUniverse.NordicExhibition);
+        var nordic = store.ProjectVerifiedTo(nordicStore);
+
+        Assert.Single(stockholm.Instruments);
+        Assert.True(nordicStore.Exists);
+        Assert.Equal(2, nordic.Instruments.Count);
+        Assert.Contains(nordic.Instruments, item => item.Venue == "XCSE" && item.Currency == "DKK");
+    }
+
+    [Fact]
+    public void NordicProjectionReplacesRemovedListingsOnANewerFullSnapshot()
+    {
+        using var temp = new TemporaryDirectory();
+        const string first = """
+            <Document xmlns="urn:iso:std:iso:20022:tech:xsd:auth.017.001.02">
+              <RefData><FinInstrmGnlAttrbts><Id>SE0000108656</Id><FullNm>Ericsson B</FullNm><ClssfctnTp>ESEUFR</ClssfctnTp><NtnlCcy>SEK</NtnlCcy></FinInstrmGnlAttrbts><Issr>5493001KJTIIGC8Y1R12</Issr><TradgVnRltdAttrbts><Id>XSTO</Id><TradgVnInstrmId>ERIC-B</TradgVnInstrmId></TradgVnRltdAttrbts></RefData>
+              <RefData><FinInstrmGnlAttrbts><Id>DK0010181676</Id><FullNm>Carlsberg A A/S</FullNm><ClssfctnTp>ESEUFN</ClssfctnTp><NtnlCcy>DKK</NtnlCcy></FinInstrmGnlAttrbts><Issr>5299001O0WJQYB5GYZ19</Issr><TradgVnRltdAttrbts><Id>XCSE</Id><TradgVnInstrmId>CARL-A</TradgVnInstrmId></TradgVnRltdAttrbts></RefData>
+            </Document>
+            """;
+        const string second = """
+            <Document xmlns="urn:iso:std:iso:20022:tech:xsd:auth.017.001.02">
+              <RefData><FinInstrmGnlAttrbts><Id>SE0000108656</Id><FullNm>Ericsson B</FullNm><ClssfctnTp>ESEUFR</ClssfctnTp><NtnlCcy>SEK</NtnlCcy></FinInstrmGnlAttrbts><Issr>5493001KJTIIGC8Y1R12</Issr><TradgVnRltdAttrbts><Id>XSTO</Id><TradgVnInstrmId>ERIC-B</TradgVnInstrmId></TradgVnRltdAttrbts></RefData>
+            </Document>
+            """;
+        var source = new DurableFirdsStore(Path.Combine(temp.Path, "strict.json"));
+        var destination = new DurableFirdsStore(Path.Combine(temp.Path, "nordic.json"),
+            FirdsUniverse.NordicExhibition);
+        var firstBytes = Encoding.UTF8.GetBytes(first);
+        source.ApplyFull(new MemoryStream(firstBytes), new DateOnly(2026, 8, 20),
+            new Uri("https://firds.esma.europa.eu/firds/FULINS_E_20260820_01of01.zip"),
+            Convert.ToHexStringLower(SHA256.HashData(firstBytes)), "full-2026-08-20", 1);
+        Assert.Equal(2, source.ProjectVerifiedTo(destination).Instruments.Count);
+
+        var secondBytes = Encoding.UTF8.GetBytes(second);
+        source.ApplyFull(new MemoryStream(secondBytes), new DateOnly(2026, 8, 21),
+            new Uri("https://firds.esma.europa.eu/firds/FULINS_E_20260821_01of01.zip"),
+            Convert.ToHexStringLower(SHA256.HashData(secondBytes)), "full-2026-08-21", 2);
+        var projected = source.ProjectVerifiedTo(destination);
+
+        Assert.Single(projected.Instruments);
+        Assert.DoesNotContain(projected.Instruments, item => item.Isin == "DK0010181676");
     }
 
     [Fact]

@@ -43,6 +43,127 @@ public sealed class AssumedFillExhibitionTests
     }
 
     [Fact]
+    public void Nordic_buy_binds_native_observation_and_verified_fx()
+    {
+        var clock = new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:20:01Z"));
+        var store = new PreviewRaceStore(clock, null, DelayedNasdaqInstrumentStore.NordicDataMode,
+            PreviewRaceStore.NordicAssumedExecutionMode);
+        var fxAvailableAt = DateTimeOffset.Parse("2026-08-14T14:10:00Z");
+        var instrument = new InstrumentDto("XCSE:DK0010181676:CARL-A", "CARL-A", "Carlsberg A A/S",
+            "XCSE", "Denmark", "DKK", 750m, 750m, false, ExecutedAt, AvailableAt,
+            "Nasdaq Nordic MiFID II delayed post-trade", 15, false, true, 1m,
+            new DateOnly(2026, 8, 14), fxAvailableAt, "ECB euro foreign exchange reference rates (informational, not transaction rates)",
+            new string('c', 64));
+        var snapshot = new InstrumentListDto([instrument], DelayedNasdaqInstrumentStore.NordicDataMode);
+        var request = Decision("nordic-buy-001", "buy", instrument.Id, 10) with
+        {
+            ObservedPrice = 750m,
+            ObservedCurrency = "DKK",
+            ObservedVenue = "XCSE",
+            ObservedFxToDkk = 1m,
+            ObservationExecutedAt = ExecutedAt,
+            FxAvailableAt = fxAvailableAt,
+            FxSha256 = new string('c', 64),
+            FxReferenceDate = new DateOnly(2026, 8, 14),
+            FxSource = "ECB euro foreign exchange reference rates (informational, not transaction rates)"
+        };
+        StartRun(store, request);
+
+        var submission = store.SubmitAi(request, snapshot);
+
+        Assert.Equal("assumed-delayed-paper-fills-v2", submission.Decision.AssumedPaperFill!.ExecutionMode);
+        Assert.Equal("DKK", submission.Decision.AssumedPaperFill.ObservedCurrency);
+        Assert.Equal("XCSE", submission.Decision.AssumedPaperFill.ObservedVenue);
+        Assert.Equal(1m, submission.Decision.AssumedPaperFill.FxToDkk);
+        Assert.Equal(7_575m, submission.Decision.AssumedPaperFill.TotalDkk);
+    }
+
+    [Fact]
+    public void Nordic_sell_uses_native_fx_and_marks_remaining_position_in_dkk()
+    {
+        var store = new PreviewRaceStore(new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:40:00Z")),
+            null, DelayedNasdaqInstrumentStore.NordicDataMode, PreviewRaceStore.NordicAssumedExecutionMode);
+        var fxAvailableAt = DateTimeOffset.Parse("2026-08-14T14:10:00Z");
+        var bought = NordicInstrument(750m, fxAvailableAt);
+        Submit(store, NordicDecision("nordic-sell-seed", "buy", bought, 10, AvailableAt.AddMinutes(2)),
+            new InstrumentListDto([bought], DelayedNasdaqInstrumentStore.NordicDataMode));
+        var marked = NordicInstrument(800m, fxAvailableAt) with
+        {
+            ExecutedAt = ExecutedAt.AddMinutes(5),
+            AvailableAt = AvailableAt.AddMinutes(5),
+            PriceDkk = 800m
+        };
+        var snapshot = new InstrumentListDto([marked], DelayedNasdaqInstrumentStore.NordicDataMode);
+        var sell = NordicDecision("nordic-sell-001", "sell", marked, 4, AvailableAt.AddMinutes(8));
+
+        var accepted = Submit(store, sell, snapshot);
+        var portfolio = store.AiProgress(snapshot).Participants.Single(item => item.AgentId == Agent.Id).Portfolio;
+
+        Assert.Equal(792m, accepted.Decision.AssumedPaperFill!.FillPriceDkk);
+        Assert.Equal(3_168m, accepted.Decision.AssumedPaperFill.TotalDkk);
+        Assert.Equal(6, Assert.Single(portfolio.Holdings).Quantity);
+        Assert.Equal(4_800m, portfolio.HoldingsValueDkk);
+        Assert.Equal(100_393m, portfolio.TotalValueDkk);
+    }
+
+    [Fact]
+    public void Nordic_snapshot_without_verified_fx_fails_closed()
+    {
+        var store = new PreviewRaceStore(TimeProvider.System, null, DelayedNasdaqInstrumentStore.NordicDataMode,
+            PreviewRaceStore.NordicAssumedExecutionMode);
+        var instrument = NordicInstrument(750m, DateTimeOffset.Parse("2026-08-14T14:10:00Z")) with
+        {
+            PriceDkk = null,
+            FxToDkk = null,
+            FxReferenceDate = null,
+            FxAvailableAt = null,
+            FxSource = null,
+            FxSha256 = null
+        };
+        var snapshot = new InstrumentListDto([instrument], DelayedNasdaqInstrumentStore.NordicDataMode);
+        var request = NordicDecision("nordic-no-fx-01", "buy", instrument, 1, AvailableAt.AddMinutes(2));
+        StartRun(store, request);
+
+        Assert.Equal("invalid-fx",
+            Assert.Throws<PreviewOrderException>(() => store.SubmitAi(request, snapshot)).Code);
+        Assert.Equal("invalid-fx",
+            Assert.Throws<PreviewOrderException>(() => store.AiProgress(snapshot)).Code);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Nordic_buy_rejects_changed_fx_reference_provenance(bool changeDate)
+    {
+        var store = new PreviewRaceStore(TimeProvider.System, null, DelayedNasdaqInstrumentStore.NordicDataMode,
+            PreviewRaceStore.NordicAssumedExecutionMode);
+        var instrument = NordicInstrument(750m, DateTimeOffset.Parse("2026-08-14T14:10:00Z"));
+        var snapshot = new InstrumentListDto([instrument], DelayedNasdaqInstrumentStore.NordicDataMode);
+        var valid = NordicDecision("nordic-fx-provenance", "buy", instrument, 1, AvailableAt.AddMinutes(2));
+        var request = changeDate
+            ? valid with { FxReferenceDate = valid.FxReferenceDate!.Value.AddDays(-1) }
+            : valid with { FxSource = "untrusted FX source" };
+        StartRun(store, request);
+
+        Assert.Equal("observation-mismatch",
+            Assert.Throws<PreviewOrderException>(() => store.SubmitAi(request, snapshot)).Code);
+    }
+
+    [Fact]
+    public void Nordic_buy_rejects_fx_that_was_unavailable_when_the_decision_completed()
+    {
+        var store = new PreviewRaceStore(TimeProvider.System, null, DelayedNasdaqInstrumentStore.NordicDataMode,
+            PreviewRaceStore.NordicAssumedExecutionMode);
+        var instrument = NordicInstrument(750m, AvailableAt.AddMinutes(3));
+        var snapshot = new InstrumentListDto([instrument], DelayedNasdaqInstrumentStore.NordicDataMode);
+        var request = NordicDecision("nordic-future-fx", "buy", instrument, 1, AvailableAt.AddMinutes(2));
+        StartRun(store, request);
+
+        Assert.Equal("invalid-fx",
+            Assert.Throws<PreviewOrderException>(() => store.SubmitAi(request, snapshot)).Code);
+    }
+
+    [Fact]
     public void Progress_reports_stock_name_cost_basis_gain_and_filterable_performance_series()
     {
         var clock = new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:30:00Z"));
@@ -285,6 +406,28 @@ public sealed class AssumedFillExhibitionTests
 
     private static AiEvidenceDto Evidence(DateTimeOffset publishedAt) =>
         new("https://example.com/research", publishedAt, "Exact verified excerpt.", new string('a', 64));
+
+    private static AiDecisionRequestDto NordicDecision(string runId, string action, InstrumentDto instrument,
+        int quantity, DateTimeOffset completedAt) =>
+        Decision(runId, action, instrument.Id, quantity, completedAt) with
+        {
+            ObservedPrice = instrument.Price,
+            ObservedCurrency = instrument.Currency,
+            ObservedVenue = instrument.Exchange,
+            ObservedFxToDkk = instrument.FxToDkk,
+            ObservationExecutedAt = instrument.ExecutedAt,
+            ObservationAvailableAt = instrument.AvailableAt,
+            FxAvailableAt = instrument.FxAvailableAt,
+            FxSha256 = instrument.FxSha256,
+            FxReferenceDate = instrument.FxReferenceDate,
+            FxSource = instrument.FxSource
+        };
+
+    private static InstrumentDto NordicInstrument(decimal price, DateTimeOffset fxAvailableAt) =>
+        new("XCSE:DK0010181676:CARL-A", "CARL-A", "Carlsberg A A/S", "XCSE", "Denmark", "DKK",
+            price, price, false, ExecutedAt, AvailableAt, "Nasdaq Nordic MiFID II delayed post-trade", 15,
+            false, true, 1m, new DateOnly(2026, 8, 14), fxAvailableAt,
+            "ECB euro foreign exchange reference rates (informational, not transaction rates)", new string('c', 64));
 
     private static InstrumentDto Instrument(string id, string symbol, decimal price,
         DateTimeOffset? executedAt = null, DateTimeOffset? availableAt = null) =>

@@ -53,6 +53,18 @@ if [[ "$action" == up || "$action" == start || "$action" == restart ]]; then
       printf 'compose-mode: contest collector is still active; stop it before starting warmup\n' >&2
       exit 1
     fi
+    if [[ "$mode" == contest && "$running" == preview-collector ]]; then
+      printf 'compose-mode: preview runtime is still active (%s); stop it before starting contest\n' "$running" >&2
+      exit 1
+    fi
+    if [[ "$mode" == preview && "$running" == warmup-collector ]]; then
+      printf 'compose-mode: warmup runtime is still active (%s); stop it before starting preview\n' "$running" >&2
+      exit 1
+    fi
+    if [[ "$mode" == warmup && "$running" == preview-collector ]]; then
+      printf 'compose-mode: preview runtime is still active (%s); stop it before starting warmup\n' "$running" >&2
+      exit 1
+    fi
   done
   if [[ "$mode" == contest ]]; then
     opposite_label=preview

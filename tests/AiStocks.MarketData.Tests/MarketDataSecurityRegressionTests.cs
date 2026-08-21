@@ -113,6 +113,7 @@ public sealed class MarketDataSecurityRegressionTests
         var restarted = NasdaqStatusMachine.LoadPublicRssBestEffort(statePath);
         Assert.Equal(InstrumentTradingState.Suspended, restarted.StateOf("SE0000108656"));
         Assert.Equal(InstrumentTradingState.Clear, restarted.StateOf("SE0000112233"));
+        Assert.True(restarted.IsFreshAt(DateTimeOffset.Parse("2026-08-06T09:05:00Z"), TimeSpan.FromMinutes(10)));
     }
 
     [Fact]
@@ -292,12 +293,16 @@ public sealed class MarketDataSecurityRegressionTests
             ? new(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(full) }
             : new(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(rss) }));
         var firds = new DurableFirdsStore(Path.Combine(temp.Path, "firds-state.json"));
-        var acquisition = new MarketReferenceAcquirer(http, firds, statuses, planPath, Path.Combine(temp.Path, "status-rss"));
+        var nordicFirds = new DurableFirdsStore(Path.Combine(temp.Path, "firds-nordic-state.json"),
+            FirdsUniverse.NordicExhibition);
+        var acquisition = new MarketReferenceAcquirer(http, firds, statuses, planPath,
+            Path.Combine(temp.Path, "status-rss"), nordicFirds);
 
         await acquisition.AcquireAsync(DateTimeOffset.Parse("2026-08-06T09:00:00Z"), CancellationToken.None);
         await acquisition.AcquireAsync(DateTimeOffset.Parse("2026-08-06T10:00:00Z"), CancellationToken.None);
 
         Assert.Single(firds.LoadVerified().Instruments);
+        Assert.Single(nordicFirds.LoadVerified().Instruments);
         Assert.Equal(InstrumentTradingState.Suspended, statuses.StateOf("SE0000108656"));
         Assert.Equal(2, statuses.RssArtifacts.Count);
         var artifact = statuses.RssArtifacts[0];
@@ -460,6 +465,30 @@ public sealed class MarketDataSecurityRegressionTests
         var result = readiness.Evaluate(new DateOnly(2026, 8, 6));
         Assert.False(result.Ready);
         Assert.NotEmpty(result.Failures);
+    }
+
+    [Fact]
+    public async Task EcbFxAcquirerPinsOfficialSourceAndArchivesBoundedResponse()
+    {
+        using var temp = new TemporaryDirectory();
+        const string xml = """
+            <gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01" xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref"><Cube><Cube time="2026-08-21"><Cube currency="DKK" rate="7.4758"/><Cube currency="SEK" rate="11.0625"/><Cube currency="NOK" rate="10.8675"/><Cube currency="ISK" rate="141.60"/></Cube></Cube></gesmes:Envelope>
+            """;
+        Uri? requested = null;
+        using var http = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri;
+            return new(System.Net.HttpStatusCode.OK)
+                { Content = new ByteArrayContent(Encoding.UTF8.GetBytes(xml)) };
+        }));
+        var store = new EcbFxStore(temp.Path);
+
+        var snapshot = await new EcbFxAcquirer(http, store).AcquireAsync(
+            DateTimeOffset.Parse("2026-08-21T14:10:00Z"), CancellationToken.None);
+
+        Assert.Equal(EcbFxStore.OfficialSource, requested);
+        Assert.Equal(7.4758m, snapshot.DkkPerUnit["EUR"]);
+        Assert.True(store.Exists);
     }
 
     private static IReadOnlyList<DateOnly> ExpectedSessionsEnding(DateOnly ending, int count)
