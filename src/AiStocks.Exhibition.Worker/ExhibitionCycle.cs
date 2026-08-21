@@ -48,7 +48,8 @@ public sealed class ExhibitionCycle(
     IExhibitionModelInvoker invoker,
     IEvidenceVerifier evidenceVerifier,
     ExhibitionHealthState health,
-    ILogger<ExhibitionCycle> logger)
+    ILogger<ExhibitionCycle> logger,
+    IStrategyMemoryStore? strategyMemoryStore = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -58,20 +59,24 @@ public sealed class ExhibitionCycle(
         var progressJson = await api.GetProgressAsync(cancellationToken).ConfigureAwait(false);
         var observations = ReadDelayedObservations(instrumentsJson);
         var failures = new List<ExhibitionAgentFailure>();
+        var degradedErrors = new List<string>();
         var succeeded = 0;
         foreach (var agent in ContestContract.Agents)
         {
             var runId = CreateRunId(scheduledAt, agent);
+            StrategyUpdate? pendingStrategyUpdate = null;
             try
             {
                 await api.PostStatusAsync(StatusJson(runId, agent, "queued", null, scheduledAt), cancellationToken)
                     .ConfigureAwait(false);
                 await api.PostStatusAsync(StatusJson(runId, agent, "running", null, DateTimeOffset.UtcNow), cancellationToken)
                     .ConfigureAwait(false);
-                var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson);
+                var memory = strategyMemoryStore?.Load(agent);
+                var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson, memory);
                 var (execution, decision, verified, correctionUsed) = await InvokeVerifiedDecisionAsync(
                         agent, runId, prompt, observations, cancellationToken)
                     .ConfigureAwait(false);
+                pendingStrategyUpdate = decision.StrategyUpdate;
                 DelayedObservation? selectedObservation = null;
                 if (decision.InstrumentId is not null)
                 {
@@ -89,6 +94,7 @@ public sealed class ExhibitionCycle(
                                 ExhibitionPromptBuilder.RetryAfterAdvancedSnapshot(refreshedPrompt), cancellationToken)
                             .ConfigureAwait(false);
                         decision = new ExhibitionDecisionParser().Parse(execution.StandardOutput, agent, refreshed);
+                        pendingStrategyUpdate = decision.StrategyUpdate;
                         verified = await VerifyEvidenceAsync(decision, cancellationToken).ConfigureAwait(false);
                         if (decision.InstrumentId is not null &&
                             !refreshed.TryGetValue(decision.InstrumentId, out selectedObservation))
@@ -136,6 +142,7 @@ public sealed class ExhibitionCycle(
                 }, JsonOptions);
                 await api.PostDecisionAsync(runId, payload, cancellationToken).ConfigureAwait(false);
                 succeeded++;
+                SaveAcceptedStrategy(agent, runId, pendingStrategyUpdate, degradedErrors);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception exception)
@@ -146,6 +153,7 @@ public sealed class ExhibitionCycle(
                     if (IsAuthoritativeSuccess(authoritative, agent, runId))
                     {
                         succeeded++;
+                        SaveAcceptedStrategy(agent, runId, pendingStrategyUpdate, degradedErrors);
                         logger.LogWarning(exception,
                             "Exhibition decision response was lost for {AgentId} ({RunId}); authoritative API state confirms success",
                             agent.Id, runId);
@@ -172,8 +180,26 @@ public sealed class ExhibitionCycle(
                 logger.LogError(exception, "Exhibition agent {AgentId} ({ModelId}) failed for {RunId}; no result was fabricated", agent.Id, agent.ModelId, runId);
             }
         }
-        health.Complete(DateTimeOffset.UtcNow, failures.Count, failures.FirstOrDefault()?.Error);
+        var healthError = failures.FirstOrDefault()?.Error ?? degradedErrors.FirstOrDefault();
+        health.Complete(DateTimeOffset.UtcNow, failures.Count + degradedErrors.Count, healthError);
         return new ExhibitionCycleResult(scheduledAt, succeeded, failures);
+    }
+
+    private void SaveAcceptedStrategy(AgentDefinition agent, string runId, StrategyUpdate? update, List<string> degradedErrors)
+    {
+        if (strategyMemoryStore is null || update is null) return;
+        try
+        {
+            strategyMemoryStore.Save(agent, runId, update);
+        }
+        catch (Exception exception)
+        {
+            var error = BoundError("Strategy memory write failed: " + exception.Message);
+            degradedErrors.Add(error);
+            logger.LogError(exception,
+                "Accepted exhibition decision {RunId} for {AgentId}, but durable strategy memory could not be updated",
+                runId, agent.Id);
+        }
     }
 
     private static string BoundError(string error)

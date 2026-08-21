@@ -23,6 +23,26 @@ public sealed class ExhibitionOptionsTests
     }
 
     [Theory]
+    [InlineData("relative/memory", "/dev/shm/aistocks-exhibition")]
+    [InlineData("/dev/shm/aistocks-exhibition", "/dev/shm/aistocks-exhibition")]
+    [InlineData("/dev/shm/aistocks-exhibition/memory", "/dev/shm/aistocks-exhibition")]
+    public void Validate_RejectsNonAbsoluteOrEphemeralStrategyMemory(string memoryRoot, string hermesRoot)
+    {
+        var options = new ExhibitionOptions
+        {
+            ApiBaseUrl = new Uri("https://api.example.test"),
+            InternalKey = new string('k', 32),
+            CopilotCredentialFile = "/run/secrets/copilot.json",
+            HermesHomeRoot = hermesRoot,
+            StrategyMemoryRoot = memoryRoot
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(options.Validate);
+
+        Assert.Contains("StrategyMemoryRoot", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("file:///tmp/search")]
     [InlineData("http://user:password@searxng:8080")]
     public void Validate_RejectsUnsafeSearchOrigins(string value)

@@ -17,12 +17,16 @@ public sealed record ExhibitionDecision(
     int Quantity,
     string Reason,
     decimal Confidence,
-    IReadOnlyList<EvidenceClaim> Evidence);
+    IReadOnlyList<EvidenceClaim> Evidence,
+    StrategyUpdate? StrategyUpdate = null);
 
 public sealed class ExhibitionDecisionParser
 {
     private static readonly HashSet<string> RootNames =
         ["agentId", "modelId", "action", "instrumentId", "quantity", "reason", "confidence", "evidence"];
+    private static readonly HashSet<string> StrategyNames =
+        ["philosophy", "researchPlan", "entryRules", "exitRules", "riskRules", "activeTheses", "lessons", "journalNote"];
+    private static readonly HashSet<string> ThesisNames = ["thesis", "invalidation"];
     private static readonly HashSet<string> EvidenceNames = ["url", "publishedAt", "exactExcerpt"];
 
     public ExhibitionDecision Parse(
@@ -62,8 +66,13 @@ public sealed class ExhibitionDecisionParser
                 MaxDepth = 12
             });
             var root = document.RootElement;
-            RequireShape(root, RootNames, "decision");
             RejectDuplicates(root);
+            if (root.ValueKind != JsonValueKind.Object) throw Invalid("decision must be an object.");
+            var rootProperties = root.EnumerateObject().ToArray();
+            if (rootProperties.Length is not (8 or 9) ||
+                rootProperties.Any(property => !RootNames.Contains(property.Name) && property.Name != "strategyUpdate") ||
+                RootNames.Any(name => !root.TryGetProperty(name, out _)))
+                throw Invalid("decision must contain exactly the documented properties.");
             var agentIdText = String(root, "agentId", 36);
             if (!Guid.TryParseExact(agentIdText, "D", out var agentId) || agentId != expectedAgent.Id ||
                 !StringComparer.Ordinal.Equals(String(root, "modelId", 128), expectedAgent.ModelId))
@@ -91,13 +100,57 @@ public sealed class ExhibitionDecisionParser
             }
             else if (instrument is null || !fixtureInstrumentIds.Contains(instrument) || quantity <= 0 || evidence.Count == 0)
                 throw Invalid("buy and sell require a current instrumentId, positive whole quantity, and verified evidence.");
-            return new ExhibitionDecision(agentId, expectedAgent.ModelId, action, instrument, quantity, reason, confidence, evidence);
+            var strategyUpdate = root.TryGetProperty("strategyUpdate", out var strategyElement)
+                ? ParseStrategyUpdate(strategyElement)
+                : null;
+            return new ExhibitionDecision(agentId, expectedAgent.ModelId, action, instrument, quantity, reason, confidence, evidence, strategyUpdate);
         }
         catch (ExhibitionDecisionException) { throw; }
-        catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException or EncoderFallbackException)
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException or EncoderFallbackException or InvalidDataException)
         {
             throw Invalid("Decision JSON is malformed or contains an invalid field.", exception);
         }
+    }
+
+    private static StrategyUpdate ParseStrategyUpdate(JsonElement element)
+    {
+        RequireShape(element, StrategyNames, "strategyUpdate");
+        var thesesElement = element.GetProperty("activeTheses");
+        if (thesesElement.ValueKind != JsonValueKind.Array) throw Invalid("activeTheses must be an array.");
+        var theses = new List<StrategyThesis>();
+        foreach (var item in thesesElement.EnumerateArray())
+        {
+            if (theses.Count >= 8) throw Invalid("activeTheses exceeds its item bound.");
+            RequireShape(item, ThesisNames, "active thesis");
+            theses.Add(new StrategyThesis(String(item, "thesis", 1_000), String(item, "invalidation", 1_000)));
+        }
+        var update = new StrategyUpdate(
+            String(element, "philosophy", 2_000),
+            ParseStringList(element.GetProperty("researchPlan"), "researchPlan"),
+            ParseStringList(element.GetProperty("entryRules"), "entryRules"),
+            ParseStringList(element.GetProperty("exitRules"), "exitRules"),
+            ParseStringList(element.GetProperty("riskRules"), "riskRules"),
+            theses,
+            ParseStringList(element.GetProperty("lessons"), "lessons"),
+            String(element, "journalNote", 1_000));
+        StrategyMemoryStore.ValidateUpdate(update);
+        return update;
+    }
+
+    private static IReadOnlyList<string> ParseStringList(JsonElement element, string name)
+    {
+        if (element.ValueKind != JsonValueKind.Array) throw Invalid($"{name} must be an array.");
+        var values = new List<string>();
+        foreach (var item in element.EnumerateArray())
+        {
+            if (values.Count >= 8 || item.ValueKind != JsonValueKind.String)
+                throw Invalid($"{name} exceeds its item bound or contains a non-string.");
+            var value = item.GetString()!;
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 500 || value.Contains('\0', StringComparison.Ordinal))
+                throw Invalid($"{name} contains an invalid item.");
+            values.Add(value);
+        }
+        return values;
     }
 
     private static byte[] ExtractSingleDecisionObject(string response, byte[] responseBytes)

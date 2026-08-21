@@ -214,6 +214,28 @@ public sealed class ExhibitionCycleTests
     }
 
     [Fact]
+    public async Task RunAsync_MemoryFailureAfterAcceptedDecisionDoesNotReplayOrRelabelTradeAndDegradesHealth()
+    {
+        var api = new FakeApi();
+        var invoker = new FakeInvoker { FailingAgentId = null, IncludeStrategyUpdate = true };
+        var memory = new FailingMemoryStore();
+        var health = new ExhibitionHealthState();
+        var cycle = new ExhibitionCycle(api, invoker, new FakeVerifier(), health,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ExhibitionCycle>.Instance, memory);
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(4, result.Succeeded);
+        Assert.Empty(result.Failures);
+        Assert.Equal(4, api.Posts.Count);
+        Assert.Equal(4, memory.SaveCalls);
+        Assert.All(invoker.InvocationCounts.Values, count => Assert.Equal(1, count));
+        Assert.DoesNotContain(api.Statuses, status => status.Contains("\"status\":\"failed\"", StringComparison.Ordinal));
+        Assert.Equal("degraded", health.Snapshot().Status);
+        Assert.Contains("strategy memory", health.Snapshot().LastError!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task RunAsync_DoesNotSplitSurrogatePairWhenBoundingFailureStatus()
     {
         var api = new FakeApi();
@@ -620,6 +642,7 @@ public sealed class ExhibitionCycleTests
         public bool AlternateEvidenceOnSecondInvocation { get; init; }
         public bool RejectedEvidenceSecondOnFirstInvocation { get; init; }
         public bool ReuseRejectedEvidenceOnSecondInvocation { get; init; }
+        public bool IncludeStrategyUpdate { get; init; }
         public List<Guid> Agents { get; } = [];
         public Dictionary<Guid, int> InvocationCounts { get; } = [];
         public Dictionary<Guid, List<string>> Prompts { get; } = [];
@@ -640,10 +663,13 @@ public sealed class ExhibitionCycleTests
             var evidence = RejectedEvidenceSecondOnFirstInvocation && InvocationCounts[agent.Id] == 1
                 ? "[{\"url\":\"https://example.com/news\",\"publishedAt\":\"2026-08-16T10:00:00Z\",\"exactExcerpt\":\"Exact public text\"},{\"url\":\"https://rejected.example/news\",\"publishedAt\":\"2026-08-16T10:00:00Z\",\"exactExcerpt\":\"Rejected public text\"}]"
                 : "[{\"url\":\"" + evidenceUrl + "\",\"publishedAt\":\"2026-08-16T10:00:00Z\",\"exactExcerpt\":\"Exact public text\"}]";
+            var strategyUpdate = IncludeStrategyUpdate
+                ? ",\"strategyUpdate\":{\"philosophy\":\"Evidence-led quality\",\"researchPlan\":[\"Read filings\"],\"entryRules\":[\"Require catalyst\"],\"exitRules\":[\"Exit on invalidation\"],\"riskRules\":[\"Bound size\"],\"activeTheses\":[{\"thesis\":\"Growth\",\"invalidation\":\"Revenue declines\"}],\"lessons\":[\"Prefer primary sources\"],\"journalNote\":\"Held while evidence was weak\"}"
+                : string.Empty;
             var output = (agent.Id == MalformedFirstAgentId && InvocationCounts[agent.Id] == 1) ||
                          (agent.Id == MalformedSecondAgentId && InvocationCounts[agent.Id] == 2)
                 ? "Web research completed, but this is not JSON."
-                : $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"{{Action}}","instrumentId":{{instrument}},"quantity":{{quantity}},"reason":"Assumed-fill paper decision","confidence":0.5,"evidence":{{evidence}}}""";
+                : $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"{{Action}}","instrumentId":{{instrument}},"quantity":{{quantity}},"reason":"Assumed-fill paper decision","confidence":0.5,"evidence":{{evidence}}{{strategyUpdate}}}""";
             return Task.FromResult(new ResearchExecutionResult(output, string.Empty, new InvocationProvenance
             {
                 AgentId = agent.Id,
@@ -663,6 +689,17 @@ public sealed class ExhibitionCycleTests
                 StandardOutputSha256 = new string('c', 64),
                 StandardErrorSha256 = new string('d', 64)
             }));
+        }
+    }
+
+    private sealed class FailingMemoryStore : IStrategyMemoryStore
+    {
+        public int SaveCalls { get; private set; }
+        public AgentStrategyMemory? Load(AgentDefinition agent) => null;
+        public void Save(AgentDefinition agent, string acceptedRunId, StrategyUpdate update)
+        {
+            SaveCalls++;
+            throw new IOException("strategy memory disk unavailable");
         }
     }
 

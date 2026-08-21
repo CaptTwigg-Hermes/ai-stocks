@@ -42,6 +42,10 @@ def test_dockge_compose_separates_and_hardens_services():
     assert "DATABASE_URL" in services["app"]["environment"]
     assert "DATABASE_URL" not in services["ui"]["environment"]
     assert "HERMES_HOME" not in services["ui"]["environment"]
+    assert services["exhibition"]["environment"]["AI_EXHIBITION_STRATEGY_MEMORY_PATH"] == "/data/strategy-memory"
+    assert "exhibition-strategy-memory:/data/strategy-memory" in services["exhibition"]["volumes"]
+    assert "exhibition-strategy-memory" in compose["volumes"]
+    assert all("/data/strategy-memory" not in mount for mount in services["exhibition"].get("tmpfs", []))
     repository = "${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}"
     version = "${AISTOCKS_IMAGE_VERSION:-latest}"
     targets = {

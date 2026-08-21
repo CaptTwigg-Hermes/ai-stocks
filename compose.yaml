@@ -158,12 +158,14 @@ services:
       AI_EXHIBITION_KEY: ${AI_EXHIBITION_KEY:?set a random AI exhibition internal key}
       AI_EXHIBITION_INTERVAL_SECONDS: ${AI_EXHIBITION_INTERVAL_SECONDS:-3600}
       HERMES_CREDENTIAL_FILE: /run/hermes-credentials/copilot.env
+      AI_EXHIBITION_STRATEGY_MEMORY_PATH: /data/strategy-memory
       SEARXNG_URL: http://search:8080
       TZ: Europe/Stockholm
       SEQ_SERVER_URL: ${SEQ_SERVER_URL:-http://192.168.50.2:5341}
       SEQ_API_KEY: ${SEQ_API_KEY:-}
     volumes:
       - ${HERMES_COPILOT_ENV_FILE:?set a mode-0600 Copilot-only Hermes env file}:/run/hermes-credentials/copilot.env:ro
+      - exhibition-strategy-memory:/data/strategy-memory
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=1770
     healthcheck:
@@ -344,3 +346,6 @@ services:
 
 networks:
   egress: {}
+
+volumes:
+  exhibition-strategy-memory: {}
