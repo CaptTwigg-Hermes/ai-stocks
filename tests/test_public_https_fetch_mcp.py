@@ -299,12 +299,23 @@ def test_conflicting_verifier_timestamps_make_source_ineligible():
     assert result["ineligibility_reason"] == "ambiguous-publication-time"
 
 
-def test_html_without_css_structured_representation_is_discovery_only():
+def test_html_without_css_exposes_verifier_aligned_visible_text():
     module = load_module()
     document = b'''<html><head><meta name="datePublished" content="2026-08-19T08:00:00Z"></head>
-    <body><p hidden>Concealed catalyst.</p><p>Visible catalyst.</p></body></html>'''
+    <body><p>Visible catalyst.</p></body></html>'''
     result = module.extract_document("https://example.com/news", "text/html", document)
-    assert "Visible catalyst." in result["discovery_text"]
+    assert result["discovery_text"] == "Visible catalyst."
+    assert result["evidence_candidates"] == ["Visible catalyst."]
+    assert result["verifier_publication_time"] == "2026-08-19T08:00:00Z"
+    assert result["verifier_eligible"] is True
+    assert result["ineligibility_reason"] is None
+
+
+def test_html_without_css_rejects_transform_unstable_visible_text():
+    module = load_module()
+    document = b'''<html><head><meta name="datePublished" content="2026-08-19T08:00:00Z"></head>
+    <body><p>A\x1cB</p></body></html>'''
+    result = module.extract_document("https://example.com/news", "text/html", document)
     assert result["evidence_candidates"] == []
     assert result["verifier_eligible"] is False
 

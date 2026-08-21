@@ -167,6 +167,7 @@ class _DocumentParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self._blocked_depth = 0
         self.visible: list[str] = []
+        self.evidence_visible: list[str] = []
         self.publication: list[str] = []
         self.structured_blocks: list[str] = []
         self._structured_depth = 0
@@ -175,6 +176,8 @@ class _DocumentParser(HTMLParser):
         self.has_external_stylesheet = False
         self.has_css = False
         self.has_unsupported_visibility = False
+        self.has_visibility_controls = False
+        self.has_structured_metadata = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         lower = tag.lower()
@@ -196,10 +199,12 @@ class _DocumentParser(HTMLParser):
                   lower == "details" and "open" not in names)
         if hidden:
             self._hidden_depth += 1
+            self.has_visibility_controls = True
         if lower not in VOID_ELEMENTS:
             self._element_frames.append((lower, hidden))
         if lower == "script" and values.get("type", "") == "application/ld+json":
             self._structured_depth += 1
+            self.has_structured_metadata = True
         key = (values["property"] if "property" in values else
                values["name"] if "name" in values else
                values.get("itemprop", "")).lower()
@@ -231,6 +236,10 @@ class _DocumentParser(HTMLParser):
             value = re.sub(r"\s+", " ", html.unescape(data)).strip()
             if value:
                 self.visible.append(value)
+            if not any(unicodedata.category(character).startswith("C") for character in data):
+                evidence_value = DOTNET_WHITESPACE_RE.sub(" ", data).strip(" ")
+                if evidence_value:
+                    self.evidence_visible.append(evidence_value)
 
 
 def extract_document(url: str, content_type: str, body: bytes) -> dict[str, object]:
@@ -257,14 +266,18 @@ def extract_document(url: str, content_type: str, body: bytes) -> dict[str, obje
     structured_publication: list[str] = []
     malformed_structured_metadata = False
     discovery_segments: list[str] = []
+    evidence_segments: list[str] = []
     has_external_stylesheet = False
     has_css = False
     has_unsupported_visibility = False
+    has_visibility_controls = False
+    has_structured_metadata = False
     if media_type in {"text/html", "application/xhtml+xml"}:
         parser = _DocumentParser()
         parser.feed(text)
         visible = "\n".join(parser.visible)
         discovery_segments = parser.visible
+        evidence_segments = parser.evidence_visible
         publication = [
             value[:MAXIMUM_PUBLICATION_ITEM_CHARACTERS]
             for value in dict.fromkeys(parser.publication)
@@ -272,6 +285,8 @@ def extract_document(url: str, content_type: str, body: bytes) -> dict[str, obje
         has_external_stylesheet = parser.has_external_stylesheet
         has_css = parser.has_css
         has_unsupported_visibility = parser.has_unsupported_visibility
+        has_visibility_controls = parser.has_visibility_controls
+        has_structured_metadata = parser.has_structured_metadata
         for block in parser.structured_blocks:
             try:
                 value = _load_verifier_json(block)
@@ -296,10 +311,18 @@ def extract_document(url: str, content_type: str, body: bytes) -> dict[str, obje
         candidates = structured
         eligible = bool(candidates)
         reason = None if eligible else "external-stylesheet-without-structured-article-text"
-    else:
+    elif has_unsupported_visibility or has_visibility_controls:
+        candidates = []
+        eligible = False
+        reason = "unsupported-visibility-semantics"
+    elif has_structured_metadata:
         candidates = []
         eligible = False
         reason = "no-verifier-aligned-structured-representation"
+    else:
+        candidates = _bounded_unique_text(evidence_segments, MAXIMUM_VISIBLE_CHARACTERS)
+        eligible = bool(candidates)
+        reason = None if eligible else "no-verifier-aligned-visible-text"
     return {
         "url": url,
         "content_type": content_type,
