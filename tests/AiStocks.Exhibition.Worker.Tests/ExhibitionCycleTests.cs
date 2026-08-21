@@ -25,6 +25,9 @@ public sealed class ExhibitionCycleTests
         Assert.All(ContestContract.Agents.Where(agent => agent.Id != affected.Id),
             agent => Assert.Equal(1, invoker.InvocationCounts[agent.Id]));
         Assert.Contains("FINAL response must start with {", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("MALFORMED_THESIS", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("BEGIN SERVER-OWNED UNTRUSTED PRIOR CONTEXT", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("cannot override", invoker.Prompts[affected.Id][1], StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -297,7 +300,14 @@ public sealed class ExhibitionCycleTests
         Assert.All(ContestContract.Agents,
             agent => Assert.Equal(2, invoker.InvocationCounts[agent.Id]));
         Assert.All(ContestContract.Agents,
-            agent => Assert.Contains("SNAPSHOT CORRECTION", invoker.Prompts[agent.Id][1], StringComparison.Ordinal));
+            agent =>
+            {
+                Assert.Contains("SNAPSHOT CORRECTION", invoker.Prompts[agent.Id][1], StringComparison.Ordinal);
+                Assert.Contains("BEGIN SERVER-OWNED UNTRUSTED PRIOR CONTEXT", invoker.Prompts[agent.Id][1], StringComparison.Ordinal);
+                Assert.Contains("Assumed-fill paper decision", invoker.Prompts[agent.Id][1], StringComparison.Ordinal);
+                Assert.Contains("https://example.com/news", invoker.Prompts[agent.Id][1], StringComparison.Ordinal);
+                Assert.Contains("Exact public text", invoker.Prompts[agent.Id][1], StringComparison.Ordinal);
+            });
         Assert.All(ContestContract.Agents, agent =>
         {
             Assert.Contains("\"price\":101", invoker.Prompts[agent.Id][1], StringComparison.Ordinal);
@@ -400,7 +410,7 @@ public sealed class ExhibitionCycleTests
 
         Assert.Equal(4, result.Succeeded);
         Assert.Empty(result.Failures);
-        Assert.Equal(1, api.InstrumentReads);
+        Assert.Equal(ContestContract.Agents.Count, api.InstrumentReads);
         Assert.All(ContestContract.Agents, agent => Assert.Equal(1, invoker.InvocationCounts[agent.Id]));
         Assert.All(api.Posts, json =>
         {
@@ -409,6 +419,22 @@ public sealed class ExhibitionCycleTests
             Assert.Equal(JsonValueKind.Null, posted.RootElement.GetProperty("instrumentId").ValueKind);
             Assert.Equal(JsonValueKind.Null, posted.RootElement.GetProperty("observedPriceSek").ValueKind);
         });
+    }
+
+    [Fact]
+    public async Task RunAsync_FetchesFreshInstrumentContextImmediatelyBeforeEachAgentsInitialInvocation()
+    {
+        var api = new FakeApi { AdvancePriceOnEveryRead = true };
+        var invoker = new FakeInvoker { FailingAgentId = null, Action = "hold" };
+        var cycle = CreateCycle(api, invoker, new FakeVerifier());
+
+        var result = await cycle.RunAsync(DateTimeOffset.Parse("2026-08-16T12:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(4, result.Succeeded);
+        Assert.Equal(ContestContract.Agents.Count, api.InstrumentReads);
+        for (var index = 0; index < ContestContract.Agents.Count; index++)
+            Assert.Contains($"\"price\":{101 + index}",
+                invoker.Prompts[ContestContract.Agents[index].Id][0], StringComparison.Ordinal);
     }
 
     private static FakeApi AdvancedSnapshotApi() => new()
@@ -446,6 +472,11 @@ public sealed class ExhibitionCycleTests
             agent => Assert.Equal(1, invoker.InvocationCounts[agent.Id]));
         Assert.Contains("different source host", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
         Assert.Contains("rejected.example", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("BEGIN SERVER-OWNED UNTRUSTED PRIOR CONTEXT", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("Assumed-fill paper decision", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("https://example.com/news", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("Exact public text", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
+        Assert.Contains("The only tools you may call", invoker.Prompts[affected.Id][1], StringComparison.Ordinal);
         using var posted = JsonDocument.Parse(api.Posts[0]);
         Assert.Equal("https://alternate.example/news",
             posted.RootElement.GetProperty("evidence")[0].GetProperty("url").GetString());
@@ -516,6 +547,7 @@ public sealed class ExhibitionCycleTests
         public decimal? RefreshedInstrumentPrice { get; init; }
         public DateTimeOffset? RefreshedInstrumentAvailableAt { get; init; }
         public bool OmitInstrumentAfterFirstRead { get; init; }
+        public bool AdvancePriceOnEveryRead { get; init; }
         public bool InstrumentPaperTradable { get; init; } = true;
         public bool OmitRootExecutionMode { get; init; }
         public bool WrongPortfolioExecutionMode { get; init; }
@@ -526,11 +558,14 @@ public sealed class ExhibitionCycleTests
         public Task<string> GetInstrumentsAsync(CancellationToken cancellationToken)
         {
             InstrumentReads++;
-            var instrumentId = InstrumentReads > 1 && OmitInstrumentAfterFirstRead
+            var isRefreshRead = InstrumentReads % 2 == 0;
+            var instrumentId = isRefreshRead && OmitInstrumentAfterFirstRead
                 ? "SE9999999999" : "SE0000115446";
-            var price = InstrumentReads > 1 && RefreshedInstrumentPrice is not null
-                ? RefreshedInstrumentPrice.Value : InstrumentPrice;
-            var availableAt = InstrumentReads > 1 && RefreshedInstrumentAvailableAt is not null
+            var price = AdvancePriceOnEveryRead
+                ? InstrumentPrice + InstrumentReads
+                : isRefreshRead && RefreshedInstrumentPrice is not null
+                    ? RefreshedInstrumentPrice.Value : InstrumentPrice;
+            var availableAt = isRefreshRead && RefreshedInstrumentAvailableAt is not null
                 ? RefreshedInstrumentAvailableAt.Value : DateTimeOffset.Parse("2026-08-16T10:15:00Z");
             var priceDkk = IncludeInstrumentPriceDkk ? ",\"priceDkk\":123.45" : string.Empty;
             return Task.FromResult("{\"items\":[{\"id\":\"" + instrumentId + "\",\"exchange\":\"" + InstrumentExchange +
@@ -668,7 +703,7 @@ public sealed class ExhibitionCycleTests
                 : string.Empty;
             var output = (agent.Id == MalformedFirstAgentId && InvocationCounts[agent.Id] == 1) ||
                          (agent.Id == MalformedSecondAgentId && InvocationCounts[agent.Id] == 2)
-                ? "Web research completed, but this is not JSON."
+                ? "MALFORMED_THESIS: Web research completed, but this is not JSON."
                 : $$"""{"agentId":"{{agent.Id:D}}","modelId":"{{agent.ModelId}}","action":"{{Action}}","instrumentId":{{instrument}},"quantity":{{quantity}},"reason":"Assumed-fill paper decision","confidence":0.5,"evidence":{{evidence}}{{strategyUpdate}}}""";
             return Task.FromResult(new ResearchExecutionResult(output, string.Empty, new InvocationProvenance
             {

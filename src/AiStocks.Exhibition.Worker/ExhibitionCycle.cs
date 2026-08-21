@@ -55,14 +55,17 @@ public sealed class ExhibitionCycle(
 
     public async Task<ExhibitionCycleResult> RunAsync(DateTimeOffset scheduledAt, CancellationToken cancellationToken)
     {
-        var instrumentsJson = await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
         var progressJson = await api.GetProgressAsync(cancellationToken).ConfigureAwait(false);
-        var observations = ReadDelayedObservations(instrumentsJson);
+        // Validate the first snapshot before publishing any run statuses, preserving
+        // fail-closed cycle behavior while avoiding one stale snapshot for all agents.
+        var firstInstrumentsJson = await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
+        var firstObservations = ReadDelayedObservations(firstInstrumentsJson);
         var failures = new List<ExhibitionAgentFailure>();
         var degradedErrors = new List<string>();
         var succeeded = 0;
-        foreach (var agent in ContestContract.Agents)
+        for (var agentIndex = 0; agentIndex < ContestContract.Agents.Count; agentIndex++)
         {
+            var agent = ContestContract.Agents[agentIndex];
             var runId = CreateRunId(scheduledAt, agent);
             StrategyUpdate? pendingStrategyUpdate = null;
             try
@@ -71,6 +74,12 @@ public sealed class ExhibitionCycle(
                     .ConfigureAwait(false);
                 await api.PostStatusAsync(StatusJson(runId, agent, "running", null, DateTimeOffset.UtcNow), cancellationToken)
                     .ConfigureAwait(false);
+                var instrumentsJson = agentIndex == 0
+                    ? firstInstrumentsJson
+                    : await api.GetInstrumentsAsync(cancellationToken).ConfigureAwait(false);
+                var observations = agentIndex == 0
+                    ? firstObservations
+                    : ReadDelayedObservations(instrumentsJson);
                 var memory = strategyMemoryStore?.Load(agent);
                 var prompt = ExhibitionPromptBuilder.Build(agent, runId, instrumentsJson, progressJson, memory);
                 var (execution, decision, verified, correctionUsed) = await InvokeVerifiedDecisionAsync(
@@ -89,9 +98,10 @@ public sealed class ExhibitionCycle(
                     {
                         if (correctionUsed)
                             throw new InvalidOperationException("Delayed snapshot advanced after the decision's single corrective invocation.");
-                        var refreshedPrompt = ExhibitionPromptBuilder.Build(agent, runId, refreshedJson, progressJson);
+                        var refreshedPrompt = ExhibitionPromptBuilder.Build(agent, runId, refreshedJson, progressJson, memory);
                         execution = await invoker.InvokeAsync(agent,
-                                ExhibitionPromptBuilder.RetryAfterAdvancedSnapshot(refreshedPrompt), cancellationToken)
+                                ExhibitionPromptBuilder.RetryAfterAdvancedSnapshot(
+                                    refreshedPrompt, decision, verified), cancellationToken)
                             .ConfigureAwait(false);
                         decision = new ExhibitionDecisionParser().Parse(execution.StandardOutput, agent, refreshed);
                         pendingStrategyUpdate = decision.StrategyUpdate;
@@ -229,7 +239,8 @@ public sealed class ExhibitionCycle(
             logger.LogWarning(exception,
                 "Exhibition agent {AgentId} returned an invalid final response for {RunId}; retrying once with the strict parser unchanged",
                 agent.Id, runId);
-            var retryPrompt = ExhibitionPromptBuilder.RetryAfterInvalidFinalResponse(prompt);
+            var retryPrompt = ExhibitionPromptBuilder.RetryAfterInvalidFinalResponse(
+                prompt, execution.StandardOutput);
             execution = await invoker.InvokeAsync(agent, retryPrompt, cancellationToken).ConfigureAwait(false);
             decision = parser.Parse(execution.StandardOutput, agent, observations);
             return (execution, decision,
@@ -248,7 +259,7 @@ public sealed class ExhibitionCycle(
                 "Exhibition agent {AgentId} supplied rejected evidence from {Host} for {RunId}; retrying once with another source host",
                 agent.Id, rejectedHost, runId);
             var retryPrompt = ExhibitionPromptBuilder.RetryAfterRejectedEvidence(
-                prompt, rejectedHost, decision.InstrumentId ?? "hold");
+                prompt, rejectedHost, decision, exception.VerifiedEvidence);
             execution = await invoker.InvokeAsync(agent, retryPrompt, cancellationToken).ConfigureAwait(false);
             decision = parser.Parse(execution.StandardOutput, agent, observations);
             if (decision.Evidence.Any(claim =>
@@ -272,16 +283,20 @@ public sealed class ExhibitionCycle(
             }
             catch (EvidenceVerificationException exception)
             {
-                throw new RejectedEvidenceException(claim.Url.IdnHost, exception);
+                throw new RejectedEvidenceException(claim.Url.IdnHost, verified.ToArray(), exception);
             }
         }
         return verified;
     }
 
-    private sealed class RejectedEvidenceException(string host, EvidenceVerificationException innerException)
+    private sealed class RejectedEvidenceException(
+        string host,
+        IReadOnlyList<VerifiedEvidence> verifiedEvidence,
+        EvidenceVerificationException innerException)
         : Exception(innerException.Message, innerException)
     {
         public string Host { get; } = host;
+        public IReadOnlyList<VerifiedEvidence> VerifiedEvidence { get; } = verifiedEvidence;
     }
 
     private static string StatusJson(string runId, AgentDefinition agent, string status, string? error, DateTimeOffset occurredAt) =>

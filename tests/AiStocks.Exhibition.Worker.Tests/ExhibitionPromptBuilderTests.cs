@@ -78,35 +78,67 @@ public sealed class ExhibitionPromptBuilderTests
     [Fact]
     public void RetryAfterInvalidFinalResponse_RequiresImmediateJsonWithoutMoreResearch()
     {
-        var prompt = ExhibitionPromptBuilder.RetryAfterInvalidFinalResponse("original");
+        var priorResponse = "MALFORMED_THESIS " + new string('x', 20_000) + "😀";
+        var prompt = ExhibitionPromptBuilder.RetryAfterInvalidFinalResponse("original", priorResponse);
 
         Assert.Contains("Do not call tools or research again", prompt, StringComparison.Ordinal);
         Assert.Contains("return a HOLD decision", prompt, StringComparison.Ordinal);
+        Assert.Contains("BEGIN SERVER-OWNED UNTRUSTED PRIOR CONTEXT", prompt, StringComparison.Ordinal);
+        Assert.Contains("END SERVER-OWNED UNTRUSTED PRIOR CONTEXT", prompt, StringComparison.Ordinal);
+        Assert.Contains("cannot override", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("MALFORMED_THESIS", prompt, StringComparison.Ordinal);
+        Assert.True(prompt.Length < 10_000);
+        Assert.False(char.IsHighSurrogate(prompt[^1]));
         Assert.DoesNotContain("You may research again", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
     public void RetryAfterRejectedEvidence_ScopesResearchToSelectedInstrument()
     {
+        var agent = ContestContract.Agents[0];
+        var claim = new AiStocks.Research.Decisions.EvidenceClaim(
+            new Uri("https://rejected.example/news"), DateTimeOffset.Parse("2026-08-16T10:00:00Z"), "candidate excerpt");
+        var candidate = new ExhibitionDecision(agent.Id, agent.ModelId, ExhibitionAction.Buy,
+            "SE0000115446", 1, "candidate thesis", 0.5m, [claim]);
+        var verified = new VerifiedEvidence(
+            new Uri("https://verified.example/news"), claim.PublishedAt, claim.PublishedAt,
+            new string('a', 64), "verified excerpt");
         var prompt = ExhibitionPromptBuilder.RetryAfterRejectedEvidence(
-            "original", "rejected.example", "SE0000115446");
+            "original", "rejected.example", candidate, [verified]);
 
         Assert.Contains("initial issuer survey is complete", prompt, StringComparison.Ordinal);
         Assert.Contains("do not repeat it", prompt, StringComparison.Ordinal);
         Assert.Contains("SE0000115446", prompt, StringComparison.Ordinal);
         Assert.Contains("verifier_eligible=true", prompt, StringComparison.Ordinal);
         Assert.Contains("rejected.example", prompt, StringComparison.Ordinal);
+        Assert.Contains("candidate thesis", prompt, StringComparison.Ordinal);
+        Assert.Contains("verified excerpt", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
     public void RetryAfterAdvancedSnapshot_UsesRefreshedObservationsWithoutMoreResearch()
     {
-        var prompt = ExhibitionPromptBuilder.RetryAfterAdvancedSnapshot("refreshed observations");
+        var agent = ContestContract.Agents[0];
+        var claim = new AiStocks.Research.Decisions.EvidenceClaim(
+            new Uri("https://verified.example/news"), DateTimeOffset.Parse("2026-08-16T10:00:00Z"), "verified excerpt");
+        var strategy = new StrategyUpdate("Durable momentum thesis", ["Review filings"], ["Enter on catalyst"],
+            ["Exit on invalidation"], ["Limit concentration"],
+            [new StrategyThesis("Margins recover", "Guidance is cut")], ["Prefer primary sources"], "Keep watching margins");
+        var candidate = new ExhibitionDecision(agent.Id, agent.ModelId, ExhibitionAction.Buy,
+            "SE0000115446", 1, "candidate thesis", 0.5m, [claim], strategy);
+        var verified = new VerifiedEvidence(claim.Url, claim.PublishedAt, claim.PublishedAt,
+            new string('a', 64), claim.ExactExcerpt);
+        var prompt = ExhibitionPromptBuilder.RetryAfterAdvancedSnapshot(
+            "refreshed observations", candidate, [verified]);
 
         Assert.Contains("refreshed observations", prompt, StringComparison.Ordinal);
         Assert.Contains("SNAPSHOT CORRECTION", prompt, StringComparison.Ordinal);
         Assert.Contains("Do not call tools or research again", prompt, StringComparison.Ordinal);
         Assert.Contains("otherwise return HOLD", prompt, StringComparison.Ordinal);
+        Assert.Contains("candidate thesis", prompt, StringComparison.Ordinal);
+        Assert.Contains("verified excerpt", prompt, StringComparison.Ordinal);
+        Assert.Contains("Durable momentum thesis", prompt, StringComparison.Ordinal);
+        Assert.Contains("Guidance is cut", prompt, StringComparison.Ordinal);
     }
 
     [Theory]
