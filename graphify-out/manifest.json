@@ -90,8 +90,8 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1786198431.432527,
-    "ast_hash": "6ffea694c7135cb18db6a2299d9ac4cd",
+    "mtime": 1787254347.947454,
+    "ast_hash": "08af810eb625dbda621e0ad5a011d13b",
     "semantic_hash": ""
   },
   "README.md": {
@@ -100,8 +100,8 @@
     "semantic_hash": ""
   },
   "compose.yaml": {
-    "mtime": 1787253120.5993423,
-    "ast_hash": "6881c0962c10c92dc1def24badd1c53f",
+    "mtime": 1787305915.0759594,
+    "ast_hash": "d737ef27b7f30ae7255c0658e427a365",
     "semantic_hash": ""
   },
   "docs/acceptance-contract.md": {
@@ -155,8 +155,8 @@
     "semantic_hash": ""
   },
   "scripts/prove_no_broker.py": {
-    "mtime": 1787253120.6113427,
-    "ast_hash": "dbe2f1481dbc1f22c404241df2fd7ee1",
+    "mtime": 1787255889.4498343,
+    "ast_hash": "7349e0e906b45565c36a9d1c642380c8",
     "semantic_hash": ""
   },
   "tests/test_auth.py": {
@@ -330,7 +330,7 @@
     "semantic_hash": ""
   },
   "AiStocks.slnx": {
-    "mtime": 1787253203.3569276,
+    "mtime": 1787254365.2437978,
     "ast_hash": "f6857d3808dd0158a5a3c3a4d807a54f",
     "semantic_hash": ""
   },
@@ -350,8 +350,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Collector/Program.cs": {
-    "mtime": 1787253278.4743662,
-    "ast_hash": "4fc59942814abae2056d7cc294ef3b0e",
+    "mtime": 1787255736.9149058,
+    "ast_hash": "2858125d3252c0c16764cc7c5c0b89ae",
     "semantic_hash": ""
   },
   "src/AiStocks.Collector/Properties/launchSettings.json": {
@@ -795,8 +795,8 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Web.Tests/CloudflareAccessValidatorTests.cs": {
-    "mtime": 1786435178.840843,
-    "ast_hash": "c7f348d18f2b85bf9c6e1f72cdef0df4",
+    "mtime": 1787253553.027658,
+    "ast_hash": "199869a762d4d2389c69a5462dc4f9f5",
     "semantic_hash": ""
   },
   "tests/AiStocks.Web.Tests/DashboardApplicationTests.cs": {
@@ -830,8 +830,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Collector/PostgresCollectorPersistence.cs": {
-    "mtime": 1787253120.6153429,
-    "ast_hash": "ced27154b1ed0701bd9cda82af024525",
+    "mtime": 1787255728.066736,
+    "ast_hash": "2a1b3087e76e4d9190b32eb20f859180",
     "semantic_hash": ""
   },
   "src/AiStocks.Persistence/Migrations/004_market_runtime.sql": {
@@ -1015,8 +1015,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Ui/Program.cs": {
-    "mtime": 1787253278.4743662,
-    "ast_hash": "8e65fd8a3f710ee1903c42977fc01179",
+    "mtime": 1787255403.7043965,
+    "ast_hash": "84d26e5a72cfe6468db5555da23c97a0",
     "semantic_hash": ""
   },
   "src/AiStocks.Ui/packages.lock.json": {
@@ -1095,23 +1095,23 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionCycle.cs": {
-    "mtime": 1787253120.6153429,
-    "ast_hash": "c3edff3f35bbeed7ed5762b7dd68883b",
+    "mtime": 1787305953.4527488,
+    "ast_hash": "0996310d636b78d06df06a7a46127e1d",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionDecisionParser.cs": {
-    "mtime": 1787253120.6153429,
-    "ast_hash": "993a4fca472531581ac21a721295b2ac",
+    "mtime": 1787305915.0759594,
+    "ast_hash": "ee555f233f22d3f2da73ed59de964edc",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionOptions.cs": {
-    "mtime": 1787253120.6153429,
-    "ast_hash": "e18012ac17ed040a04e2b8a495fcf8d3",
+    "mtime": 1787305915.0759594,
+    "ast_hash": "1ca6d620b585bd2b11a2d0dfadd35a89",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionPromptBuilder.cs": {
-    "mtime": 1787253120.6153429,
-    "ast_hash": "1ede53365614fa16be021413776f4954",
+    "mtime": 1787306021.718153,
+    "ast_hash": "96300a9bc7176d00ca3179457715712a",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/ExhibitionSchedulerService.cs": {
@@ -1125,8 +1125,8 @@
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/Program.cs": {
-    "mtime": 1787253120.6153429,
-    "ast_hash": "9908f00dbedfb690b60576c29a8fafbf",
+    "mtime": 1787305915.0799596,
+    "ast_hash": "d1117904bc2bdd2e89ab4f56c193fc7c",
     "semantic_hash": ""
   },
   "src/AiStocks.Exhibition.Worker/packages.lock.json": {
@@ -1150,23 +1150,23 @@
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionCycleTests.cs": {
-    "mtime": 1787253120.6153429,
-    "ast_hash": "d8fca74d843e27aff07860696d804a4a",
+    "mtime": 1787305953.6287525,
+    "ast_hash": "e7731bde644c96f494449519178ea138",
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionDecisionParserTests.cs": {
-    "mtime": 1787253120.6153429,
-    "ast_hash": "265e223131c5ede336e57bbd1667e75a",
+    "mtime": 1787305915.0799596,
+    "ast_hash": "4da909930cbeb69f97db39c02128a360",
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionOptionsTests.cs": {
-    "mtime": 1787253120.6153429,
-    "ast_hash": "e6d63b75b693dc9d5fd883ca881f8658",
+    "mtime": 1787305915.0799596,
+    "ast_hash": "35fe8dfaec3602c8fac43da022443d9e",
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/ExhibitionPromptBuilderTests.cs": {
-    "mtime": 1787253120.6153429,
-    "ast_hash": "c31b67f36a3b49845b14d7ddf4962b69",
+    "mtime": 1787305994.1375859,
+    "ast_hash": "0bcfadf2f58ca6cf8998854ed918ef03",
     "semantic_hash": ""
   },
   "tests/AiStocks.Exhibition.Worker.Tests/packages.lock.json": {
@@ -1210,18 +1210,13 @@
     "semantic_hash": ""
   },
   "scripts/public_https_fetch_mcp.py": {
-    "mtime": 1787253120.6113427,
-    "ast_hash": "a2c9839092b6abb9c2ec2a4af3d1fde7",
+    "mtime": 1787305915.0679593,
+    "ast_hash": "0f61c00f3be1ba136e1aa57fbe2d8231",
     "semantic_hash": ""
   },
   "tests/test_public_https_fetch_mcp.py": {
-    "mtime": 1787253120.6193428,
-    "ast_hash": "9400ac66ebd813989a60f865a217fad2",
-    "semantic_hash": ""
-  },
-  "tests/test_release_artifacts.py": {
-    "mtime": 1787253120.6193428,
-    "ast_hash": "399de09949342f72e0332a478caa20a8",
+    "mtime": 1787305915.0679593,
+    "ast_hash": "00bf06f6dd58deaee149155e05ec5766",
     "semantic_hash": ""
   },
   "src/AiStocks.Api/PostgresPreviewRaceStatePersistence.cs": {
@@ -1322,6 +1317,31 @@
   ".hermes/plans/2026-08-10_144600-ai-stocks-global-human-platform.md": {
     "mtime": 1786373903.11627,
     "ast_hash": "79495cee4814372c529113bb23d5b25f",
+    "semantic_hash": ""
+  },
+  "src/AiStocks.Exhibition.Worker/StrategyMemoryStore.cs": {
+    "mtime": 1787305915.0799596,
+    "ast_hash": "4b229f9613e7ef9c9bef6a57cc88b026",
+    "semantic_hash": ""
+  },
+  "tests/AiStocks.Exhibition.Worker.Tests/StrategyMemoryStoreTests.cs": {
+    "mtime": 1787305915.0799596,
+    "ast_hash": "ab82447675ad30471f75b2f042d6fade",
+    "semantic_hash": ""
+  },
+  "tests/AiStocks.Persistence.Tests/CollectorReadinessWindowTests.cs": {
+    "mtime": 1787255708.6823637,
+    "ast_hash": "a1f4613b522b3b9b3b7326a10d4c2af3",
+    "semantic_hash": ""
+  },
+  "tests/test_solution_completeness.py": {
+    "mtime": 1787255910.2062328,
+    "ast_hash": "ef91ea8973906593f468021b93f31486",
+    "semantic_hash": ""
+  },
+  "tests/test_ui_trade_route.py": {
+    "mtime": 1787255910.2062328,
+    "ast_hash": "50ed2b06cc20e111fc4dd9fb31f0e2f0",
     "semantic_hash": ""
   }
 }
