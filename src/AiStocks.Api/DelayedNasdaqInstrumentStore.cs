@@ -29,6 +29,20 @@ public sealed class DelayedNasdaqInstrumentStore
 
     public InstrumentListDto Search(string? query)
     {
+        var snapshot = CurrentSnapshot();
+        var normalized = query?.Trim() ?? string.Empty;
+        var items = snapshot.Items
+            .Where(item => normalized.Length == 0 ||
+                item.Symbol.Contains(normalized, StringComparison.OrdinalIgnoreCase) ||
+                item.Name.Contains(normalized, StringComparison.OrdinalIgnoreCase) ||
+                item.Id.Contains(normalized, StringComparison.OrdinalIgnoreCase))
+            .Take(20)
+            .ToArray();
+        return new(items, snapshot.DataMode);
+    }
+
+    public InstrumentListDto CurrentSnapshot()
+    {
         var asOf = clock.GetUtcNow();
         var archive = new ImmutableArchive(archivePath);
         var firds = new DurableFirdsStore(Path.Combine(archivePath, "firds-state.json")).LoadVerified();
@@ -68,14 +82,8 @@ public sealed class DelayedNasdaqInstrumentStore
             }
         }
 
-        var normalized = query?.Trim() ?? string.Empty;
         var items = observations.Values
-            .Where(item => normalized.Length == 0 ||
-                item.Instrument.OrderBookId.Contains(normalized, StringComparison.OrdinalIgnoreCase) ||
-                item.Instrument.Name.Contains(normalized, StringComparison.OrdinalIgnoreCase) ||
-                item.Instrument.Isin.Contains(normalized, StringComparison.OrdinalIgnoreCase))
             .OrderBy(item => item.Instrument.OrderBookId, StringComparer.Ordinal)
-            .Take(20)
             .Select(item => new InstrumentDto(item.Instrument.Isin, item.Instrument.OrderBookId,
                 item.Instrument.Name, "XSTO", "Sweden", "SEK", item.Trade.Price, PriceDkk: null,
                 IsPreviewPrice: false, item.Trade.ExecutedAt, item.Trade.AvailableAt, item.Source,

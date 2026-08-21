@@ -259,7 +259,7 @@ else if (localAuth)
     if (aiExhibitionMode)
         api.MapGet("/leaderboard", (PreviewRaceStore store, DelayedNasdaqInstrumentStore market) =>
         {
-            var snapshot = market.Search(null);
+            var snapshot = market.CurrentSnapshot();
             return Results.Ok(store.AiLeaderboard(snapshot));
         });
     else
@@ -269,7 +269,7 @@ else if (localAuth)
     {
         api.MapGet("/ai-progress", (PreviewRaceStore store, DelayedNasdaqInstrumentStore market) =>
         {
-            var snapshot = market.Search(null);
+            var snapshot = market.CurrentSnapshot();
             return Results.Ok(store.AiProgress(snapshot));
         });
         app.MapPost("/internal/preview/ai-status", (AiStatusRequestDto request, PreviewRaceStore store, HttpContext context) =>
@@ -292,7 +292,7 @@ else if (localAuth)
             if (!ValidSecret(context, aiExhibitionKey!)) return Results.Unauthorized();
             try
             {
-                var snapshot = market.Search(null);
+                var snapshot = market.CurrentSnapshot();
                 var submission = store.SubmitAi(request, snapshot);
                 return submission.Replayed ? Results.Ok(submission.Decision) : Results.Created("/api/v1/ai-progress", submission.Decision);
             }

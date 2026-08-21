@@ -55,6 +55,22 @@ public sealed class DelayedNasdaqApiTests
     }
 
     [Fact]
+    public void Current_snapshot_includes_aggregated_observations_beyond_the_search_page()
+    {
+        using var data = DelayedNasdaqFixture.Create();
+        data.AddDenseNewerReport();
+        var clock = new FixedTimeProvider(DateTimeOffset.Parse("2026-08-16T10:17:01Z"));
+        var store = new DelayedNasdaqInstrumentStore(data.Path, clock);
+
+        var searchPage = store.Search(null);
+        var snapshot = store.CurrentSnapshot();
+
+        Assert.Equal(20, searchPage.Items.Count);
+        Assert.Equal(21, snapshot.Items.Count);
+        Assert.Contains(snapshot.Items, item => item.Id == "SE0000108656");
+    }
+
+    [Fact]
     public void Archive_scan_verifies_only_the_fixed_newest_report_window()
     {
         using var data = DelayedNasdaqFixture.Create();
