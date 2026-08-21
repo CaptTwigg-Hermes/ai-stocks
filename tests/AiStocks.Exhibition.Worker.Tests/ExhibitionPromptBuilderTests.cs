@@ -98,11 +98,8 @@ public sealed class ExhibitionPromptBuilderTests
         var agent = ContestContract.Agents[0];
         var claim = new AiStocks.Research.Decisions.EvidenceClaim(
             new Uri("https://verified.example/news"), DateTimeOffset.Parse("2026-08-16T10:00:00Z"), "verified excerpt");
-        var strategy = new StrategyUpdate("Durable momentum thesis", ["Review filings"], ["Enter on catalyst"],
-            ["Exit on invalidation"], ["Limit concentration"],
-            [new StrategyThesis("Margins recover", "Guidance is cut")], ["Prefer primary sources"], "Keep watching margins");
         var candidate = new ExhibitionDecision(agent.Id, agent.ModelId, ExhibitionAction.Buy,
-            "SE0000115446", 1, "candidate thesis", 0.5m, [claim], strategy);
+            "SE0000115446", 1, "candidate thesis", 0.5m, [claim]);
         var verified = new VerifiedEvidence(claim.Url, claim.PublishedAt, claim.PublishedAt,
             new string('a', 64), claim.ExactExcerpt);
         var prompt = ExhibitionPromptBuilder.RetryAfterAdvancedSnapshot(
@@ -114,8 +111,6 @@ public sealed class ExhibitionPromptBuilderTests
         Assert.Contains("otherwise return HOLD", prompt, StringComparison.Ordinal);
         Assert.Contains("candidate thesis", prompt, StringComparison.Ordinal);
         Assert.Contains("verified excerpt", prompt, StringComparison.Ordinal);
-        Assert.Contains("Durable momentum thesis", prompt, StringComparison.Ordinal);
-        Assert.Contains("Guidance is cut", prompt, StringComparison.Ordinal);
     }
 
     [Theory]
