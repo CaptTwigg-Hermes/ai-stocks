@@ -251,6 +251,30 @@ public sealed class AiExhibitionFlowTests
     }
 
     [Fact]
+    public void Evidence_excerpt_accepts_api_limit_and_rejects_one_utf16_unit_over()
+    {
+        var store = new PreviewRaceStore(TimeProvider.System);
+        var request = HoldRequest("evidence-boundary-001");
+        StartRun(store, request);
+        var evidence = request.Evidence[0];
+
+        var oversized = request with
+        {
+            Evidence = [evidence with { ExactExcerpt = new string('x', 2_001) }]
+        };
+        Assert.Equal("invalid-evidence",
+            Assert.Throws<PreviewOrderException>(() => store.SubmitAi(oversized)).Code);
+
+        var accepted = request with
+        {
+            Evidence = [evidence with { ExactExcerpt = new string('x', 2_000) }]
+        };
+        store.SubmitAi(accepted);
+        Assert.Equal("succeeded",
+            store.AiProgress().Participants.Single(item => item.AgentId == request.AgentId).Status);
+    }
+
+    [Fact]
     public void New_run_cannot_replace_an_active_queued_or_running_run()
     {
         var store = new PreviewRaceStore(TimeProvider.System);

@@ -23,7 +23,8 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 MAXIMUM_RESPONSE_BYTES = 512 * 1024
 MAXIMUM_VISIBLE_CHARACTERS = 30_000
 MAXIMUM_STRUCTURED_CHARACTERS = 30_000
-MAXIMUM_EVIDENCE_EXCERPT_UTF16 = 4_000
+MAXIMUM_STRUCTURED_ITEM_UTF16 = 4_000
+MAXIMUM_EVIDENCE_EXCERPT_UTF16 = 2_000
 MAXIMUM_PUBLICATION_ITEM_CHARACTERS = 512
 MAXIMUM_REDIRECTS = 4
 MAXIMUM_OPERATION_SECONDS = 15
@@ -303,7 +304,8 @@ def extract_document(url: str, content_type: str, body: bytes) -> dict[str, obje
                 continue
     else:
         visible = re.sub(r"\s+", " ", text).strip()
-    structured = _bounded_unique_text(structured, MAXIMUM_STRUCTURED_CHARACTERS)
+    structured = _bounded_unique_text(
+        structured, MAXIMUM_STRUCTURED_CHARACTERS, MAXIMUM_STRUCTURED_ITEM_UTF16)
     verifier_time = _one_verifier_publication_time(authority_publication + structured_publication)
     if malformed_structured_metadata:
         eligible = False
@@ -314,7 +316,7 @@ def extract_document(url: str, content_type: str, body: bytes) -> dict[str, obje
         reason = "ambiguous-publication-time"
         candidates: list[str] = []
     elif has_external_stylesheet or has_css:
-        candidates = structured
+        candidates = _bounded_unique_text(structured, MAXIMUM_VISIBLE_CHARACTERS)
         eligible = bool(candidates)
         reason = None if eligible else "external-stylesheet-without-structured-article-text"
     elif has_unsupported_visibility or has_visibility_controls:
@@ -435,7 +437,9 @@ def _one_verifier_publication_time(values: list[str]) -> str | None:
     return next(iter(parsed.values())) if len(parsed) == 1 else None
 
 
-def _bounded_unique_text(values: list[str], maximum_characters: int) -> list[str]:
+def _bounded_unique_text(
+        values: list[str], maximum_characters: int,
+        maximum_item_utf16: int = MAXIMUM_EVIDENCE_EXCERPT_UTF16) -> list[str]:
     output: list[str] = []
     seen: set[str] = set()
     remaining = maximum_characters
@@ -443,7 +447,7 @@ def _bounded_unique_text(values: list[str], maximum_characters: int) -> list[str
         if value in seen or remaining <= 0:
             continue
         seen.add(value)
-        bounded = _truncate_utf16(value, MAXIMUM_EVIDENCE_EXCERPT_UTF16)[:remaining]
+        bounded = _truncate_utf16(value, maximum_item_utf16)[:remaining]
         if bounded:
             output.append(bounded)
             remaining -= len(bounded)

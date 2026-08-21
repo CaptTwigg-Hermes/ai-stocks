@@ -245,8 +245,8 @@ def test_structured_output_has_one_aggregate_character_bound():
                for value in result["structured_article_text"])
 
 
-@pytest.mark.parametrize("candidate", ["x" * 4_001, "😀" * 2_001])
-def test_each_evidence_candidate_fits_decision_parser_utf16_bound(candidate):
+@pytest.mark.parametrize("candidate", ["x" * 2_001, "😀" * 1_001])
+def test_each_evidence_candidate_fits_api_intake_utf16_bound(candidate):
     module = load_module()
     payload = json.dumps({
         "@type": "NewsArticle",
@@ -260,7 +260,7 @@ def test_each_evidence_candidate_fits_decision_parser_utf16_bound(candidate):
     result = module.extract_document("https://example.com/news", "text/html", document)
     assert result["verifier_eligible"] is True
     assert len(result["evidence_candidates"]) == 1
-    assert len(result["evidence_candidates"][0].encode("utf-16-le")) // 2 <= 4_000
+    assert len(result["evidence_candidates"][0].encode("utf-16-le")) // 2 <= 2_000
 
 
 def test_external_css_body_text_is_discovery_only():
