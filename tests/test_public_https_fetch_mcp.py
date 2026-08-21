@@ -339,6 +339,24 @@ def test_title_text_is_never_verifier_eligible_even_when_misplaced():
     assert result["evidence_candidates"] == ["Body catalyst."]
 
 
+def test_plain_html_rejects_double_encoded_entity_but_allows_literal_ampersand():
+    module = load_module()
+    metadata = '<meta name="datePublished" content="2026-08-19T08:00:00Z">'
+    unstable = module.extract_document(
+        "https://example.com/news", "text/html",
+        f"<html><head>{metadata}</head><body><p>A &amp;amp; B</p></body></html>".encode(),
+    )
+    assert unstable["evidence_candidates"] == []
+    assert unstable["verifier_eligible"] is False
+
+    stable = module.extract_document(
+        "https://example.com/news", "text/html",
+        f"<html><head>{metadata}</head><body><p>A &amp; B</p></body></html>".encode(),
+    )
+    assert stable["evidence_candidates"] == ["A & B"]
+    assert stable["verifier_eligible"] is True
+
+
 def test_all_publication_metadata_is_checked_before_output_bounding():
     module = load_module()
     instant = datetime(2026, 8, 19, 8, tzinfo=timezone.utc)

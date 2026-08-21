@@ -242,7 +242,7 @@ class _DocumentParser(HTMLParser):
                 for character in data
             ):
                 evidence_value = DOTNET_WHITESPACE_RE.sub(" ", data).strip(" ")
-                if evidence_value:
+                if evidence_value and html.unescape(evidence_value) == evidence_value:
                     self.evidence_visible.append(evidence_value)
 
 
