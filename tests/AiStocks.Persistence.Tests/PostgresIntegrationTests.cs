@@ -512,6 +512,45 @@ public sealed class PostgresIntegrationTests
                 await Execute(connection, "UPDATE market_observations SET complete_history_sessions=1");
                 await Execute(connection, "ALTER TABLE market_observations ENABLE TRIGGER market_observations_no_update_delete");
             }
+            await using var recoveredCounts = new NpgsqlCommand("""
+                SELECT (SELECT count(*) FROM raw_market_reports),
+                       (SELECT count(*) FROM market_session_manifests),
+                       (SELECT count(*) FROM market_strict_trade_rows),
+                       (SELECT count(*) FROM market_observations)
+                """, connection);
+            long[] expectedCounts;
+            await using (var beforeRecovery = await recoveredCounts.ExecuteReaderAsync())
+            {
+                Assert.True(await beforeRecovery.ReadAsync());
+                expectedCounts =
+                [
+                    beforeRecovery.GetInt64(0), beforeRecovery.GetInt64(1),
+                    beforeRecovery.GetInt64(2), beforeRecovery.GetInt64(3)
+                ];
+            }
+
+            var recoveredRoot = Path.Combine(root, "recovered-archive");
+            var recoveredArchive = new ImmutableArchive(recoveredRoot);
+            var recoveredManifests = new SessionManifestStore(recoveredRoot);
+            var recoveredReports = SessionManifest.ExpectedReports(session).Select(name => recoveredArchive.Archive(name, csv,
+                new Uri($"https://tradereports.nasdaq.com/api/regulatory/trade-report/download?type=POST_TRADE&assetClass=EQUITY&fileName={name}"),
+                session.Close.AddHours(2))).ToArray();
+            var recoveredManifestPath = recoveredManifests.Save(session, recoveredReports, session.Close.AddHours(3));
+            var recoveredPersistence = new PostgresCollectorPersistence(connectionString, recoveredArchive, recoveredManifests,
+                firds, statuses, null, null);
+            await recoveredPersistence.PersistAsync(new CollectionResult([], [recoveredManifestPath], []),
+                session.Close.AddHours(3), CancellationToken.None);
+
+            await using (var afterRecovery = await recoveredCounts.ExecuteReaderAsync())
+            {
+                Assert.True(await afterRecovery.ReadAsync());
+                var actualCounts = new long[]
+                {
+                    afterRecovery.GetInt64(0), afterRecovery.GetInt64(1),
+                    afterRecovery.GetInt64(2), afterRecovery.GetInt64(3)
+                };
+                Assert.Equal(expectedCounts, actualCounts);
+            }
             await persistence.PersistAsync(new CollectionResult([], [manifestPath], []), session.Close.AddHours(1), CancellationToken.None);
             Assert.Equal(await ScalarLong(connection, "SELECT count(*) FROM market_strict_trade_rows"),
                 await ScalarLong(connection, "SELECT count(*) FROM market_observations"));

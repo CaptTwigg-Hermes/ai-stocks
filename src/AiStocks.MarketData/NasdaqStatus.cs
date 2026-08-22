@@ -59,7 +59,15 @@ public sealed partial class NasdaqStatusMachine
         SignerKeyId = signerKeyId; SignerKeySha256 = signerKeySha256;
         _durableStatePath = Path.GetFullPath(durableStatePath);
         _events = events?.ToList() ?? [];
-        _rssArtifacts = rssArtifacts?.ToList() ?? [];
+        var persistedArtifacts = rssArtifacts?.ToArray() ?? [];
+        var eventArtifactKeys = _events.Where(item => item.RssSha256 is not null && item.RssRetrievedAt is not null)
+            .Select(item => (item.RssSha256!, item.RssRetrievedAt!.Value)).ToHashSet();
+        _rssArtifacts = persistedArtifacts
+            .Where(item => eventArtifactKeys.Contains((item.Sha256, item.RetrievedAt)))
+            .Concat(persistedArtifacts.GroupBy(item => (item.Sha256, item.Source, item.RawPath))
+                .Select(group => group.MinBy(item => item.RetrievedAt)!))
+            .DistinctBy(item => (item.Sha256, item.RetrievedAt))
+            .OrderBy(item => item.RetrievedAt).ToList();
         _eventIds = _events.Select(x => x.Id).ToHashSet(StringComparer.Ordinal);
         _latestPublishedAt = _events.Count == 0 ? seedAsOf : DateTimeOffset.Compare(seedAsOf, _events.Max(x => x.PublishedAt)) >= 0
             ? seedAsOf : _events.Max(x => x.PublishedAt);
@@ -212,7 +220,9 @@ public sealed partial class NasdaqStatusMachine
         {
             _eventIds.Add(entry.Id); _events.Add(entry); _states[entry.Isin] = entry.State; _latestPublishedAt = entry.PublishedAt;
         }
-        if (artifact is not null) _rssArtifacts.Add(artifact);
+        if (artifact is not null && !_rssArtifacts.Any(existing =>
+                existing.Sha256 == artifact.Sha256 && existing.Source == artifact.Source && existing.RawPath == artifact.RawPath))
+            _rssArtifacts.Add(artifact);
         Persist();
     }
 

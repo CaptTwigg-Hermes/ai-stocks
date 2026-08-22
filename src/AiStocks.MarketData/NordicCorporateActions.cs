@@ -34,7 +34,11 @@ public sealed partial class UnsupportedCorporateActionStore
     private static readonly IReadOnlyDictionary<string, string> VenueCurrencies =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["XSTO"] = "SEK", ["XCSE"] = "DKK", ["XHEL"] = "EUR", ["ONSE"] = "NOK", ["XICE"] = "ISK"
+            ["XSTO"] = "SEK",
+            ["XCSE"] = "DKK",
+            ["XHEL"] = "EUR",
+            ["ONSE"] = "NOK",
+            ["XICE"] = "ISK"
         };
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web) { WriteIndented = true };

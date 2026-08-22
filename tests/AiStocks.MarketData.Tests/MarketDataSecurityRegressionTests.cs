@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using AiStocks.MarketData;
 
 namespace AiStocks.MarketData.Tests;
@@ -171,6 +173,66 @@ public sealed class MarketDataSecurityRegressionTests
     }
 
     [Fact]
+    public void DurableFirdsStateLoadsChecksumValidLegacyVersionsWithoutKind()
+    {
+        using var temp = new TemporaryDirectory();
+        var path = Path.Combine(temp.Path, "firds.json");
+        var store = new DurableFirdsStore(path);
+        var bytes = File.ReadAllBytes(Fixture("firds-full.xml"));
+        store.ApplyFull(new MemoryStream(bytes), new DateOnly(2026, 8, 6),
+            new Uri("https://firds.esma.europa.eu/firds/FULINS_E_20260806_01of01.zip"),
+            Convert.ToHexStringLower(SHA256.HashData(bytes)), "full-10", 10);
+
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
+        var envelope = JsonNode.Parse(File.ReadAllBytes(path))!.AsObject();
+        var state = envelope["state"]!.AsObject();
+        foreach (var version in state["versions"]!.AsArray()) version!.AsObject().Remove("kind");
+        envelope["sha256"] = Convert.ToHexStringLower(SHA256.HashData(
+            JsonSerializer.SerializeToUtf8Bytes(state, options)));
+        File.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(envelope, options));
+
+        var loaded = new DurableFirdsStore(path).LoadVerified();
+        Assert.Equal(10, loaded.Cursor);
+        Assert.Null(loaded.Versions[0].Kind);
+    }
+
+    [Fact]
+    public void LegacyFirdsProjectionRejectsContradictoryFullFilenameFamily()
+    {
+        using var temp = new TemporaryDirectory();
+        var path = Path.Combine(temp.Path, "firds.json");
+        var store = new DurableFirdsStore(path);
+        var bytes = File.ReadAllBytes(Fixture("firds-full.xml"));
+        store.ApplyFull(new MemoryStream(bytes), new DateOnly(2026, 8, 6),
+            new Uri("https://firds.esma.europa.eu/firds/DLTINS_E_20260806_01of01.zip"),
+            Convert.ToHexStringLower(SHA256.HashData(bytes)), "full-10", 10);
+        RewriteAsLegacyFirdsState(path);
+
+        var destination = new DurableFirdsStore(Path.Combine(temp.Path, "nordic.json"),
+            FirdsUniverse.NordicExhibition);
+        Assert.Throws<MarketDataException>(() => store.ProjectVerifiedTo(destination));
+    }
+
+    [Fact]
+    public void LegacyFirdsProjectionRejectsMismatchedMultipartIdentity()
+    {
+        using var temp = new TemporaryDirectory();
+        var path = Path.Combine(temp.Path, "firds.json");
+        var store = new DurableFirdsStore(path);
+        var bytes = File.ReadAllBytes(Fixture("firds-full.xml"));
+        var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        store.ApplyFull(new MemoryStream(bytes), new DateOnly(2026, 8, 6),
+            new Uri("https://firds.esma.europa.eu/firds/FULINS_E_20260806_01of02.zip"), hash, "full-1", 1);
+        store.ApplyFullPart(new MemoryStream(bytes), new DateOnly(2026, 8, 6),
+            new Uri("https://firds.esma.europa.eu/firds/FULINS_E_20260806_02of03.zip"), hash, "full-2", 2);
+        RewriteAsLegacyFirdsState(path);
+
+        var destination = new DurableFirdsStore(Path.Combine(temp.Path, "nordic.json"),
+            FirdsUniverse.NordicExhibition);
+        Assert.Throws<MarketDataException>(() => store.ProjectVerifiedTo(destination));
+    }
+
+    [Fact]
     public void OfficialFirdsZipIsExtractedAndMultipartFullRetainsEveryPartProvenance()
     {
         using var temp = new TemporaryDirectory();
@@ -304,7 +366,7 @@ public sealed class MarketDataSecurityRegressionTests
         Assert.Single(firds.LoadVerified().Instruments);
         Assert.Single(nordicFirds.LoadVerified().Instruments);
         Assert.Equal(InstrumentTradingState.Suspended, statuses.StateOf("SE0000108656"));
-        Assert.Equal(2, statuses.RssArtifacts.Count);
+        Assert.Single(statuses.RssArtifacts);
         var artifact = statuses.RssArtifacts[0];
         Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(rss)), artifact.Sha256);
         Assert.True(File.Exists(artifact.RawPath));
@@ -479,7 +541,7 @@ public sealed class MarketDataSecurityRegressionTests
         {
             requested = request.RequestUri;
             return new(System.Net.HttpStatusCode.OK)
-                { Content = new ByteArrayContent(Encoding.UTF8.GetBytes(xml)) };
+            { Content = new ByteArrayContent(Encoding.UTF8.GetBytes(xml)) };
         }));
         var store = new EcbFxStore(temp.Path);
 
@@ -496,6 +558,17 @@ public sealed class MarketDataSecurityRegressionTests
         var result = new List<DateOnly>();
         for (var day = ending; result.Count < count; day = day.AddDays(-1)) if (StockholmCalendar.GetSession(day) is not null) result.Add(day);
         result.Reverse(); return result;
+    }
+
+    private static void RewriteAsLegacyFirdsState(string path)
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
+        var envelope = JsonNode.Parse(File.ReadAllBytes(path))!.AsObject();
+        var state = envelope["state"]!.AsObject();
+        foreach (var version in state["versions"]!.AsArray()) version!.AsObject().Remove("kind");
+        envelope["sha256"] = Convert.ToHexStringLower(SHA256.HashData(
+            JsonSerializer.SerializeToUtf8Bytes(state, options)));
+        File.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(envelope, options));
     }
 
     private static Stream Rss(string id, string published, string state) => new MemoryStream(Encoding.UTF8.GetBytes($"<rss><channel><item><guid>{id}</guid><title>SE0000108656 {state}</title><description>{state}</description><pubDate>{published}</pubDate><link>https://api.news.eu.nasdaq.com/news/{id}</link></item></channel></rss>"));

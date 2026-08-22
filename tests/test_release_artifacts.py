@@ -73,7 +73,7 @@ def test_dockge_compose_separates_and_hardens_services():
     collector_environment = services["collector"]["environment"]
     assert "COLLECT_NORDIC_EXHIBITION" not in collector_environment
     assert "COLLECT_NORDIC_EXHIBITION" not in services["warmup-collector"]["environment"]
-    assert services["preview-collector"]["environment"]["COLLECT_NORDIC_EXHIBITION"] == "1"
+    assert services["preview-collector"]["environment"]["COLLECT_NORDIC_EXHIBITION"] == "true"
     assert collector_environment["CORPORATE_ACTION_INPUT_PATH"] == "/run/corporate-actions"
     assert collector_environment["FIRDS_ACQUISITION_PLAN_PATH"] == "/run/market-bootstrap/firds-plan.json"
     assert not any(name.startswith("STATUS_SEED_") for name in collector_environment)

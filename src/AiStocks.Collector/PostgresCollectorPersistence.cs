@@ -226,7 +226,7 @@ public sealed class PostgresCollectorPersistence(
             """, "PostgreSQL trading session identity conflict", cancellationToken, verifiedManifest.Manifest.SessionId,
             session.Day, session.Open.ToUniversalTime(), session.Close.ToUniversalTime(),
             session.Day == StockholmCalendar.FinalSession2026().Day).ConfigureAwait(false);
-        var rawIds = new Dictionary<string, Guid>(StringComparer.Ordinal);
+        var rawReports = new Dictionary<string, (Guid Id, DateTimeOffset RetrievedAt)>(StringComparer.Ordinal);
         foreach (var reportEntry in verifiedManifest.Manifest.Reports)
         {
             var report = archive.Verify(reportEntry.Report);
@@ -241,15 +241,21 @@ public sealed class PostgresCollectorPersistence(
             raw.Parameters.AddWithValue(retrievedAt); raw.Parameters.AddWithValue(File.ReadAllBytes(report.CsvPath)); raw.Parameters.AddWithValue(report.Sha256);
             raw.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = metadata });
             await raw.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            await using var lookup = new NpgsqlCommand("SELECT id,payload_hash::text,source_url,retrieved_at=$3,metadata_json=$2::jsonb FROM raw_market_reports WHERE report_name=$1", connection, transaction);
-            lookup.Parameters.AddWithValue(report.Report);
-            lookup.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = metadata });
-            lookup.Parameters.AddWithValue(retrievedAt);
+            await using var lookup = new NpgsqlCommand("""
+                SELECT id,retrieved_at,payload_hash::text=$2,source_url=$4,octet_length(payload)=$3,
+                       COALESCE(metadata_json->>'Report'=$1,false),COALESCE(metadata_json->>'Sha256'=$2,false),
+                       COALESCE((metadata_json->>'Bytes')::bigint=$3,false),
+                       COALESCE(metadata_json->>'sourceUrl'=$4,false)
+                FROM raw_market_reports WHERE report_name=$1
+                """, connection, transaction);
+            lookup.Parameters.AddWithValue(report.Report); lookup.Parameters.AddWithValue(report.Sha256);
+            lookup.Parameters.AddWithValue(report.Bytes); lookup.Parameters.AddWithValue(report.SourceUrl.AbsoluteUri);
             await using var reader = await lookup.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || reader.GetGuid(0) != id || reader.GetString(1) != report.Sha256 ||
-                reader.GetString(2) != report.SourceUrl.AbsoluteUri || !reader.GetBoolean(3) || !reader.GetBoolean(4))
+            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || reader.GetGuid(0) != id ||
+                !reader.GetBoolean(2) || !reader.GetBoolean(3) || !reader.GetBoolean(4) || !reader.GetBoolean(5) ||
+                !reader.GetBoolean(6) || !reader.GetBoolean(7) || !reader.GetBoolean(8))
                 throw new MarketDataException("PostgreSQL raw report identity conflict");
-            rawIds[report.Report] = reader.GetGuid(0);
+            rawReports[report.Report] = (reader.GetGuid(0), reader.GetFieldValue<DateTimeOffset>(1));
         }
         var finalizedAt = NormalizeDatabaseTimestamp(verifiedManifest.Manifest.FinalizedAt);
         await using (var manifest = new NpgsqlCommand("""
@@ -262,12 +268,20 @@ public sealed class PostgresCollectorPersistence(
             manifest.Parameters.AddWithValue(verifiedManifest.Manifest.Reports.Count);
             await manifest.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
-        await RequireMatchAsync(connection, transaction, """
-            SELECT manifest_hash=$2 AND finalized_at=$3 AND source_listing_url=$4 AND report_count=$5 AND complete
+        await using var manifestLookup = new NpgsqlCommand("""
+            SELECT manifest_hash,source_listing_url=$2,report_count=$3,complete,finalized_at >= $4
             FROM market_session_manifests WHERE session_id=$1
-            """, "PostgreSQL session manifest identity conflict", cancellationToken, verifiedManifest.Manifest.SessionId,
-            verifiedManifest.Sha256, finalizedAt,
-            verifiedManifest.Manifest.SourceListingUrl, verifiedManifest.Manifest.Reports.Count).ConfigureAwait(false);
+            """, connection, transaction);
+        manifestLookup.Parameters.AddWithValue(verifiedManifest.Manifest.SessionId);
+        manifestLookup.Parameters.AddWithValue(verifiedManifest.Manifest.SourceListingUrl);
+        manifestLookup.Parameters.AddWithValue(verifiedManifest.Manifest.Reports.Count);
+        manifestLookup.Parameters.AddWithValue(session.Close.AddMinutes(15).ToUniversalTime());
+        await using var manifestReader = await manifestLookup.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await manifestReader.ReadAsync(cancellationToken).ConfigureAwait(false) || !manifestReader.GetBoolean(1) ||
+            !manifestReader.GetBoolean(2) || !manifestReader.GetBoolean(3) || !manifestReader.GetBoolean(4))
+            throw new MarketDataException("PostgreSQL session manifest identity conflict");
+        var canonicalManifestHash = manifestReader.GetString(0);
+        await manifestReader.DisposeAsync().ConfigureAwait(false);
         var instrumentIds = await LoadInstrumentIdsAsync(connection, transaction, instruments, cancellationToken).ConfigureAwait(false);
         var totals = instruments.ToDictionary(x => (x.Isin, x.OrderBookId), _ => (Value: 0m, Count: 0));
         var projectedTrades = new List<(NasdaqTrade Trade, FirdsInstrument Instrument, Guid StrictId, Guid RawId)>();
@@ -280,16 +294,16 @@ public sealed class PostgresCollectorPersistence(
                 """, connection, transaction))
             {
                 member.Parameters.AddWithValue(verifiedManifest.Manifest.SessionId); member.Parameters.AddWithValue(ordinal);
-                member.Parameters.AddWithValue(rawIds[entry.Report]); member.Parameters.AddWithValue(entry.Report); member.Parameters.AddWithValue(entry.Sha256);
+                member.Parameters.AddWithValue(rawReports[entry.Report].Id); member.Parameters.AddWithValue(entry.Report); member.Parameters.AddWithValue(entry.Sha256);
                 await member.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
             await RequireMatchAsync(connection, transaction, """
                 SELECT raw_market_report_id=$3 AND report_name=$4 AND payload_hash=$5
                 FROM market_manifest_reports WHERE session_id=$1 AND ordinal=$2
                 """, "PostgreSQL manifest member identity conflict", cancellationToken,
-                verifiedManifest.Manifest.SessionId, ordinal, rawIds[entry.Report], entry.Report, entry.Sha256).ConfigureAwait(false);
+                verifiedManifest.Manifest.SessionId, ordinal, rawReports[entry.Report].Id, entry.Report, entry.Sha256).ConfigureAwait(false);
             var report = archive.Verify(entry.Report);
-            foreach (var trade in NasdaqCsvParser.Parse(File.ReadAllBytes(report.CsvPath), report.FetchedAt)
+            foreach (var trade in NasdaqCsvParser.Parse(File.ReadAllBytes(report.CsvPath), rawReports[entry.Report].RetrievedAt)
                 .Where(x => x.Venue == "XSTO" && x.Currency == "SEK" && x.PriceNotation == "MONE" && session.Contains(x.ExecutedAt)))
             {
                 var instrument = TradeInstrumentMapper.TryResolve(trade, instruments);
@@ -305,7 +319,7 @@ public sealed class PostgresCollectorPersistence(
                     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING
                     """, connection, transaction);
                 row.Parameters.AddWithValue(strictId);
-                row.Parameters.AddWithValue(verifiedManifest.Manifest.SessionId); row.Parameters.AddWithValue(rawIds[entry.Report]);
+                row.Parameters.AddWithValue(verifiedManifest.Manifest.SessionId); row.Parameters.AddWithValue(rawReports[entry.Report].Id);
                 row.Parameters.AddWithValue(instrumentIds[key]); row.Parameters.AddWithValue(trade.TransactionId);
                 row.Parameters.AddWithValue(tradedAt); row.Parameters.AddWithValue(publishedAt); row.Parameters.AddWithValue(retrievedAt);
                 row.Parameters.AddWithValue(trade.Price); row.Parameters.AddWithValue(trade.Quantity); row.Parameters.AddWithValue(trade.Flags);
@@ -315,10 +329,10 @@ public sealed class PostgresCollectorPersistence(
                        AND traded_at=$6 AND published_at=$7 AND retrieved_at=$8 AND price=$9 AND quantity=$10 AND flags=$11
                     FROM market_strict_trade_rows WHERE id=$1
                     """, "PostgreSQL strict trade identity conflict", cancellationToken, strictId,
-                    verifiedManifest.Manifest.SessionId, rawIds[entry.Report], instrumentIds[key], trade.TransactionId,
+                    verifiedManifest.Manifest.SessionId, rawReports[entry.Report].Id, instrumentIds[key], trade.TransactionId,
                     tradedAt, publishedAt, retrievedAt,
                     trade.Price, trade.Quantity, trade.Flags).ConfigureAwait(false);
-                projectedTrades.Add((trade, instrument, strictId, rawIds[entry.Report]));
+                projectedTrades.Add((trade, instrument, strictId, rawReports[entry.Report].Id));
             }
         }
         foreach (var (key, total) in totals)
@@ -354,7 +368,7 @@ public sealed class PostgresCollectorPersistence(
             var sourceJson = JsonSerializer.Serialize(new
             {
                 strictTradeRowId = item.StrictId,
-                manifestHash = verifiedManifest.Sha256,
+                manifestHash = canonicalManifestHash,
                 isin = item.Instrument.Isin,
                 orderBookId = item.Instrument.OrderBookId,
                 transactionId = item.Trade.TransactionId

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -173,9 +174,17 @@ public sealed class DurableFirdsStore
         if (!File.Exists(_path)) throw new MarketDataException("Durable FIRDS state is missing");
         try
         {
-            var envelope = JsonSerializer.Deserialize<Envelope>(File.ReadAllBytes(_path), JsonOptions) ?? throw new JsonException();
+            var bytes = File.ReadAllBytes(_path);
+            var envelope = JsonSerializer.Deserialize<Envelope>(bytes, JsonOptions) ?? throw new JsonException();
             var actual = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(envelope.State, JsonOptions)));
-            if (actual != envelope.Sha256 || envelope.State.Cursor <= 0 || envelope.State.Versions.Count == 0 ||
+            using var document = JsonDocument.Parse(bytes);
+            var stateElement = document.RootElement.GetProperty("state");
+            var legacyActual = envelope.State.Versions.All(version => version.Kind is null) && IsLegacyShape(stateElement)
+                ? Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
+                    JsonNode.Parse(stateElement.GetRawText()), JsonOptions)))
+                : null;
+            if ((actual != envelope.Sha256 && legacyActual != envelope.Sha256) ||
+                envelope.State.Cursor <= 0 || envelope.State.Versions.Count == 0 ||
                 envelope.State.Versions[^1].Cursor != envelope.State.Cursor) throw new MarketDataException("Durable FIRDS state checksum/cursor is invalid");
             foreach (var version in envelope.State.Versions)
                 if (Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(version.RawPath))) != version.Sha256)
@@ -196,16 +205,15 @@ public sealed class DurableFirdsStore
         var projected = destination.Exists ? destination.LoadVerified() : null;
         if (projected is not null && projected.Cursor > source.Cursor)
             throw new MarketDataException("Projected FIRDS state is ahead of its verified source");
-        foreach (var version in source.Versions.OrderBy(item => item.Cursor))
+        foreach (var (version, kind) in ResolveSourceKinds(source.Versions))
         {
             if (projected is not null && version.Cursor <= projected.Cursor) continue;
             var bytes = File.ReadAllBytes(version.RawPath);
             using var xml = new MemoryStream(bytes, writable: false);
             var effectiveAt = SourceDate(version);
-            var kind = version.Kind ?? (projected is null ? "full" : version.IsFull ? "full-part" : "delta");
             if (projected is null)
             {
-                if (kind is not ("full" or "full-part"))
+                if (kind != "full")
                     throw new MarketDataException("Projected FIRDS state lacks a full baseline");
                 destination.ApplyFull(xml, effectiveAt, version.SourceUrl, version.Sha256,
                     version.Version, version.Cursor);
@@ -229,6 +237,60 @@ public sealed class DurableFirdsStore
             projected = destination.LoadVerified();
         }
         return projected ?? throw new MarketDataException("Projected FIRDS state contains no verified baseline");
+    }
+
+    private static IReadOnlyList<(FirdsSourceVersion Version, string Kind)> ResolveSourceKinds(
+        IReadOnlyList<FirdsSourceVersion> versions)
+    {
+        var result = new List<(FirdsSourceVersion, string)>(versions.Count);
+        (string Family, string Stem, int Total, int NextPart)? pending = null;
+        foreach (var version in versions.OrderBy(item => item.Cursor))
+        {
+            if (version.Kind is { } currentKind && pending is null)
+            {
+                if (currentKind is not ("full" or "full-part" or "delta") ||
+                    version.IsFull != (currentKind != "delta"))
+                    throw new MarketDataException("Projected FIRDS source kind is invalid");
+                result.Add((version, currentKind));
+                continue;
+            }
+            var (family, stem, part, total) = SourceIdentity(version);
+            var kind = version.Kind ?? (version.IsFull ? part == 1 ? "full" : "full-part" : "delta");
+            if (kind is not ("full" or "full-part" or "delta"))
+                throw new MarketDataException("Projected FIRDS source kind is invalid");
+            var expectedFamily = kind == "delta" ? "DLTINS" : "FULINS";
+            if (family != expectedFamily || version.IsFull != (kind != "delta") ||
+                kind == "full" && part != 1 || kind == "full-part" && part == 1)
+                throw new MarketDataException("FIRDS source kind contradicts its provenance");
+            if (pending is { } group)
+            {
+                if (family != group.Family || stem != group.Stem || total != group.Total || part != group.NextPart)
+                    throw new MarketDataException("FIRDS multipart provenance is incoherent");
+            }
+            else if (part != 1)
+                throw new MarketDataException("FIRDS multipart provenance lacks its first part");
+            pending = part < total ? (family, stem, total, part + 1) : null;
+            result.Add((version, kind));
+        }
+        if (pending is not null) throw new MarketDataException("FIRDS multipart provenance is incomplete");
+        return result;
+    }
+
+    private static (string Family, string Stem, int Part, int Total) SourceIdentity(FirdsSourceVersion version)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(version.SourceUrl.AbsolutePath);
+        var markerIndex = fileName.LastIndexOf('_');
+        if (markerIndex <= 0) throw new MarketDataException("FIRDS source identity is malformed");
+        var stem = fileName[..markerIndex];
+        var stemParts = stem.Split('_');
+        var markerParts = fileName[(markerIndex + 1)..].Split("of", StringSplitOptions.None);
+        if (stemParts is not { Length: 3 } || stemParts[1] != "E" || stemParts[2].Length != 8 ||
+            !DateOnly.TryParseExact(stemParts[2], "yyyyMMdd", out _) || markerParts is not { Length: 2 } ||
+            markerParts[0].Length != 2 || markerParts[1].Length != 2 ||
+            !int.TryParse(markerParts[0], out var part) || !int.TryParse(markerParts[1], out var total) ||
+            part <= 0 || total <= 0 || part > total)
+            throw new MarketDataException("FIRDS source identity is malformed");
+        return (stemParts[0], stem, part, total);
     }
 
     private static DateOnly SourceDate(FirdsSourceVersion version)
@@ -287,4 +349,15 @@ public sealed class DurableFirdsStore
         return path;
     }
     private sealed record Envelope(string Sha256, FirdsSnapshot State);
+    private static bool IsLegacyShape(JsonElement state)
+    {
+        static bool Exact(JsonElement value, params string[] names) => value.ValueKind == JsonValueKind.Object &&
+            value.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal)
+                .SetEquals(names);
+        return Exact(state, "cursor", "instruments", "versions") &&
+            state.GetProperty("instruments").EnumerateArray().All(item => Exact(item,
+                "isin", "orderBookId", "issuerId", "name", "cfi", "currency", "venue", "firstTradeDate", "terminationDate")) &&
+            state.GetProperty("versions").EnumerateArray().All(item => Exact(item,
+                "version", "cursor", "sourceUrl", "sha256", "appliedAt", "isFull", "rawPath"));
+    }
 }

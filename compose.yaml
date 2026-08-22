@@ -248,7 +248,7 @@ services:
     image: ${AISTOCKS_IMAGE_REPOSITORY:-ghcr.io/capttwigg-hermes/ai-stocks}:collector-${AISTOCKS_IMAGE_VERSION:-latest}
     environment:
       APP_ENV: production
-      COLLECT_NORDIC_EXHIBITION: "1"
+      COLLECT_NORDIC_EXHIBITION: "true"
       COLLECTOR_DATABASE_URL: ${COLLECTOR_DATABASE_URL:?set the least-privilege collector PostgreSQL URL}
       ARCHIVE_PATH: /data/nasdaq
       FIRDS_ACQUISITION_PLAN_PATH: /run/market-bootstrap/firds-plan.json

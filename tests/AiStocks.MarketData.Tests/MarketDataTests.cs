@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using AiStocks.MarketData;
 
 namespace AiStocks.MarketData.Tests;
@@ -434,6 +436,21 @@ public sealed class MarketDataTests
 
         Assert.Single(projected.Instruments);
         Assert.DoesNotContain(projected.Instruments, item => item.Isin == "DK0010181676");
+
+        var sourcePath = Path.Combine(temp.Path, "strict.json");
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
+        var envelope = JsonNode.Parse(File.ReadAllBytes(sourcePath))!.AsObject();
+        var state = envelope["state"]!.AsObject();
+        foreach (var version in state["versions"]!.AsArray()) version!.AsObject().Remove("kind");
+        envelope["sha256"] = Convert.ToHexStringLower(SHA256.HashData(
+            JsonSerializer.SerializeToUtf8Bytes(state, options)));
+        File.WriteAllBytes(sourcePath, JsonSerializer.SerializeToUtf8Bytes(envelope, options));
+
+        var legacyDestination = new DurableFirdsStore(Path.Combine(temp.Path, "legacy-nordic.json"),
+            FirdsUniverse.NordicExhibition);
+        var legacyProjected = source.ProjectVerifiedTo(legacyDestination);
+        Assert.Single(legacyProjected.Instruments);
+        Assert.DoesNotContain(legacyProjected.Instruments, item => item.Isin == "DK0010181676");
     }
 
     [Fact]
